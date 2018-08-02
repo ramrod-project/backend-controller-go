@@ -1,0 +1,193 @@
+{
+    'Type': 'service', 
+    'Action': 'update', 
+    'Actor': {
+        'ID': 'nuwska004eeelo706ljq452c2', 
+        'Attributes': {
+            'name': 'pcp-test_backend'
+        }
+    }, 
+    'scope': 'swarm', 
+    'time': 1533221452, 
+    'timeNano': 1533221452162910336
+}
+{
+    'Type': 'service',
+    'Action': 'update',
+    'Actor': {
+        'ID': 'nuwska004eeelo706ljq452c2',
+        'Attributes': {
+            'name': 'pcp-test_backend',
+            'updatestate.new': 'updating'
+        }
+    },
+    'scope': 'swarm',
+    'time': 1533221452,
+    'timeNano': 1533221452170018062
+}
+{
+    'status': 'create',
+    'id': 'ffbc8199ddfcb8422e6ff98c9c32b6e16dbe72bdd5990a82d80c4e459535eb68',
+    'from': 'ramrodpcp/backend-interpreter:dev@sha256:ddfbbd6e1e71154fb32a1026fd5b2d90599dd76176cec2eacc34c76f80146125',
+    'Type': 'container',
+    'Action': 'create',
+    'Actor': {
+        'ID': 'ffbc8199ddfcb8422e6ff98c9c32b6e16dbe72bdd5990a82d80c4e459535eb68',
+        'Attributes': {
+            'com.docker.stack.namespace': 'pcp-test',
+            'com.docker.swarm.node.id': 'pbg1dyi94dd8f72kqetsz2js2',
+            'com.docker.swarm.service.id': 'nuwska004eeelo706ljq452c2',
+            'com.docker.swarm.service.name': 'pcp-test_backend',
+            'com.docker.swarm.task': '',
+            'com.docker.swarm.task.id': 'x51cr9hyedsjo6kfxl07gsyg8',
+            'com.docker.swarm.task.name': 'pcp-test_backend.1.x51cr9hyedsjo6kfxl07gsyg8',
+            'image': 'ramrodpcp/backend-interpreter:dev@sha256:ddfbbd6e1e71154fb32a1026fd5b2d90599dd76176cec2eacc34c76f80146125',
+            'name': 'pcp-test_backend.1.x51cr9hyedsjo6kfxl07gsyg8'
+        }
+    },
+    'scope': 'local',
+    'time': 1533221452,
+    'timeNano': 1533221452534133827
+}
+{
+    'status': 'kill',
+    'id': '22a85f0416cbcf1cbc7e4369496427237f80238d3d959d061af04e032b9eae7c',
+    'from': 'ramrodpcp/backend-interpreter:dev@sha256:ddfbbd6e1e71154fb32a1026fd5b2d90599dd76176cec2eacc34c76f80146125',
+    'Type': 'container',
+    'Action': 'kill',
+    'Actor': {
+        'ID': '22a85f0416cbcf1cbc7e4369496427237f80238d3d959d061af04e032b9eae7c',
+        'Attributes': {
+            'com.docker.stack.namespace': 'pcp-test',
+            'com.docker.swarm.node.id': 'pbg1dyi94dd8f72kqetsz2js2',
+            'com.docker.swarm.service.id': 'nuwska004eeelo706ljq452c2',
+            'com.docker.swarm.service.name': 'pcp-test_backend',
+            'com.docker.swarm.task': '',
+            'com.docker.swarm.task.id': 'qwyjiijx9mmxkbegk76xqdnh3',
+            'com.docker.swarm.task.name': 'pcp-test_backend.1.qwyjiijx9mmxkbegk76xqdnh3',
+            'image': 'ramrodpcp/backend-interpreter:dev@sha256:ddfbbd6e1e71154fb32a1026fd5b2d90599dd76176cec2eacc34c76f80146125',
+            'name': 'pcp-test_backend.1.qwyjiijx9mmxkbegk76xqdnh3',
+            'signal': '15'
+        }
+    },
+    'scope': 'local',
+    'time': 1533221455,
+    'timeNano': 1533221455373162269}
+{
+    'status': 'die',
+    'id': '22a85f0416cbcf1cbc7e4369496427237f80238d3d959d061af04e032b9eae7c',
+    'from': 'ramrodpcp/backend-interpreter:dev@sha256:ddfbbd6e1e71154fb32a1026fd5b2d90599dd76176cec2eacc34c76f80146125',
+    'Type': 'container',
+    'Action': 'die',
+    'Actor': {
+        'ID': '22a85f0416cbcf1cbc7e4369496427237f80238d3d959d061af04e032b9eae7c',
+        'Attributes': {
+            'com.docker.stack.namespace': 'pcp-test',
+            'com.docker.swarm.node.id': 'pbg1dyi94dd8f72kqetsz2js2',
+            'com.docker.swarm.service.id': 'nuwska004eeelo706ljq452c2',
+            'com.docker.swarm.service.name': 'pcp-test_backend',
+            'com.docker.swarm.task': '',
+            'com.docker.swarm.task.id': 'qwyjiijx9mmxkbegk76xqdnh3',
+            'com.docker.swarm.task.name': 'pcp-test_backend.1.qwyjiijx9mmxkbegk76xqdnh3',
+            'exitCode': '0',
+            'image': 'ramrodpcp/backend-interpreter:dev@sha256:ddfbbd6e1e71154fb32a1026fd5b2d90599dd76176cec2eacc34c76f80146125',
+            'name': 'pcp-test_backend.1.qwyjiijx9mmxkbegk76xqdnh3'
+        }
+    },
+    'scope': 'local', 
+    'time': 1533221455,
+    'timeNano': 1533221455553027848
+}
+{
+    'Type': 'network',
+    'Action': 'disconnect',
+    'Actor': {
+        'ID': 'aqno3z4rrefo0k8fyu77g7zco',
+        'Attributes': {
+            'container': '22a85f0416cbcf1cbc7e4369496427237f80238d3d959d061af04e032b9eae7c',
+            'name': 'pcp',
+            'type': 'overlay'
+        }
+    },
+    'scope': 'local', 
+    'time': 1533221456,
+    'timeNano': 1533221456002648685
+}
+{
+    'status': 'stop',
+    'id': '22a85f0416cbcf1cbc7e4369496427237f80238d3d959d061af04e032b9eae7c',
+    'from': 'ramrodpcp/backend-interpreter:dev@sha256:ddfbbd6e1e71154fb32a1026fd5b2d90599dd76176cec2eacc34c76f80146125',
+    'Type': 'container',
+    'Action': 'stop',
+    'Actor': {
+        'ID': '22a85f0416cbcf1cbc7e4369496427237f80238d3d959d061af04e032b9eae7c',
+        'Attributes': {
+            'com.docker.stack.namespace': 'pcp-test',
+            'com.docker.swarm.node.id': 'pbg1dyi94dd8f72kqetsz2js2',
+            'com.docker.swarm.service.id': 'nuwska004eeelo706ljq452c2',
+            'com.docker.swarm.service.name': 'pcp-test_backend',
+            'com.docker.swarm.task': '',
+            'com.docker.swarm.task.id': 'qwyjiijx9mmxkbegk76xqdnh3',
+            'com.docker.swarm.task.name': 'pcp-test_backend.1.qwyjiijx9mmxkbegk76xqdnh3',
+            'image': 'ramrodpcp/backend-interpreter:dev@sha256:ddfbbd6e1e71154fb32a1026fd5b2d90599dd76176cec2eacc34c76f80146125',
+            'name': 'pcp-test_backend.1.qwyjiijx9mmxkbegk76xqdnh3'
+        }
+    },
+    'scope': 'local',
+    'time': 1533221456,
+    'timeNano': 1533221456077450070
+}
+{
+    'Type': 'network',
+    'Action': 'connect',
+    'Actor': {
+        'ID': 'aqno3z4rrefo0k8fyu77g7zco',
+        'Attributes': {
+            'container': 'ffbc8199ddfcb8422e6ff98c9c32b6e16dbe72bdd5990a82d80c4e459535eb68',
+            'name': 'pcp',
+            'type': 'overlay'
+        }
+    },
+    'scope': 'local',
+    'time': 1533221456,
+    'timeNano': 1533221456404219875
+}
+{
+    'status': 'start',
+    'id': 'ffbc8199ddfcb8422e6ff98c9c32b6e16dbe72bdd5990a82d80c4e459535eb68',
+    'from': 'ramrodpcp/backend-interpreter:dev@sha256:ddfbbd6e1e71154fb32a1026fd5b2d90599dd76176cec2eacc34c76f80146125',
+    'Type': 'container',
+    'Action': 'start',
+    'Actor': {
+        'ID': 'ffbc8199ddfcb8422e6ff98c9c32b6e16dbe72bdd5990a82d80c4e459535eb68',
+        'Attributes': {
+            'com.docker.stack.namespace': 'pcp-test',
+            'com.docker.swarm.node.id': 'pbg1dyi94dd8f72kqetsz2js2',
+            'com.docker.swarm.service.id': 'nuwska004eeelo706ljq452c2',
+            'com.docker.swarm.service.name': 'pcp-test_backend',
+            'com.docker.swarm.task': '',
+            'com.docker.swarm.task.id': 'x51cr9hyedsjo6kfxl07gsyg8',
+            'com.docker.swarm.task.name': 'pcp-test_backend.1.x51cr9hyedsjo6kfxl07gsyg8',
+            'image': 'ramrodpcp/backend-interpreter:dev@sha256:ddfbbd6e1e71154fb32a1026fd5b2d90599dd76176cec2eacc34c76f80146125',
+            'name': 'pcp-test_backend.1.x51cr9hyedsjo6kfxl07gsyg8'
+        }
+    },
+    'scope': 'local',
+    'time': 1533221456,
+    'timeNano': 1533221456884767740
+}
+{
+    'Type': 'service',
+    'Action': 'update',
+    'Actor': {
+        'ID': 'nuwska004eeelo706ljq452c2',
+        'Attributes': {
+            'name': 'pcp-test_backend',
+            'updatestate.new': 'completed',
+            'updatestate.old': 'updating'
+        }
+    },
+    'scope': 'swarm',
+    'time': 1533221462,
+    'timeNano': 1533221462057397809
+}
