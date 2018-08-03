@@ -64,30 +64,54 @@ func (e *ControllerError) Error() string {
 
 func newPlugin(change map[string]interface{}) (*Plugin, error) {
 	var (
-		desired PluginDesiredState
+		desired  PluginDesiredState
+		state    PluginState
+		extports []string
+		intports []string
 	)
 
 	switch change["DesiredState"] {
-	case DesiredStateActivate:
+	case string(DesiredStateActivate):
 		desired = DesiredStateActivate
-	case DesiredStateRestart:
+	case string(DesiredStateRestart):
 		desired = DesiredStateRestart
-	case DesiredStateStop:
+	case string(DesiredStateStop):
 		desired = DesiredStateStop
-	case DesiredStateNull:
+	case "":
 		desired = DesiredStateNull
 	default:
+		return &Plugin{}, NewControllerError("Invalid desired state sent!")
+	}
+
+	switch change["State"] {
+	case string(StateActive):
+		state = StateActive
+	case string(StateAvailable):
+		state = StateAvailable
+	case string(StateRestarting):
+		state = StateRestarting
+	case string(StateStopped):
+		state = StateStopped
+	default:
 		return &Plugin{}, NewControllerError("Invalid state sent!")
+	}
+
+	for _, v := range change["ExternalPorts"].([]interface{}) {
+		extports = append(extports, v.(string))
+	}
+
+	for _, v := range change["InternalPorts"].([]interface{}) {
+		extports = append(intports, v.(string))
 	}
 
 	plugin := &Plugin{
 		Name:          change["Name"].(string),
 		ServiceName:   change["ServiceName"].(string),
 		DesiredState:  desired,
-		State:         change["State"].(PluginState),
+		State:         state,
 		Interface:     change["Interface"].(string),
-		ExternalPorts: change["ExternalPorts"].([]string),
-		InternalPorts: change["InternalPorts"].([]string),
+		ExternalPorts: extports,
+		InternalPorts: intports,
 		OS:            change["OS"].(string),
 	}
 
@@ -101,11 +125,13 @@ func watchChanges(res *r.Cursor) (<-chan Plugin, <-chan error) {
 		var doc map[string]interface{}
 		for cursor.Next(&doc) {
 			log.Printf("Change: %v, Type: %T", doc, doc)
-			plugin, err := newPlugin(doc)
-			if err != nil {
-				errChan <- err
+			if v, ok := doc["new_val"]; ok {
+				plugin, err := newPlugin(v.(map[string]interface{}))
+				if err != nil {
+					errChan <- err
+				}
+				out <- *plugin
 			}
-			out <- *plugin
 		}
 	}(res)
 	return out, errChan
