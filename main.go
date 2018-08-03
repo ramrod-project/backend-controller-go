@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	dockerservicemanager "github.com/manziman/backend-controller-go/dockerservicemanager"
-	errorhandler "github.com/manziman/backend-controller-go/errorhandler"
-	rethink "github.com/manziman/backend-controller-go/rethink"
+	"github.com/manziman/backend-controller-go/errorhandler"
+	"github.com/manziman/backend-controller-go/rethink"
 )
 
 func main() {

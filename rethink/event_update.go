@@ -24,6 +24,9 @@ func handleEvent(event events.Message, session *r.Session) (r.WriteResponse, err
 	return r.WriteResponse{}, nil
 }
 
+// EventUpdate consumes the event channel from the docker
+// client event monitor. If handles events (one by one at
+// the moment) and updates the database as they are recieved.
 func EventUpdate(in <-chan events.Message) (<-chan r.WriteResponse, <-chan error) {
 	outErr := make(chan error)
 	outDB := make(chan r.WriteResponse)
