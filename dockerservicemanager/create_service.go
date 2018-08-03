@@ -23,18 +23,7 @@ type PluginServiceConfig struct {
 	Volumes     []mount.Mount
 }
 
-// CreatePluginService creates a service for a plugin
-// given a PluginServiceConfig.
-func CreatePluginService(config *PluginServiceConfig) (types.ServiceCreateResponse, error) {
-	ctx := context.Background()
-	dockerClient, err := client.NewEnvClient()
-
-	if err != nil {
-		return types.ServiceCreateResponse{}, err
-	}
-
-	log.Printf("Creating service %v with config %v\n", config.ServiceName, config)
-
+func generateServiceSpec(config *PluginServiceConfig) (*swarm.ServiceSpec, error) {
 	var (
 		labels          = make(map[string]string)
 		imageName       string
@@ -44,7 +33,7 @@ func CreatePluginService(config *PluginServiceConfig) (types.ServiceCreateRespon
 		replicas        uint64
 	)
 
-	log.Printf("Setting variables\n")
+	log.Printf("Creating service %v with config %v\n", config.ServiceName, config)
 
 	maxAttempts = uint64(3)
 	replicas = uint64(1)
@@ -107,11 +96,30 @@ func CreatePluginService(config *PluginServiceConfig) (types.ServiceCreateRespon
 		},
 	}
 
+	return serviceSpec, nil
+}
+
+// CreatePluginService creates a service for a plugin
+// given a PluginServiceConfig.
+func CreatePluginService(config *PluginServiceConfig) (types.ServiceCreateResponse, error) {
+	ctx := context.Background()
+	dockerClient, err := client.NewEnvClient()
+
+	if err != nil {
+		return types.ServiceCreateResponse{}, err
+	}
+
+	log.Printf("Generating service spec\n")
+
+	serviceSpec, err := generateServiceSpec(config)
+
+	if err != nil {
+		return types.ServiceCreateResponse{}, err
+	}
+
 	log.Printf("Service spec created: %v", serviceSpec)
 
-	serviceOpts := &types.ServiceCreateOptions{}
-
-	resp, err2 := dockerClient.ServiceCreate(ctx, *serviceSpec, *serviceOpts)
+	resp, err2 := dockerClient.ServiceCreate(ctx, *serviceSpec, types.ServiceCreateOptions{})
 	return resp, err2
 
 }
