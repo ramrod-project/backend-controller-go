@@ -18,9 +18,9 @@ type PluginServiceConfig struct {
 	Environment []string
 	Network     string
 	OS          string
-	Ports       []swarm.PortConfig
+	Ports       []swarm.PortConfig `json:",omitempty"`
 	ServiceName string
-	Volumes     []mount.Mount
+	Volumes     []mount.Mount `json:",omitempty"`
 }
 
 func generateServiceSpec(config *PluginServiceConfig) (*swarm.ServiceSpec, error) {

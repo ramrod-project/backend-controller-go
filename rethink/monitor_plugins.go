@@ -8,18 +8,107 @@ import (
 
 // Plugin represents a plugin entry
 // in the database.
-type Plugin interface{}
+type Plugin struct {
+	Name          string
+	ServiceName   string
+	DesiredState  PluginDesiredState `json:",omitempty`
+	State         PluginState        `json:",omitempty`
+	Interface     string
+	ExternalPorts []string
+	InternalPorts []string
+	OS            string
+}
 
-func watchChanges(res *r.Cursor) <-chan interface{} {
-	out := make(chan interface{})
+// PluginDesiredState is the desired state of the
+// plugin service.
+type PluginDesiredState string
+
+const (
+	// DesiredStateActivate is the start plugin command.
+	DesiredStateActivate PluginDesiredState = "Activate"
+	// DesiredStateRestart is the restart plugin command.
+	DesiredStateRestart PluginDesiredState = "Restart"
+	// DesiredStateStop is the stop plugin command.
+	DesiredStateStop PluginDesiredState = "Stop"
+	// DesiredStateNull is no command.
+	DesiredStateNull PluginDesiredState = ""
+)
+
+// PluginState is the state of the plugin service.
+type PluginState string
+
+const (
+	// StateAvailable is the plugin available state.
+	StateAvailable PluginState = "Available"
+	// StateActive is the running state.
+	StateActive PluginState = "Active"
+	// StateRestarting is the updating state.
+	StateRestarting PluginState = "Restarting"
+	// StateStopped is the removed state.
+	StateStopped PluginState = "Stopped"
+)
+
+// NewControllerError returns a custom ControllerError.
+func NewControllerError(text string) error {
+	return &ControllerError{text}
+}
+
+// ControllerError is a custom error for the controller.
+type ControllerError struct {
+	s string
+}
+
+func (e *ControllerError) Error() string {
+	return e.s
+}
+
+func newPlugin(change map[string]interface{}) (*Plugin, error) {
+	var (
+		desired PluginDesiredState
+	)
+
+	switch change["DesiredState"] {
+	case DesiredStateActivate:
+		desired = DesiredStateActivate
+	case DesiredStateRestart:
+		desired = DesiredStateRestart
+	case DesiredStateStop:
+		desired = DesiredStateStop
+	case DesiredStateNull:
+		desired = DesiredStateNull
+	default:
+		return &Plugin{}, NewControllerError("Invalid state sent!")
+	}
+
+	plugin := &Plugin{
+		Name:          change["Name"].(string),
+		ServiceName:   change["ServiceName"].(string),
+		DesiredState:  desired,
+		State:         change["State"].(PluginState),
+		Interface:     change["Interface"].(string),
+		ExternalPorts: change["ExternalPorts"].([]string),
+		InternalPorts: change["InternalPorts"].([]string),
+		OS:            change["OS"].(string),
+	}
+
+	return plugin, nil
+}
+
+func watchChanges(res *r.Cursor) (<-chan Plugin, <-chan error) {
+	out := make(chan Plugin)
+	errChan := make(chan error)
 	go func(cursor *r.Cursor) {
-		var doc interface{}
+		var doc map[string]interface{}
 		for cursor.Next(&doc) {
-			log.Printf("Change: %v", doc)
-			out <- doc
+			log.Printf("Change: %v, Type: %T", doc, doc)
+			plugin, err := newPlugin(doc)
+			if err != nil {
+				errChan <- err
+			}
+			out <- *plugin
 		}
 	}(res)
-	return out
+	return out, errChan
 }
 
 // MonitorPlugins purpose of this function is to monitor changes
@@ -29,9 +118,7 @@ func watchChanges(res *r.Cursor) <-chan interface{} {
 // handling the changes to the state of the services.
 // At some point the query here will be filtered down
 // to only the changes that matter.
-func MonitorPlugins() (<-chan interface{}, <-chan error) {
-	outErr := make(chan error)
-
+func MonitorPlugins() (<-chan Plugin, <-chan error) {
 	session, err := r.Connect(r.ConnectOpts{
 		Address: "127.0.0.1",
 	})
@@ -41,10 +128,10 @@ func MonitorPlugins() (<-chan interface{}, <-chan error) {
 
 	res, err := r.DB("Controller").Table("Plugins").Changes().Run(session)
 	if err != nil {
-		outErr <- err
+		panic(err)
 	}
 
-	outDB := watchChanges(res)
+	outDB, errDB := watchChanges(res)
 
-	return outDB, outErr
+	return outDB, errDB
 }
