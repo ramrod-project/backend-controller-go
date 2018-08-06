@@ -3,6 +3,7 @@ package dockerservicemanager
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"time"
@@ -73,6 +74,8 @@ func generateServiceSpec(config *PluginServiceConfig) (*swarm.ServiceSpec, error
 	} else if config.OS == rethink.PluginOSWindows {
 		imageName.Name = "ramrodpcp/interpreter-plugin-windows"
 		placementConfig.Constraints = []string{"node.labels.os==nt"}
+	} else {
+		return &swarm.ServiceSpec{}, fmt.Errorf("invalid OS setting: %v", config.OS)
 	}
 
 	log.Printf("Creating service spec\n")
