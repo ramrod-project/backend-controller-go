@@ -31,4 +31,4 @@ script:
   - docker stop rethinkdb
 
 notifications:
-slack: ramrod-project:GDF82rRYDg3KSekrT3GA24qO
+  slack: ramrod-project:GDF82rRYDg3KSekrT3GA24qO
