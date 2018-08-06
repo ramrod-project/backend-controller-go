@@ -2,6 +2,7 @@ package dockerservicemanager
 
 import (
 	"context"
+	"errors"
 	"log"
 	"reflect"
 	"testing"
@@ -9,6 +10,7 @@ import (
 	types "github.com/docker/docker/api/types"
 	swarm "github.com/docker/docker/api/types/swarm"
 	client "github.com/docker/docker/client"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestCreatePluginService(t *testing.T) {
@@ -20,6 +22,7 @@ func TestCreatePluginService(t *testing.T) {
 		args    args
 		want    types.ServiceCreateResponse
 		wantErr bool
+		err     error
 	}{
 		{
 			name: "Test creating a plugin service",
@@ -32,7 +35,7 @@ func TestCreatePluginService(t *testing.T) {
 						"PLUGIN=Harness",
 					},
 					Network: "test",
-					OS:      "linux",
+					OS:      "posix",
 					Ports: []swarm.PortConfig{swarm.PortConfig{
 						Protocol:      swarm.PortConfigProtocolTCP,
 						TargetPort:    5000,
@@ -44,9 +47,66 @@ func TestCreatePluginService(t *testing.T) {
 			},
 			want: types.ServiceCreateResponse{
 				ID:       "",
-				Warnings: []string{},
+				Warnings: nil,
 			},
 			wantErr: false,
+			err:     nil,
+		},
+		{
+			name: "Bad network",
+			args: args{
+				config: PluginServiceConfig{
+					Environment: []string{
+						"STAGE=DEV",
+						"LOGLEVEL=DEBUG",
+						"PORT=5000",
+						"PLUGIN=Harness",
+					},
+					Network: "blah",
+					OS:      "posix",
+					Ports: []swarm.PortConfig{swarm.PortConfig{
+						Protocol:      swarm.PortConfigProtocolTCP,
+						TargetPort:    6000,
+						PublishedPort: 6000,
+						PublishMode:   swarm.PortConfigPublishModeIngress,
+					}},
+					ServiceName: "Harnessnet",
+				},
+			},
+			want: types.ServiceCreateResponse{
+				ID:       "",
+				Warnings: nil,
+			},
+			wantErr: true,
+			err:     errors.New("Error response from daemon: network blah not found"),
+		},
+		{
+			name: "Duplicate service name",
+			args: args{
+				config: PluginServiceConfig{
+					Environment: []string{
+						"STAGE=DEV",
+						"LOGLEVEL=DEBUG",
+						"PORT=5000",
+						"PLUGIN=Harness",
+					},
+					Network: "test",
+					OS:      "posix",
+					Ports: []swarm.PortConfig{swarm.PortConfig{
+						Protocol:      swarm.PortConfigProtocolTCP,
+						TargetPort:    5001,
+						PublishedPort: 5001,
+						PublishMode:   swarm.PortConfigPublishModeIngress,
+					}},
+					ServiceName: "Harness",
+				},
+			},
+			want: types.ServiceCreateResponse{
+				ID:       "",
+				Warnings: nil,
+			},
+			wantErr: true,
+			err:     errors.New("Error response from daemon: rpc error: code = Unknown desc = name conflicts with an existing object"),
 		},
 	}
 	generatedIDs := make([]string, len(tests))
@@ -56,11 +116,12 @@ func TestCreatePluginService(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Errorf("CreatePluginService() error = %v, wantErr %v", err, tt.wantErr)
 				return
+			} else if tt.wantErr {
+				assert.Equal(t, err, tt.err)
 			}
-			if !reflect.DeepEqual(got.Warnings, tt.want.Warnings) {
-				t.Errorf("CreatePluginService() = %v, want %v", got.Warnings, tt.want.Warnings)
-			}
-			log.Printf("ID created: %v\n", got.ID)
+			assert.Equal(t, got.Warnings, tt.want.Warnings)
+			log.Printf("Warnings: %v\n", got.Warnings)
+			log.Printf("ID created: %v\n\n", got.ID)
 			generatedIDs[i] = got.ID
 		})
 	}
@@ -71,6 +132,9 @@ func TestCreatePluginService(t *testing.T) {
 		t.Errorf("%v", err)
 	}
 	for _, v := range generatedIDs {
+		if v == "" {
+			continue
+		}
 		log.Printf("Removing service %v\n", v)
 		err := dockerClient.ServiceRemove(ctx, v)
 		if err != nil {

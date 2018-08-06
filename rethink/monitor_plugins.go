@@ -16,8 +16,20 @@ type Plugin struct {
 	Interface     string
 	ExternalPorts []string
 	InternalPorts []string
-	OS            string
+	OS            PluginOS
 }
+
+// PluginOS is the supported OS for the plugin
+type PluginOS string
+
+const (
+	// PluginOSPosix is posix compoliant OS's.
+	PluginOSPosix PluginOS = "posix"
+	// PluginOSWindows is Windows.
+	PluginOSWindows PluginOS = "nt"
+	// PluginOSAll is any.
+	PluginOSAll PluginOS = "all"
+)
 
 // PluginDesiredState is the desired state of the
 // plugin service.
@@ -65,9 +77,10 @@ func (e *ControllerError) Error() string {
 func newPlugin(change map[string]interface{}) (*Plugin, error) {
 	var (
 		desired  PluginDesiredState
-		state    PluginState
 		extports []string
 		intports []string
+		os       PluginOS
+		state    PluginState
 	)
 
 	switch change["DesiredState"] {
@@ -96,6 +109,17 @@ func newPlugin(change map[string]interface{}) (*Plugin, error) {
 		return &Plugin{}, NewControllerError("Invalid state sent!")
 	}
 
+	switch change["OS"] {
+	case string(PluginOSPosix):
+		os = PluginOSPosix
+	case string(PluginOSWindows):
+		os = PluginOSWindows
+	case string(PluginOSAll):
+		os = PluginOSAll
+	default:
+		return &Plugin{}, NewControllerError("Invalid desired state sent!")
+	}
+
 	for _, v := range change["ExternalPorts"].([]interface{}) {
 		extports = append(extports, v.(string))
 	}
@@ -112,7 +136,7 @@ func newPlugin(change map[string]interface{}) (*Plugin, error) {
 		Interface:     change["Interface"].(string),
 		ExternalPorts: extports,
 		InternalPorts: intports,
-		OS:            change["OS"].(string),
+		OS:            os,
 	}
 
 	return plugin, nil

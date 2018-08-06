@@ -1,8 +1,10 @@
 package dockerservicemanager
 
 import (
+	"bytes"
 	"context"
 	"log"
+	"os"
 	"time"
 
 	types "github.com/docker/docker/api/types"
@@ -10,42 +12,64 @@ import (
 	mount "github.com/docker/docker/api/types/mount"
 	swarm "github.com/docker/docker/api/types/swarm"
 	client "github.com/docker/docker/client"
+	rethink "github.com/ramrod-project/backend-controller-go/rethink"
 )
+
+type dockerImageName struct {
+	Name string
+	Tag  string
+}
+
+// String method for image name
+func (d dockerImageName) String() string {
+	var stringBuf bytes.Buffer
+
+	stringBuf.WriteString(d.Name)
+	stringBuf.WriteString(":")
+	stringBuf.WriteString(d.Tag)
+
+	return stringBuf.String()
+}
 
 // PluginServiceConfig contains configuration parameters
 // for a plugin service.
 type PluginServiceConfig struct {
 	Environment []string
 	Network     string
-	OS          string
+	OS          rethink.PluginOS
 	Ports       []swarm.PortConfig `json:",omitempty"`
 	ServiceName string
 	Volumes     []mount.Mount `json:",omitempty"`
 }
 
+func getTagFromEnv() string {
+	temp := os.Getenv("TAG")
+	if temp == "" {
+		temp = "latest"
+	}
+	return temp
+}
+
 func generateServiceSpec(config *PluginServiceConfig) (*swarm.ServiceSpec, error) {
 	var (
+		imageName = &dockerImageName{
+			Tag: getTagFromEnv(),
+		}
 		labels          = make(map[string]string)
-		imageName       string
+		maxAttempts     = uint64(3)
 		placementConfig = &swarm.Placement{}
-		maxAttempts     uint64
-		stopGrace       time.Duration
-		replicas        uint64
+		replicas        = uint64(1)
+		stopGrace       = time.Second
 	)
 
 	log.Printf("Creating service %v with config %v\n", config.ServiceName, config)
 
-	maxAttempts = uint64(3)
-	replicas = uint64(1)
-	stopGrace = time.Second
-
 	// Determine container image
-	if config.OS == "linux" || config.OS == "all" {
-		imageName = "ramrodpcp/interpreter-plugin:dev"
-	} else {
-		imageName = "ramrodpcp/interpreter-plugin-windows:dev"
-		constraints := []string{"node.labels.os==nt"}
-		placementConfig.Constraints = constraints
+	if config.OS == rethink.PluginOSPosix || config.OS == rethink.PluginOSAll {
+		imageName.Name = "ramrodpcp/interpreter-plugin"
+	} else if config.OS == rethink.PluginOSWindows {
+		imageName.Name = "ramrodpcp/interpreter-plugin-windows"
+		placementConfig.Constraints = []string{"node.labels.os==nt"}
 	}
 
 	log.Printf("Creating service spec\n")
@@ -63,7 +87,7 @@ func generateServiceSpec(config *PluginServiceConfig) (*swarm.ServiceSpec, error
 					Timeout:  time.Second * 3,
 					Retries:  3,
 				},
-				Image:           imageName,
+				Image:           imageName.String(),
 				Labels:          labels,
 				Mounts:          config.Volumes,
 				OpenStdin:       false,
