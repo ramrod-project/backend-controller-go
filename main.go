@@ -3,9 +3,9 @@ package main
 import (
 	"fmt"
 
-	dockerservicemanager "github.com/manziman/backend-controller-go/dockerservicemanager"
-	"github.com/manziman/backend-controller-go/errorhandler"
-	"github.com/manziman/backend-controller-go/rethink"
+	dockerservicemanager "github.com/ramrod-project/backend-controller-go/dockerservicemanager"
+	"github.com/ramrod-project/backend-controller-go/errorhandler"
+	"github.com/ramrod-project/backend-controller-go/rethink"
 )
 
 func main() {
