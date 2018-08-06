@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestCreatePluginService(t *testing.T) {
+func Test_CreatePluginService(t *testing.T) {
 	type args struct {
 		config PluginServiceConfig
 	}
@@ -120,9 +120,9 @@ func TestCreatePluginService(t *testing.T) {
 				t.Errorf("CreatePluginService() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			} else if tt.wantErr {
-				assert.Equal(t, err, tt.err)
+				assert.Equal(t, tt.err, err)
 			}
-			assert.Equal(t, got.Warnings, tt.want.Warnings)
+			assert.Equal(t, tt.want.Warnings, got.Warnings)
 			log.Printf("Warnings: %v\n", got.Warnings)
 			log.Printf("ID created: %v\n\n", got.ID)
 			generatedIDs[i] = got.ID
@@ -284,7 +284,7 @@ func Test_generateServiceSpec(t *testing.T) {
 				t.Errorf("generateServiceSpec() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			} else if tt.wantErr {
-				assert.Equal(t, err, tt.err)
+				assert.Equal(t, tt.err, err)
 			}
 
 			if !reflect.DeepEqual(got, tt.want) {
@@ -292,4 +292,42 @@ func Test_generateServiceSpec(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_getTagFromEnv(t *testing.T) {
+	oldEnvTag := os.Getenv("TAG")
+	oldEnvTravis := os.Getenv("TRAVIS_BRANCH")
+
+	tests := []struct {
+		name   string
+		setEnv []string
+		want   string
+	}{
+		{
+			name:   "Default not set",
+			setEnv: []string{"TAG", ""},
+			want:   "latest",
+		},
+		{
+			name:   "TAG dev",
+			setEnv: []string{"TAG", "dev"},
+			want:   "dev",
+		},
+		{
+			name:   "TRAVIS_BRANCH",
+			setEnv: []string{"TAG", "dev"},
+			want:   "dev",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			os.Setenv("TAG", "")
+			os.Setenv("TRAVIS_BRANCH", "")
+			os.Setenv(tt.setEnv[0], tt.setEnv[1])
+			got := getTagFromEnv()
+			assert.Equal(t, tt.want, got)
+		})
+	}
+	os.Setenv("TAG", oldEnvTag)
+	os.Setenv("TRAVIS_BRANCH", oldEnvTravis)
 }
