@@ -1,11 +1,14 @@
 package dockerservicemanager
 
 import (
+	"context"
+	"log"
 	"reflect"
 	"testing"
 
 	types "github.com/docker/docker/api/types"
 	swarm "github.com/docker/docker/api/types/swarm"
+	client "github.com/docker/docker/client"
 )
 
 func TestCreatePluginService(t *testing.T) {
@@ -18,44 +21,61 @@ func TestCreatePluginService(t *testing.T) {
 		want    types.ServiceCreateResponse
 		wantErr bool
 	}{
-		// TODO: Add test cases.
-		/*
-			config := &dockerservicemanager.PluginServiceConfig{
-				Environment: []string{
-					"STAGE=DEV",
-					"LOGLEVEL=DEBUG",
-					"PORT=5000",
-					"PLUGIN=Harness",
+		{
+			name: "Test creating a plugin service",
+			args: args{
+				config: PluginServiceConfig{
+					Environment: []string{
+						"STAGE=DEV",
+						"LOGLEVEL=DEBUG",
+						"PORT=5000",
+						"PLUGIN=Harness",
+					},
+					Network: "test",
+					OS:      "linux",
+					Ports: []swarm.PortConfig{swarm.PortConfig{
+						Protocol:      swarm.PortConfigProtocolTCP,
+						TargetPort:    5000,
+						PublishedPort: 5000,
+						PublishMode:   swarm.PortConfigPublishModeIngress,
+					}},
+					ServiceName: "Harness",
 				},
-				Network: "test",
-				OS:      "linux",
-				Ports: []swarm.PortConfig{swarm.PortConfig{
-					Protocol:      swarm.PortConfigProtocolTCP,
-					TargetPort:    5000,
-					PublishedPort: 5000,
-					PublishMode:   swarm.PortConfigPublishModeIngress,
-				}},
-				ServiceName: "Harness",
-			}
-
-			res, err := dockerservicemanager.CreatePluginService(config)
-			if err != nil {
-				panic(err)
-			}
-			log.Printf("Response: %v\n", res)
-		*/
+			},
+			want: types.ServiceCreateResponse{
+				ID:       "",
+				Warnings: []string{},
+			},
+			wantErr: false,
+		},
 	}
-	for _, tt := range tests {
+	generatedIDs := make([]string, len(tests))
+	for i, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := CreatePluginService(tt.args.config)
+			got, err := CreatePluginService(&tt.args.config)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("CreatePluginService() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("CreatePluginService() = %v, want %v", got, tt.want)
+			if !reflect.DeepEqual(got.Warnings, tt.want.Warnings) {
+				t.Errorf("CreatePluginService() = %v, want %v", got.Warnings, tt.want.Warnings)
 			}
+			log.Printf("ID created: %v\n", got.ID)
+			generatedIDs[i] = got.ID
 		})
+	}
+	// Docker cleanup
+	ctx := context.Background()
+	dockerClient, err := client.NewEnvClient()
+	if err != nil {
+		t.Errorf("%v", err)
+	}
+	for _, v := range generatedIDs {
+		log.Printf("Removing service %v\n", v)
+		err := dockerClient.ServiceRemove(ctx, v)
+		if err != nil {
+			t.Errorf("%v", err)
+		}
 	}
 }
 

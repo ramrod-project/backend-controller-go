@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	rethink "github.com/manziman/backend-controller-go/rethink"
+	rethink "github.com/ramrod-project/backend-controller-go/rethink"
 )
 
 func TestHandlePluginChanges(t *testing.T) {

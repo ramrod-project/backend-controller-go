@@ -1,7 +1,7 @@
 package dockerservicemanager
 
 import (
-	rethink "github.com/manziman/backend-controller-go/rethink"
+	rethink "github.com/ramrod-project/backend-controller-go/rethink"
 )
 
 func selectChange(plugin rethink.Plugin) (interface{}, error) {
