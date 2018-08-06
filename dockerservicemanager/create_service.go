@@ -119,7 +119,7 @@ func CreatePluginService(config *PluginServiceConfig) (types.ServiceCreateRespon
 
 	log.Printf("Service spec created: %v", serviceSpec)
 
-	resp, err2 := dockerClient.ServiceCreate(ctx, *serviceSpec, types.ServiceCreateOptions{})
-	return resp, err2
+	resp, err := dockerClient.ServiceCreate(ctx, *serviceSpec, types.ServiceCreateOptions{})
+	return resp, err
 
 }
