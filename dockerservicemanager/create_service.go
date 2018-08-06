@@ -45,6 +45,9 @@ type PluginServiceConfig struct {
 func getTagFromEnv() string {
 	temp := os.Getenv("TAG")
 	if temp == "" {
+		temp = os.Getenv("TRAVIS_BRANCH")
+	}
+	if temp == "" {
 		temp = "latest"
 	}
 	return temp
