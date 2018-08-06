@@ -49,11 +49,8 @@ func Test_CreatePluginService(t *testing.T) {
 				},
 			},
 			want: types.ServiceCreateResponse{
-				ID:       "",
-				Warnings: nil,
+				ID: "",
 			},
-			wantErr: false,
-			err:     nil,
 		},
 		{
 			name: "Bad network",
@@ -77,8 +74,7 @@ func Test_CreatePluginService(t *testing.T) {
 				},
 			},
 			want: types.ServiceCreateResponse{
-				ID:       "",
-				Warnings: nil,
+				ID: "",
 			},
 			wantErr: true,
 			err:     errors.New("Error response from daemon: network blah not found"),
@@ -105,8 +101,7 @@ func Test_CreatePluginService(t *testing.T) {
 				},
 			},
 			want: types.ServiceCreateResponse{
-				ID:       "",
-				Warnings: nil,
+				ID: "",
 			},
 			wantErr: true,
 			err:     errors.New("Error response from daemon: rpc error: code = Unknown desc = name conflicts with an existing object"),
@@ -212,11 +207,7 @@ func Test_generateServiceSpec(t *testing.T) {
 							Retries:  3,
 						},
 						Image:           "ramrodpcp/interpreter-plugin:" + tag,
-						Labels:          make(map[string]string),
-						Mounts:          nil,
-						OpenStdin:       false,
 						StopGracePeriod: &second,
-						TTY:             false,
 					},
 					RestartPolicy: &swarm.RestartPolicy{
 						Condition:   "on-failure",
@@ -234,10 +225,6 @@ func Test_generateServiceSpec(t *testing.T) {
 						Replicas: &replicas,
 					},
 				},
-				UpdateConfig: &swarm.UpdateConfig{
-					Parallelism: 0,
-					Delay:       0,
-				},
 				EndpointSpec: &swarm.EndpointSpec{
 					Mode: swarm.ResolutionModeVIP,
 					Ports: []swarm.PortConfig{swarm.PortConfig{
@@ -249,7 +236,6 @@ func Test_generateServiceSpec(t *testing.T) {
 				},
 			},
 			wantErr: false,
-			err:     nil,
 		},
 		{
 			name: "Bad config OS",
