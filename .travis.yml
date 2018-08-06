@@ -1,0 +1,34 @@
+sudo: required
+
+language: go
+go:
+  - 1.10
+
+services:
+  - docker
+
+before_install:
+  - if [ "$TRAVIS_BRANCH" == "master" ]; 
+    then export TAG=latest;
+    else export TAG=$TRAVIS_BRANCH; fi
+  - docker swarm init
+  - docker network create --driver=overlay --attachable test
+  - travis_wait 10 docker pull ramrodpcp/database-brain:$TAG
+
+install:
+  - dep ensure
+  - go test github.com/ramrod-project/backend-controller-go/dockerservicemanager github.com/ramrod-project/backend-controller-go/rethink 
+    github.com/ramrod-project/backend-controller-go/errorhandler
+  - make
+
+script:
+  - docker build -t ramrodpcp/backend-contoller:$TAG
+  - docker run -d --name rethinkdb --network test -p 28015:28015 ramrodpcp/database-brain:$TAG
+  - docker run -d --name controller --network test -v /var/run/docker.sock:/var/run/docker.sock ramrodpcp/backend-contoller:$TAG
+  - docker ps -a
+  - docker logs controller
+  - docker stop controller
+  - docker stop rethinkdb
+
+notifications:
+slack: ramrod-project:GDF82rRYDg3KSekrT3GA24qO
