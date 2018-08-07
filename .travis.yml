@@ -21,6 +21,7 @@ before_install:
   - travis_wait 10 docker pull ramrodpcp/database-brain:$TAG
 
 install:
+  - go version
   - dep ensure
   - go test github.com/ramrod-project/backend-controller-go/dockerservicemanager github.com/ramrod-project/backend-controller-go/rethink 
     github.com/ramrod-project/backend-controller-go/errorhandler
