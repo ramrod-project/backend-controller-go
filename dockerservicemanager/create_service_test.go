@@ -5,7 +5,6 @@ import (
 	"errors"
 	"log"
 	"os"
-	"reflect"
 	"testing"
 	"time"
 
@@ -271,11 +270,21 @@ func Test_generateServiceSpec(t *testing.T) {
 				return
 			} else if tt.wantErr {
 				assert.Equal(t, tt.err, err)
+				assert.Equal(t, tt.want, got)
+				return
 			}
 
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("generateServiceSpec() = %v, want %v", got, tt.want)
-			}
+			assert.Equal(t, tt.want.Annotations.Name, got.Annotations.Name)
+			assert.Equal(t, *tt.want.TaskTemplate.ContainerSpec.DNSConfig, *got.TaskTemplate.ContainerSpec.DNSConfig)
+			assert.Equal(t, tt.want.TaskTemplate.ContainerSpec.Env, got.TaskTemplate.ContainerSpec.Env)
+			assert.Equal(t, *tt.want.TaskTemplate.ContainerSpec.Healthcheck, *got.TaskTemplate.ContainerSpec.Healthcheck)
+			assert.Equal(t, tt.want.TaskTemplate.ContainerSpec.Image, got.TaskTemplate.ContainerSpec.Image)
+			assert.Equal(t, *tt.want.TaskTemplate.ContainerSpec.StopGracePeriod, *got.TaskTemplate.ContainerSpec.StopGracePeriod)
+			assert.Equal(t, *tt.want.TaskTemplate.RestartPolicy, *got.TaskTemplate.RestartPolicy)
+			assert.Equal(t, *tt.want.TaskTemplate.Placement, *got.TaskTemplate.Placement)
+			assert.Equal(t, *tt.want.Mode.Replicated.Replicas, *got.Mode.Replicated.Replicas)
+			assert.Equal(t, tt.want.EndpointSpec.Mode, got.EndpointSpec.Mode)
+			assert.Equal(t, tt.want.EndpointSpec.Ports, got.EndpointSpec.Ports)
 		})
 	}
 }

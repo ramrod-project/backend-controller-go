@@ -1,3 +1,7 @@
+# TODO:
+# - Add Golint
+# - Add coverage tool
+
 sudo: required
 
 env:
@@ -9,6 +13,12 @@ go:
 
 services:
   - docker
+
+branches:
+  only:
+  - master
+  - dev
+  - qa
 
 before_install:
   - if [ "$TRAVIS_BRANCH" == "master" ]; 
