@@ -5,7 +5,6 @@ import (
 	"errors"
 	"log"
 	"os"
-	"reflect"
 	"testing"
 	"time"
 
@@ -49,11 +48,8 @@ func Test_CreatePluginService(t *testing.T) {
 				},
 			},
 			want: types.ServiceCreateResponse{
-				ID:       "",
-				Warnings: nil,
+				ID: "",
 			},
-			wantErr: false,
-			err:     nil,
 		},
 		{
 			name: "Bad network",
@@ -77,8 +73,7 @@ func Test_CreatePluginService(t *testing.T) {
 				},
 			},
 			want: types.ServiceCreateResponse{
-				ID:       "",
-				Warnings: nil,
+				ID: "",
 			},
 			wantErr: true,
 			err:     errors.New("Error response from daemon: network blah not found"),
@@ -105,8 +100,7 @@ func Test_CreatePluginService(t *testing.T) {
 				},
 			},
 			want: types.ServiceCreateResponse{
-				ID:       "",
-				Warnings: nil,
+				ID: "",
 			},
 			wantErr: true,
 			err:     errors.New("Error response from daemon: rpc error: code = Unknown desc = name conflicts with an existing object"),
@@ -212,11 +206,7 @@ func Test_generateServiceSpec(t *testing.T) {
 							Retries:  3,
 						},
 						Image:           "ramrodpcp/interpreter-plugin:" + tag,
-						Labels:          make(map[string]string),
-						Mounts:          nil,
-						OpenStdin:       false,
 						StopGracePeriod: &second,
-						TTY:             false,
 					},
 					RestartPolicy: &swarm.RestartPolicy{
 						Condition:   "on-failure",
@@ -234,10 +224,6 @@ func Test_generateServiceSpec(t *testing.T) {
 						Replicas: &replicas,
 					},
 				},
-				UpdateConfig: &swarm.UpdateConfig{
-					Parallelism: 0,
-					Delay:       0,
-				},
 				EndpointSpec: &swarm.EndpointSpec{
 					Mode: swarm.ResolutionModeVIP,
 					Ports: []swarm.PortConfig{swarm.PortConfig{
@@ -249,7 +235,6 @@ func Test_generateServiceSpec(t *testing.T) {
 				},
 			},
 			wantErr: false,
-			err:     nil,
 		},
 		{
 			name: "Bad config OS",
@@ -285,11 +270,21 @@ func Test_generateServiceSpec(t *testing.T) {
 				return
 			} else if tt.wantErr {
 				assert.Equal(t, tt.err, err)
+				assert.Equal(t, tt.want, got)
+				return
 			}
 
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("generateServiceSpec() = %v, want %v", got, tt.want)
-			}
+			assert.Equal(t, tt.want.Annotations.Name, got.Annotations.Name)
+			assert.Equal(t, *tt.want.TaskTemplate.ContainerSpec.DNSConfig, *got.TaskTemplate.ContainerSpec.DNSConfig)
+			assert.Equal(t, tt.want.TaskTemplate.ContainerSpec.Env, got.TaskTemplate.ContainerSpec.Env)
+			assert.Equal(t, *tt.want.TaskTemplate.ContainerSpec.Healthcheck, *got.TaskTemplate.ContainerSpec.Healthcheck)
+			assert.Equal(t, tt.want.TaskTemplate.ContainerSpec.Image, got.TaskTemplate.ContainerSpec.Image)
+			assert.Equal(t, *tt.want.TaskTemplate.ContainerSpec.StopGracePeriod, *got.TaskTemplate.ContainerSpec.StopGracePeriod)
+			assert.Equal(t, *tt.want.TaskTemplate.RestartPolicy, *got.TaskTemplate.RestartPolicy)
+			assert.Equal(t, *tt.want.TaskTemplate.Placement, *got.TaskTemplate.Placement)
+			assert.Equal(t, *tt.want.Mode.Replicated.Replicas, *got.Mode.Replicated.Replicas)
+			assert.Equal(t, tt.want.EndpointSpec.Mode, got.EndpointSpec.Mode)
+			assert.Equal(t, tt.want.EndpointSpec.Ports, got.EndpointSpec.Ports)
 		})
 	}
 }

@@ -1,3 +1,7 @@
+# TODO:
+# - Add Golint
+# - Add coverage tool
+
 sudo: required
 
 env:
@@ -10,6 +14,12 @@ go:
 services:
   - docker
 
+branches:
+  only:
+  - master
+  - dev
+  - qa
+
 before_install:
   - if [ "$TRAVIS_BRANCH" == "master" ]; 
     then export TAG=latest;
@@ -20,9 +30,10 @@ before_install:
   - docker network create --driver=overlay --attachable test
   - travis_wait 10 docker pull ramrodpcp/database-brain:$TAG
 
-install:
-  - go version
+install:  
   - dep ensure
+  - go vet
+  - go build -race
   - go test github.com/ramrod-project/backend-controller-go/dockerservicemanager github.com/ramrod-project/backend-controller-go/rethink 
     github.com/ramrod-project/backend-controller-go/errorhandler
   - make
