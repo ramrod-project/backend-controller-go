@@ -20,9 +20,10 @@ before_install:
   - docker network create --driver=overlay --attachable test
   - travis_wait 10 docker pull ramrodpcp/database-brain:$TAG
 
-install:
-  - go version
+install:  
   - dep ensure
+  - go vet
+  - go build -race
   - go test github.com/ramrod-project/backend-controller-go/dockerservicemanager github.com/ramrod-project/backend-controller-go/rethink 
     github.com/ramrod-project/backend-controller-go/errorhandler
   - make
