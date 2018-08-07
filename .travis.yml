@@ -28,7 +28,7 @@ install:
   - make
 
 script:
-  - docker build -t ramrodpcp/backend-contoller:$TAG
+  - docker build -t ramrodpcp/backend-contoller:$TAG .
   - docker run -d --name rethinkdb --network test -p 28015:28015 ramrodpcp/database-brain:$TAG
   - docker run -d --name controller --network test -v /var/run/docker.sock:/var/run/docker.sock ramrodpcp/backend-contoller:$TAG
   - docker ps -a
