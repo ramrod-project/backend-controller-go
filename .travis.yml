@@ -26,6 +26,7 @@ before_install:
     else export TAG=$TRAVIS_BRANCH; fi
   - curl -L -s https://github.com/golang/dep/releases/download/v${DEP_VERSION}/dep-linux-amd64 -o $GOPATH/bin/dep
   - chmod +x $GOPATH/bin/dep
+  - docker swarm init
   - travis_wait 10 docker pull ramrodpcp/interpreter-plugin:$TAG
 
 install:  
@@ -37,7 +38,6 @@ install:
   - make
 
 before_script:
-  - docker swarm init
   - docker network create --driver=overlay --attachable test
   - travis_wait 10 docker pull ramrodpcp/database-brain:$TAG
 
