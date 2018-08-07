@@ -2,6 +2,7 @@ package rethink
 
 import (
 	"log"
+	"os"
 
 	r "gopkg.in/gorethink/gorethink.v4"
 )
@@ -72,6 +73,14 @@ type ControllerError struct {
 
 func (e *ControllerError) Error() string {
 	return e.s
+}
+
+func getRethinkHost() string {
+	temp := os.Getenv("STAGE")
+	if temp == "TESTING" {
+		return "localhost"
+	}
+	return "rethinkdb"
 }
 
 func newPlugin(change map[string]interface{}) (*Plugin, error) {
@@ -170,7 +179,7 @@ func watchChanges(res *r.Cursor) (<-chan Plugin, <-chan error) {
 // to only the changes that matter.
 func MonitorPlugins() (<-chan Plugin, <-chan error) {
 	session, err := r.Connect(r.ConnectOpts{
-		Address: "127.0.0.1",
+		Address: getRethinkHost(),
 	})
 	if err != nil {
 		panic(err)

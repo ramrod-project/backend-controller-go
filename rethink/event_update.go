@@ -32,7 +32,7 @@ func EventUpdate(in <-chan events.Message) (<-chan r.WriteResponse, <-chan error
 	outDB := make(chan r.WriteResponse)
 
 	session, err := r.Connect(r.ConnectOpts{
-		Address: "127.0.0.1",
+		Address: getRethinkHost(),
 	})
 	if err != nil {
 		panic(err)
