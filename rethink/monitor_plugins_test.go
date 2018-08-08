@@ -162,6 +162,111 @@ func Test_watchChanges(t *testing.T) {
 				OS:            PluginOSAll,
 			},
 		},
+		{
+			name: "ServiceID add",
+			change: map[string]interface{}{
+				"ServiceID": "some-random-id",
+			},
+			want: Plugin{
+				Name:          "TestPlugin",
+				ServiceID:     "some-random-id",
+				ServiceName:   "TestPluginService",
+				DesiredState:  DesiredStateNull,
+				State:         StateAvailable,
+				Interface:     "192.168.1.1",
+				ExternalPorts: []string{"1080/tcp"},
+				InternalPorts: []string{"1080/tcp"},
+				OS:            PluginOSAll,
+			},
+		},
+		{
+			name: "DesiredState change",
+			change: map[string]interface{}{
+				"DesiredState": "Activate",
+			},
+			want: Plugin{
+				Name:          "TestPlugin",
+				ServiceID:     "some-random-id",
+				ServiceName:   "TestPluginService",
+				DesiredState:  DesiredStateActivate,
+				State:         StateAvailable,
+				Interface:     "192.168.1.1",
+				ExternalPorts: []string{"1080/tcp"},
+				InternalPorts: []string{"1080/tcp"},
+				OS:            PluginOSAll,
+			},
+		},
+		{
+			name: "State change",
+			change: map[string]interface{}{
+				"DesiredState": "",
+				"State":        "Active",
+			},
+			want: Plugin{
+				Name:          "TestPlugin",
+				ServiceID:     "some-random-id",
+				ServiceName:   "TestPluginService",
+				DesiredState:  DesiredStateNull,
+				State:         StateActive,
+				Interface:     "192.168.1.1",
+				ExternalPorts: []string{"1080/tcp"},
+				InternalPorts: []string{"1080/tcp"},
+				OS:            PluginOSAll,
+			},
+		},
+		{
+			name: "Port change",
+			change: map[string]interface{}{
+				"ExternalPorts": []string{"1080/tcp", "2000/tcp"},
+				"InternalPorts": []string{"1080/tcp", "2000/tcp"},
+			},
+			want: Plugin{
+				Name:          "TestPlugin",
+				ServiceID:     "some-random-id",
+				ServiceName:   "TestPluginService",
+				DesiredState:  DesiredStateNull,
+				State:         StateActive,
+				Interface:     "192.168.1.1",
+				ExternalPorts: []string{"1080/tcp", "2000/tcp"},
+				InternalPorts: []string{"1080/tcp", "2000/tcp"},
+				OS:            PluginOSAll,
+			},
+		},
+		{
+			name: "Deactivate",
+			change: map[string]interface{}{
+				"DesiredState": "Stop",
+			},
+			want: Plugin{
+				Name:          "TestPlugin",
+				ServiceID:     "some-random-id",
+				ServiceName:   "TestPluginService",
+				DesiredState:  DesiredStateStop,
+				State:         StateActive,
+				Interface:     "192.168.1.1",
+				ExternalPorts: []string{"1080/tcp", "2000/tcp"},
+				InternalPorts: []string{"1080/tcp", "2000/tcp"},
+				OS:            PluginOSAll,
+			},
+		},
+		{
+			name: "Die",
+			change: map[string]interface{}{
+				"DesiredState": "",
+				"State":        "Stopped",
+			},
+			want: Plugin{
+				Name:          "TestPlugin",
+				ServiceID:     "some-random-id",
+				ServiceName:   "TestPluginService",
+				DesiredState:  DesiredStateNull,
+				State:         StateStopped,
+				Interface:     "192.168.1.1",
+				ExternalPorts: []string{"1080/tcp", "2000/tcp"},
+				InternalPorts: []string{"1080/tcp", "2000/tcp"},
+				OS:            PluginOSAll,
+			},
+		},
 	}
 	filter := map[string]string{"Name": "TestPlugin"}
 	for _, tt := range tests {
