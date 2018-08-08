@@ -6,6 +6,7 @@ import (
 	dockerservicemanager "github.com/ramrod-project/backend-controller-go/dockerservicemanager"
 	"github.com/ramrod-project/backend-controller-go/errorhandler"
 	"github.com/ramrod-project/backend-controller-go/rethink"
+	"encoding/json"
 )
 
 func main() {
@@ -17,6 +18,9 @@ func main() {
 	go errorhandler.ErrorHandler(dbError, dockError)
 
 	for resp := range fromDB {
-		fmt.Printf("DB response: %v\n", resp)
+		out, err := json.Marshal(resp)
+		if err != nil {
+			fmt.Printf("DB response: %v\n\n", resp)
+		}
 	}
 }
