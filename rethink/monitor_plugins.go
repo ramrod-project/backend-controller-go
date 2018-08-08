@@ -1,6 +1,7 @@
 package rethink
 
 import (
+	"fmt"
 	"log"
 	"os"
 
@@ -93,6 +94,10 @@ func newPlugin(change map[string]interface{}) (*Plugin, error) {
 		state    PluginState
 	)
 
+	if change["ServiceName"] == "" {
+		return &Plugin{}, NewControllerError("plugin service must have ServiceName")
+	}
+
 	switch change["DesiredState"] {
 	case string(DesiredStateActivate):
 		desired = DesiredStateActivate
@@ -103,7 +108,7 @@ func newPlugin(change map[string]interface{}) (*Plugin, error) {
 	case "":
 		desired = DesiredStateNull
 	default:
-		return &Plugin{}, NewControllerError("Invalid desired state sent!")
+		return &Plugin{}, NewControllerError(fmt.Sprintf("invalid desired state %v sent", change["DesiredState"]))
 	}
 
 	switch change["State"] {
@@ -116,7 +121,7 @@ func newPlugin(change map[string]interface{}) (*Plugin, error) {
 	case string(StateStopped):
 		state = StateStopped
 	default:
-		return &Plugin{}, NewControllerError("Invalid state sent!")
+		return &Plugin{}, NewControllerError(fmt.Sprintf("invalid state %v sent", change["State"]))
 	}
 
 	switch change["OS"] {
@@ -127,7 +132,7 @@ func newPlugin(change map[string]interface{}) (*Plugin, error) {
 	case string(PluginOSAll):
 		os = PluginOSAll
 	default:
-		return &Plugin{}, NewControllerError("Invalid desired state sent!")
+		return &Plugin{}, NewControllerError(fmt.Sprintf("invalid OS setting %v sent", change["OS"]))
 	}
 
 	for _, v := range change["ExternalPorts"].([]interface{}) {

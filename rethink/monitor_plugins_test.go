@@ -3,6 +3,7 @@ package rethink
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"reflect"
 	"testing"
@@ -65,8 +66,140 @@ func Test_newPlugin(t *testing.T) {
 		args    args
 		want    *Plugin
 		wantErr bool
+		err     error
 	}{
-		// TODO: Add test cases.
+		{
+			name: "Basic good plugin",
+			args: args{
+				change: map[string]interface{}{
+					"Name":          "TestPlugin",
+					"ServiceID":     "",
+					"ServiceName":   "TestPlugin-5000",
+					"DesiredState":  "",
+					"State":         "Available",
+					"Interface":     "192.168.1.1",
+					"ExternalPorts": []interface{}{"5000/tcp"},
+					"InternalPorts": []interface{}{"5000/tcp"},
+					"OS":            "all",
+				},
+			},
+			want: &Plugin{
+				Name:          "TestPlugin",
+				ServiceID:     "",
+				ServiceName:   "TestPlugin-5000",
+				DesiredState:  DesiredStateNull,
+				State:         StateAvailable,
+				Interface:     "192.168.1.1",
+				ExternalPorts: []string{"5000/tcp"},
+				InternalPorts: []string{"5000/tcp"},
+				OS:            PluginOSAll,
+			},
+			wantErr: false,
+		},
+		{
+			name: "Bad no ServiceName",
+			args: args{
+				change: map[string]interface{}{
+					"Name":          "TestPlugin",
+					"ServiceID":     "",
+					"ServiceName":   "",
+					"DesiredState":  "",
+					"State":         "Available",
+					"Interface":     "192.168.1.1",
+					"ExternalPorts": []interface{}{"5000/tcp"},
+					"InternalPorts": []interface{}{"5000/tcp"},
+					"OS":            "all",
+				},
+			},
+			want:    &Plugin{},
+			wantErr: true,
+			err:     NewControllerError("plugin service must have ServiceName"),
+		},
+		{
+			name: "Bad desired state",
+			args: args{
+				change: map[string]interface{}{
+					"Name":          "TestPlugin",
+					"ServiceID":     "",
+					"ServiceName":   "TestPlugin-5000",
+					"DesiredState":  "blah",
+					"State":         "Available",
+					"Interface":     "192.168.1.1",
+					"ExternalPorts": []interface{}{"5000/tcp"},
+					"InternalPorts": []interface{}{"5000/tcp"},
+					"OS":            "all",
+				},
+			},
+			want:    &Plugin{},
+			wantErr: true,
+			err:     NewControllerError(fmt.Sprintf("invalid desired state %v sent", "blah")),
+		},
+		{
+			name: "Bad desired state",
+			args: args{
+				change: map[string]interface{}{
+					"Name":          "TestPlugin",
+					"ServiceID":     "",
+					"ServiceName":   "TestPlugin-5000",
+					"DesiredState":  "",
+					"State":         "",
+					"Interface":     "192.168.1.1",
+					"ExternalPorts": []interface{}{"5000/tcp"},
+					"InternalPorts": []interface{}{"5000/tcp"},
+					"OS":            "all",
+				},
+			},
+			want:    &Plugin{},
+			wantErr: true,
+			err:     NewControllerError(fmt.Sprintf("invalid state %v sent", "")),
+		},
+		{
+			name: "Bad desired state",
+			args: args{
+				change: map[string]interface{}{
+					"Name":          "TestPlugin",
+					"ServiceID":     "",
+					"ServiceName":   "TestPlugin-5000",
+					"DesiredState":  "",
+					"State":         "",
+					"Interface":     "192.168.1.1",
+					"ExternalPorts": []interface{}{"5000/tcp"},
+					"InternalPorts": []interface{}{"5000/tcp"},
+					"OS":            "all",
+				},
+			},
+			want:    &Plugin{},
+			wantErr: true,
+			err:     NewControllerError(fmt.Sprintf("invalid state %v sent", "")),
+		},
+		{
+			name: "Plugin with more stuff",
+			args: args{
+				change: map[string]interface{}{
+					"Name":          "TestPluginAdvanced",
+					"ServiceID":     "b972q4567qe8rhgq3503q6",
+					"ServiceName":   "TestPlugin-5005",
+					"DesiredState":  "Restart",
+					"State":         "Active",
+					"Interface":     "192.168.1.1",
+					"ExternalPorts": []interface{}{"5005/tcp", "5006/tcp", "5007/tcp", "5008/tcp"},
+					"InternalPorts": []interface{}{"5005/tcp", "5006/tcp", "5007/tcp", "5008/tcp"},
+					"OS":            "nt",
+				},
+			},
+			want: &Plugin{
+				Name:          "TestPluginAdvanced",
+				ServiceID:     "b972q4567qe8rhgq3503q6",
+				ServiceName:   "TestPlugin-5005",
+				DesiredState:  DesiredStateRestart,
+				State:         StateActive,
+				Interface:     "192.168.1.1",
+				ExternalPorts: []string{"5005/tcp", "5006/tcp", "5007/tcp", "5008/tcp"},
+				InternalPorts: []string{"5005/tcp", "5006/tcp", "5007/tcp", "5008/tcp"},
+				OS:            PluginOSWindows,
+			},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -74,6 +207,8 @@ func Test_newPlugin(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Errorf("newPlugin() error = %v, wantErr %v", err, tt.wantErr)
 				return
+			} else if tt.wantErr {
+				assert.Equal(t, tt.err, err)
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("newPlugin() = %v, want %v", got, tt.want)
@@ -339,7 +474,7 @@ func Test_getRethinkHost(t *testing.T) {
 		{
 			name: "Testing",
 			env:  "TESTING",
-			want: "localhost",
+			want: "127.0.0.1",
 		},
 		{
 			name: "Nil",
