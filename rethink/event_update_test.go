@@ -9,6 +9,9 @@ import (
 )
 
 func Test_handleEvent(t *testing.T) {
+	testingSession, _ := r.Connect(r.ConnectOpts{
+		Address: getRethinkHost(),
+	})
 	type args struct {
 		event   events.Message
 		session *r.Session
@@ -16,10 +19,28 @@ func Test_handleEvent(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    r.WriteResponse
+		want    string
 		wantErr bool
 	}{
 		// TODO: Add test cases.
+		{
+			name: "Test response to creating service",
+			args: args{
+				event: events.Message{
+					Type:   "service",
+					Action: "create",
+					Actor: {
+						ID: "hfaldfhak87dfhsddfvns0naef",
+						Attributes: {
+							name: "testing",
+						},
+					},
+				},
+				session: testingSession,
+			},
+			wantErr: false,
+			want:    "updated",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

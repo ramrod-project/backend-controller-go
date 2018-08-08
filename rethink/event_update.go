@@ -21,10 +21,11 @@ func handleEvent(event events.Message, session *r.Session) (r.WriteResponse, err
 		res, err := r.DB("Controller").Table("Plugins").Filter(filter).Update(update).RunWrite(session)
 		return res, err
 	} else if event.Action == "create" {
-		insertion := make(map[string]string)
-		insertion["ServiceName"] = event.Actor.Attributes["name"]
-		insertion["ServiceID"] = event.Actor.ID
-		r.DB("Controller").Table("plugins").Insert(insertion).RunWrite(session)
+		filter := make(map[string]string)
+		update := make(map[string]string)
+		filter["ServiceName"] = event.Actor.Attributes["name"]
+		update["State"] = "Active"
+		r.DB("Controller").Table("plugins").Filter(filter).Update(update).RunWrite(session)
 	} else if event.Action == "remove" {
 		filter := make(map[string]string)
 		update := make(map[string]string)
