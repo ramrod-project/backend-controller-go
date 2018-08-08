@@ -20,13 +20,11 @@ func main() {
 	// go errorhandler.ErrorHandler(dbError, dockError)
 
 	for resp := range eventChan {
-		if resp.Type == "service" {
-			jresp, err := json.Marshal(resp)
-			if err != nil {
-				var out bytes.Buffer
-				json.Indent(&out, jresp, "=", "\t")
-				fmt.Printf("\nDB response: %s\n", out)
-			}
+		jresp, err := json.Marshal(resp)
+		if err != nil {
+			var out bytes.Buffer
+			json.Indent(&out, jresp, "=", "\t")
+			fmt.Printf("\nDB response: %s\n", out)
 		}
 	}
 }
