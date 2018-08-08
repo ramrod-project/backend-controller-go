@@ -79,7 +79,7 @@ func (e *ControllerError) Error() string {
 func getRethinkHost() string {
 	temp := os.Getenv("STAGE")
 	if temp == "TESTING" {
-		return "localhost"
+		return "127.0.0.1"
 	}
 	return "rethinkdb"
 }
