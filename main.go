@@ -1,27 +1,32 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 
 	"encoding/json"
 
 	dockerservicemanager "github.com/ramrod-project/backend-controller-go/dockerservicemanager"
-	"github.com/ramrod-project/backend-controller-go/errorhandler"
-	"github.com/ramrod-project/backend-controller-go/rethink"
+	// "github.com/ramrod-project/backend-controller-go/errorhandler"
+	// "github.com/ramrod-project/backend-controller-go/rethink"
 )
 
 func main() {
+	// _ = dockError
+	eventChan, _ := dockerservicemanager.EventMonitor()
 
-	eventChan, dockError := dockerservicemanager.EventMonitor()
+	// fromDB, dbError := rethink.EventUpdate(eventChan)
 
-	fromDB, dbError := rethink.EventUpdate(eventChan)
+	// go errorhandler.ErrorHandler(dbError, dockError)
 
-	go errorhandler.ErrorHandler(dbError, dockError)
-
-	for resp := range fromDB {
-		out, err := json.Marshal(resp)
-		if err != nil {
-			fmt.Printf("DB response: %v\n\n", out)
+	for resp := range eventChan {
+		if resp.Type == "service" {
+			jresp, err := json.Marshal(resp)
+			if err != nil {
+				var out bytes.Buffer
+				json.Indent(&out, jresp, "=", "\t")
+				fmt.Printf("\nDB response: %s\n", out)
+			}
 		}
 	}
 }
