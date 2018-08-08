@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	r "gopkg.in/gorethink/gorethink.v4"
 )
 
@@ -35,26 +36,80 @@ func Test_newPlugin(t *testing.T) {
 }
 
 func Test_watchChanges(t *testing.T) {
-	type args struct {
-		res *r.Cursor
+
+	// Test setup
+	session, err := r.Connect(r.ConnectOpts{
+		Address: "localhost",
+	})
+	if err != nil {
+		t.Errorf("%v", err)
 	}
+
+	testPlugin := map[string]interface{}{
+		"Name":          "TestPlugin",
+		"ServiceID":     "",
+		"ServiceName":   "",
+		"DesiredState":  string(DesiredStateNull),
+		"State":         string(StateAvailable),
+		"Interface":     "192.168.1.1",
+		"ExternalPorts": []string{"1080/tcp"},
+		"InternalPorts": []string{"1080/tcp"},
+		"OS":            string(PluginOSAll),
+	}
+	_, err = r.DB("Controller").Table("Plugins").Insert(testPlugin).RunWrite(session)
+	if err != nil {
+		t.Errorf("%v", err)
+	}
+
+	// Test cases
 	tests := []struct {
-		name  string
-		args  args
-		want  <-chan Plugin
-		want1 <-chan error
+		name   string
+		change map[string]interface{}
+		want   Plugin
 	}{
-		// TODO: Add test cases.
+		{
+			name: "Servicename change",
+			change: map[string]interface{}{
+				"ServiceName": "TestPluginService",
+			},
+			want: Plugin{
+				Name:          "TestPlugin",
+				ServiceID:     "",
+				ServiceName:   "TestPluginService",
+				DesiredState:  DesiredStateNull,
+				State:         StateAvailable,
+				Interface:     "192.168.1.1",
+				ExternalPorts: []string{"1080/tcp"},
+				InternalPorts: []string{"1080/tcp"},
+				OS:            PluginOSAll,
+			},
+		},
 	}
+	filter := map[string]string{"Name": "TestPlugin"}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, got1 := watchChanges(tt.args.res)
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("watchChanges() got = %v, want %v", got, tt.want)
+			// Generate cursor for changefeed
+			c, err := r.DB("Controller").Table("Plugins").Changes().Run(session)
+			if err != nil {
+				t.Errorf("%v", err)
 			}
-			if !reflect.DeepEqual(got1, tt.want1) {
-				t.Errorf("watchChanges() got1 = %v, want %v", got1, tt.want1)
+			// Create channel and start goroutine
+			resChan, errChan := watchChanges(c)
+			// Insert change into database
+			_, err = r.DB("Controller").Table("Plugins").Filter(filter).Update(tt.change).RunWrite(session)
+			if err != nil {
+				t.Errorf("%v", err)
 			}
+			select {
+			case recvData := <-resChan:
+				assert.Equal(t, recvData, tt.want)
+			case recvErr := <-errChan:
+				t.Errorf("%v", recvErr)
+			default:
+				t.Errorf("no messages received on either channel")
+			}
+			// Close cursor to stop goroutine
+			c.Close()
 		})
 	}
 }
