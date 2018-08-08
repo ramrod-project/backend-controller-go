@@ -11,9 +11,10 @@ import (
 // in the database.
 type Plugin struct {
 	Name          string
+	ServiceID     string
 	ServiceName   string
-	DesiredState  PluginDesiredState `json:",omitempty`
-	State         PluginState        `json:",omitempty`
+	DesiredState  PluginDesiredState `json:",omitempty"`
+	State         PluginState        `json:",omitempty"`
 	Interface     string
 	ExternalPorts []string
 	InternalPorts []string
@@ -134,11 +135,12 @@ func newPlugin(change map[string]interface{}) (*Plugin, error) {
 	}
 
 	for _, v := range change["InternalPorts"].([]interface{}) {
-		extports = append(intports, v.(string))
+		intports = append(intports, v.(string))
 	}
 
 	plugin := &Plugin{
 		Name:          change["Name"].(string),
+		ServiceID:     change["ServiceID"].(string),
 		ServiceName:   change["ServiceName"].(string),
 		DesiredState:  desired,
 		State:         state,

@@ -1,6 +1,7 @@
 package rethink
 
 import (
+	"os"
 	"reflect"
 	"testing"
 
@@ -77,4 +78,43 @@ func TestMonitorPlugins(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_getRethinkHost(t *testing.T) {
+	oldEnv := os.Getenv("STAGE")
+	tests := []struct {
+		name string
+		env  string
+		want string
+	}{
+		{
+			name: "Dev",
+			env:  "DEV",
+			want: "rethinkdb",
+		},
+		{
+			name: "Prod",
+			env:  "PROD",
+			want: "rethinkdb",
+		},
+		{
+			name: "Testing",
+			env:  "TESTING",
+			want: "localhost",
+		},
+		{
+			name: "Nil",
+			env:  "",
+			want: "rethinkdb",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			os.Setenv("STAGE", tt.env)
+			if got := getRethinkHost(); got != tt.want {
+				t.Errorf("getRethinkHost() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+	os.Setenv("STAGE", oldEnv)
 }
