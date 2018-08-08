@@ -28,7 +28,7 @@ before_install:
   - chmod +x $GOPATH/bin/dep
   - docker swarm init
   - docker network create --driver=overlay --attachable test
-  - travis_wait 10 docker pull ramrodpcp/database-brain:$TAG
+  - travis_wait 10 docker pull ramrodpcp/interpreter-plugin:$TAG
 
 install:  
   - dep ensure
@@ -37,6 +37,9 @@ install:
   - go test github.com/ramrod-project/backend-controller-go/dockerservicemanager github.com/ramrod-project/backend-controller-go/rethink 
     github.com/ramrod-project/backend-controller-go/errorhandler
   - make
+
+before_script:
+  - travis_wait 10 docker pull ramrodpcp/database-brain:$TAG
 
 script:
   - docker build -t ramrodpcp/backend-contoller:$TAG .

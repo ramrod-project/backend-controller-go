@@ -54,8 +54,39 @@ func getTagFromEnv() string {
 	return temp
 }
 
+func hostString(h string, i string) string {
+	var stringBuf bytes.Buffer
+
+	stringBuf.WriteString(h)
+	stringBuf.WriteString(":")
+	stringBuf.WriteString(i)
+
+	return stringBuf.String()
+}
+
+func getManagerIP() string {
+	ctx := context.TODO()
+	dockerClient, err := client.NewEnvClient()
+	if err != nil {
+		panic(err)
+	}
+
+	list, err := dockerClient.NodeList(ctx, types.NodeListOptions{})
+	if err != nil {
+		panic(err)
+	}
+
+	for _, node := range list {
+		if node.Spec.Role == "manager" {
+			return node.Status.Addr
+		}
+	}
+	return ""
+}
+
 func generateServiceSpec(config *PluginServiceConfig) (*swarm.ServiceSpec, error) {
 	var (
+		hosts     []string
 		imageName = &dockerImageName{
 			Tag: getTagFromEnv(),
 		}
@@ -74,6 +105,7 @@ func generateServiceSpec(config *PluginServiceConfig) (*swarm.ServiceSpec, error
 	} else if config.OS == rethink.PluginOSWindows {
 		imageName.Name = "ramrodpcp/interpreter-plugin-windows"
 		placementConfig.Constraints = []string{"node.labels.os==nt"}
+		hosts = append(hosts, hostString("rethinkdb", getManagerIP()))
 	} else {
 		return &swarm.ServiceSpec{}, fmt.Errorf("invalid OS setting: %v", config.OS)
 	}
@@ -99,6 +131,7 @@ func generateServiceSpec(config *PluginServiceConfig) (*swarm.ServiceSpec, error
 				OpenStdin:       false,
 				StopGracePeriod: &stopGrace,
 				TTY:             false,
+				Hosts:           hosts,
 			},
 			RestartPolicy: &swarm.RestartPolicy{
 				Condition:   "on-failure",
@@ -132,7 +165,7 @@ func generateServiceSpec(config *PluginServiceConfig) (*swarm.ServiceSpec, error
 // CreatePluginService creates a service for a plugin
 // given a PluginServiceConfig.
 func CreatePluginService(config *PluginServiceConfig) (types.ServiceCreateResponse, error) {
-	ctx := context.Background()
+	ctx := context.TODO()
 	dockerClient, err := client.NewEnvClient()
 
 	if err != nil {
