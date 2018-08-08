@@ -3,10 +3,11 @@ package main
 import (
 	"fmt"
 
+	"encoding/json"
+
 	dockerservicemanager "github.com/ramrod-project/backend-controller-go/dockerservicemanager"
 	"github.com/ramrod-project/backend-controller-go/errorhandler"
 	"github.com/ramrod-project/backend-controller-go/rethink"
-	"encoding/json"
 )
 
 func main() {
@@ -20,7 +21,7 @@ func main() {
 	for resp := range fromDB {
 		out, err := json.Marshal(resp)
 		if err != nil {
-			fmt.Printf("DB response: %v\n\n", resp)
+			fmt.Printf("DB response: %v\n\n", out)
 		}
 	}
 }
