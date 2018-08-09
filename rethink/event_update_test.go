@@ -29,10 +29,10 @@ func Test_handleEvent(t *testing.T) {
 				event: events.Message{
 					Type:   "service",
 					Action: "create",
-					Actor: {
+					Actor: events.Actor{
 						ID: "hfaldfhak87dfhsddfvns0naef",
-						Attributes: {
-							name: "testing",
+						Attributes: map[string]string{
+							"name": "testing",
 						},
 					},
 				},
