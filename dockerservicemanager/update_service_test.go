@@ -3,7 +3,6 @@ package dockerservicemanager
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"testing"
 	"time"
@@ -73,6 +72,19 @@ func TestUpdatePluginService(t *testing.T) {
 
 	ctx := context.Background()
 	dockerClient, err := client.NewEnvClient()
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+
+	netRes, err := dockerClient.NetworkCreate(ctx, "test", types.NetworkCreate{
+		Driver:     "overlay",
+		Attachable: true,
+	})
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
 
 	serviceSpec := &swarm.ServiceSpec{
 		Annotations: swarm.Annotations{
@@ -232,16 +244,15 @@ func TestUpdatePluginService(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Errorf("UpdatePluginService() error = %v, wantErr %v", err, tt.wantErr)
 				return
+			} else if tt.wantErr {
+				return
 			}
-			inspectResults, _, err := dockerClient.ServiceInspectWithRaw(ctx, tt.args.id)
+			_, _, err = dockerClient.ServiceInspectWithRaw(ctx, tt.args.id)
 			if err != nil {
-				log.Printf("%v", err)
+				t.Errorf("%v", err)
+				return
 			} else {
 				time.Sleep(time.Second)
-				if inspectResults.PreviousSpec != nil {
-					log.Printf(SpecToString(inspectResults.PreviousSpec))
-				}
-				log.Printf(SpecToString(&inspectResults.Spec))
 			}
 			assert.Equal(t, tt.want, got)
 		})
@@ -252,6 +263,7 @@ func TestUpdatePluginService(t *testing.T) {
 	if err != nil {
 		t.Errorf("%v", err)
 	}
+	dockerClient.NetworkRemove(ctx, netRes.ID)
 }
 
 func Test_checkReady(t *testing.T) {

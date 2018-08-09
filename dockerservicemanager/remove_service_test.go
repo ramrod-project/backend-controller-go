@@ -32,6 +32,20 @@ func TestRemovePluginService(t *testing.T) {
 
 	ctx := context.Background()
 	dockerClient, err := client.NewEnvClient()
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+
+	netRes, err := dockerClient.NetworkCreate(ctx, "test", types.NetworkCreate{
+		Driver:     "overlay",
+		Attachable: true,
+	})
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+
 	serviceSpec := &swarm.ServiceSpec{
 		Annotations: swarm.Annotations{
 			Name: "GoodService",
@@ -120,4 +134,5 @@ func TestRemovePluginService(t *testing.T) {
 			}
 		})
 	}
+	dockerClient.NetworkRemove(ctx, netRes.ID)
 }

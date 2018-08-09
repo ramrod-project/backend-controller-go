@@ -27,7 +27,7 @@ before_install:
   - curl -L -s https://github.com/golang/dep/releases/download/v${DEP_VERSION}/dep-linux-amd64 -o $GOPATH/bin/dep
   - chmod +x $GOPATH/bin/dep
   - docker swarm init
-  - docker network create --driver=overlay --attachable test
+  - docker network create --driver=overlay --attachable pcp
   - travis_wait 10 docker pull ramrodpcp/interpreter-plugin:$TAG
 
 install:  

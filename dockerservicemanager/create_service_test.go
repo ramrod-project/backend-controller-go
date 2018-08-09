@@ -16,6 +16,23 @@ import (
 )
 
 func Test_CreatePluginService(t *testing.T) {
+
+	ctx := context.TODO()
+	dockerClient, err := client.NewEnvClient()
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+
+	netRes, err := dockerClient.NetworkCreate(ctx, "test", types.NetworkCreate{
+		Driver:     "overlay",
+		Attachable: true,
+	})
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+
 	type args struct {
 		config PluginServiceConfig
 	}
@@ -123,8 +140,6 @@ func Test_CreatePluginService(t *testing.T) {
 		})
 	}
 	// Docker cleanup
-	ctx := context.Background()
-	dockerClient, err := client.NewEnvClient()
 	if err != nil {
 		t.Errorf("%v", err)
 	}
@@ -138,6 +153,7 @@ func Test_CreatePluginService(t *testing.T) {
 			t.Errorf("%v", err)
 		}
 	}
+	dockerClient.NetworkRemove(ctx, netRes.ID)
 }
 
 func Test_generateServiceSpec(t *testing.T) {
