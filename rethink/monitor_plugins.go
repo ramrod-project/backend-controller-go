@@ -2,7 +2,6 @@ package rethink
 
 import (
 	"fmt"
-	"log"
 	"os"
 
 	r "gopkg.in/gorethink/gorethink.v4"
@@ -97,6 +96,9 @@ func newPlugin(change map[string]interface{}) (*Plugin, error) {
 	if change["ServiceName"] == "" {
 		return &Plugin{}, NewControllerError("plugin service must have ServiceName")
 	}
+	if change["Name"] == "" {
+		return &Plugin{}, NewControllerError("plugin name must not be blank")
+	}
 
 	switch change["DesiredState"] {
 	case string(DesiredStateActivate):
@@ -164,7 +166,6 @@ func watchChanges(res *r.Cursor) (<-chan Plugin, <-chan error) {
 	go func(cursor *r.Cursor) {
 		var doc map[string]interface{}
 		for cursor.Next(&doc) {
-			log.Printf("Change: %v, Type: %T", doc, doc)
 			if v, ok := doc["new_val"]; ok {
 				plugin, err := newPlugin(v.(map[string]interface{}))
 				if err != nil {

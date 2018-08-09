@@ -33,6 +33,66 @@ func getBrainImage() string {
 	return stringBuf.String()
 }
 
+func startBrain(ctx context.Context, t *testing.T, dockerClient *client.Client) (*r.Session, string, error) {
+	// Start brain
+	result, err := dockerClient.ServiceCreate(ctx, brainSpec, types.ServiceCreateOptions{})
+	if err != nil {
+		t.Errorf("%v", err)
+		return nil, "", err
+	}
+
+	// Test setup
+	session, err := r.Connect(r.ConnectOpts{
+		Address: "127.0.0.1",
+	})
+	start := time.Now()
+	if err != nil {
+		for {
+			if time.Since(start) >= 20*time.Second {
+				t.Errorf("%v", err)
+				return nil, "", err
+			}
+			session, err = r.Connect(r.ConnectOpts{
+				Address: "127.0.0.1",
+			})
+			if err == nil {
+				_, err := r.DB("Controller").Table("Plugins").Run(session)
+				if err == nil {
+					break
+				}
+			}
+			time.Sleep(time.Second)
+		}
+	}
+	return session, result.ID, err
+}
+
+func killBrain(ctx context.Context, dockerClient *client.Client, brainID string) {
+	start := time.Now()
+	for time.Since(start) < 10*time.Second {
+		err := dockerClient.ServiceRemove(ctx, brainID)
+		if err != nil {
+			break
+		}
+		time.Sleep(time.Second)
+	}
+	for time.Since(start) < 15*time.Second {
+		containers, err := dockerClient.ContainerList(ctx, types.ContainerListOptions{})
+		if err == nil {
+			if len(containers) == 0 {
+				break
+			}
+			for _, c := range containers {
+				err = dockerClient.ContainerKill(ctx, c.ID, "")
+				if err == nil {
+					dockerClient.ContainerRemove(ctx, c.ID, types.ContainerRemoveOptions{Force: true})
+				}
+			}
+		}
+		time.Sleep(time.Second)
+	}
+}
+
 var brainSpec = swarm.ServiceSpec{
 	Annotations: swarm.Annotations{
 		Name: "rethinkdb",
@@ -226,35 +286,10 @@ func Test_watchChanges(t *testing.T) {
 		return
 	}
 
-	// Start brain
-	result, err := dockerClient.ServiceCreate(ctx, brainSpec, types.ServiceCreateOptions{})
+	session, brainID, err := startBrain(ctx, t, dockerClient)
 	if err != nil {
 		t.Errorf("%v", err)
 		return
-	}
-
-	// Test setup
-	session, err := r.Connect(r.ConnectOpts{
-		Address: "127.0.0.1",
-	})
-	start := time.Now()
-	if err != nil {
-		for {
-			if time.Since(start) >= 20*time.Second {
-				t.Errorf("%v", err)
-				return
-			}
-			session, err = r.Connect(r.ConnectOpts{
-				Address: "127.0.0.1",
-			})
-			if err == nil {
-				_, err := r.DB("Controller").Table("Plugins").Run(session)
-				if err == nil {
-					break
-				}
-			}
-			time.Sleep(time.Second)
-		}
 	}
 
 	testPlugin := map[string]interface{}{
@@ -430,28 +465,178 @@ func Test_watchChanges(t *testing.T) {
 			c.Close()
 		})
 	}
-	dockerClient.ServiceRemove(ctx, result.ID)
+	killBrain(ctx, dockerClient, brainID)
 }
 
 func TestMonitorPlugins(t *testing.T) {
+	oldEnv := os.Getenv("STAGE")
+	os.Setenv("STAGE", "TESTING")
+
+	ctx := context.TODO()
+	dockerClient, err := client.NewEnvClient()
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+
+	session, brainID, err := startBrain(ctx, t, dockerClient)
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+
 	tests := []struct {
-		name  string
-		want  <-chan Plugin
-		want1 <-chan error
+		name    string
+		plugin  map[string]interface{}
+		change  map[string]interface{}
+		filter  map[string]string
+		want    Plugin
+		wantErr bool
+		err     error
 	}{
-		// TODO: Add test cases.
+		{
+			name: "Add first plugin",
+			plugin: map[string]interface{}{
+				"Name":          "TestPlugin1",
+				"ServiceID":     "",
+				"ServiceName":   "TestPlugin1Service",
+				"DesiredState":  "",
+				"State":         "Available",
+				"Interface":     "192.168.1.1",
+				"ExternalPorts": []interface{}{"999/tcp"},
+				"InternalPorts": []interface{}{"999/tcp"},
+				"OS":            "nt",
+			},
+			want: Plugin{
+				Name:          "TestPlugin1",
+				ServiceID:     "",
+				ServiceName:   "TestPlugin1Service",
+				DesiredState:  DesiredStateNull,
+				State:         StateAvailable,
+				Interface:     "192.168.1.1",
+				ExternalPorts: []string{"999/tcp"},
+				InternalPorts: []string{"999/tcp"},
+				OS:            PluginOSWindows,
+			},
+			wantErr: false,
+		},
+		{
+			name: "Add second plugin",
+			plugin: map[string]interface{}{
+				"Name":          "TestPlugin2",
+				"ServiceID":     "",
+				"ServiceName":   "TestPlugin2Service",
+				"DesiredState":  "",
+				"State":         "Available",
+				"Interface":     "192.168.1.2",
+				"ExternalPorts": []interface{}{"444/tcp", "444/udp"},
+				"InternalPorts": []interface{}{"444/tcp", "444/udp"},
+				"OS":            "all",
+			},
+			want: Plugin{
+				Name:          "TestPlugin2",
+				ServiceID:     "",
+				ServiceName:   "TestPlugin2Service",
+				DesiredState:  DesiredStateNull,
+				State:         StateAvailable,
+				Interface:     "192.168.1.2",
+				ExternalPorts: []string{"444/tcp", "444/udp"},
+				InternalPorts: []string{"444/tcp", "444/udp"},
+				OS:            PluginOSAll,
+			},
+			wantErr: false,
+		},
+		{
+			name: "Change first plugin",
+			change: map[string]interface{}{
+				"DesiredState": "Activate",
+			},
+			filter: map[string]string{
+				"ServiceName": "TestPlugin1Service",
+			},
+			want: Plugin{
+				Name:          "TestPlugin1",
+				ServiceID:     "",
+				ServiceName:   "TestPlugin1Service",
+				DesiredState:  DesiredStateActivate,
+				State:         StateAvailable,
+				Interface:     "192.168.1.1",
+				ExternalPorts: []string{"999/tcp"},
+				InternalPorts: []string{"999/tcp"},
+				OS:            PluginOSWindows,
+			},
+			wantErr: false,
+		},
+		{
+			name: "Change second plugin",
+			change: map[string]interface{}{
+				"ServiceID": "q3hyt80qeh5ygt8hbeq8itjhgq9854t",
+			},
+			filter: map[string]string{
+				"ServiceName": "TestPlugin2Service",
+			},
+			want: Plugin{
+				Name:          "TestPlugin2",
+				ServiceID:     "q3hyt80qeh5ygt8hbeq8itjhgq9854t",
+				ServiceName:   "TestPlugin2Service",
+				DesiredState:  DesiredStateNull,
+				State:         StateAvailable,
+				Interface:     "192.168.1.2",
+				ExternalPorts: []string{"444/tcp", "444/udp"},
+				InternalPorts: []string{"444/tcp", "444/udp"},
+				OS:            PluginOSAll,
+			},
+			wantErr: false,
+		},
+		{
+			name: "Bad change first plugin",
+			change: map[string]interface{}{
+				"Name": "",
+			},
+			filter: map[string]string{
+				"ServiceName": "TestPlugin1Service",
+			},
+			want:    Plugin{},
+			wantErr: true,
+			err:     NewControllerError("plugin name must not be blank"),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, got1 := MonitorPlugins()
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("MonitorPlugins() got = %v, want %v", got, tt.want)
+			// Create channel and start goroutine
+			dbChan, errChan := MonitorPlugins()
+			var err error
+			// Insert new plugin
+			if tt.plugin != nil {
+				_, err = r.DB("Controller").Table("Plugins").Insert(tt.plugin).RunWrite(session)
+			} else {
+				// Or insert change
+				_, err = r.DB("Controller").Table("Plugins").Filter(tt.filter).Update(tt.change).RunWrite(session)
 			}
-			if !reflect.DeepEqual(got1, tt.want1) {
-				t.Errorf("MonitorPlugins() got1 = %v, want %v", got1, tt.want1)
+			if err != nil {
+				t.Errorf("%v", err)
+			}
+			if tt.wantErr {
+				select {
+				case recvErr := <-errChan:
+					assert.Equal(t, tt.err, recvErr)
+				default:
+					t.Errorf("no error message received")
+				}
+			} else {
+				select {
+				case recvData := <-dbChan:
+					assert.Equal(t, tt.want, recvData)
+				case recvErr := <-errChan:
+					assert.Equal(t, tt.err, recvErr)
+				default:
+					t.Errorf("no message received on either channel")
+				}
 			}
 		})
 	}
+	killBrain(ctx, dockerClient, brainID)
+	os.Setenv("STAGE", oldEnv)
 }
 
 func Test_getRethinkHost(t *testing.T) {
