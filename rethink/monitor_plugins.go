@@ -19,6 +19,7 @@ type Plugin struct {
 	ExternalPorts []string
 	InternalPorts []string
 	OS            PluginOS
+	Environment   []string
 }
 
 // PluginOS is the supported OS for the plugin
@@ -86,11 +87,12 @@ func getRethinkHost() string {
 
 func newPlugin(change map[string]interface{}) (*Plugin, error) {
 	var (
-		desired  PluginDesiredState
-		extports []string
-		intports []string
-		os       PluginOS
-		state    PluginState
+		desired     PluginDesiredState
+		extports    []string
+		intports    []string
+		environment []string
+		os          PluginOS
+		state       PluginState
 	)
 
 	if change["ServiceName"] == "" {
@@ -145,6 +147,10 @@ func newPlugin(change map[string]interface{}) (*Plugin, error) {
 		intports = append(intports, v.(string))
 	}
 
+	for _, v := range change["Environment"].([]interface{}) {
+		environment = append(environment, v.(string))
+	}
+
 	plugin := &Plugin{
 		Name:          change["Name"].(string),
 		ServiceID:     change["ServiceID"].(string),
@@ -155,6 +161,7 @@ func newPlugin(change map[string]interface{}) (*Plugin, error) {
 		ExternalPorts: extports,
 		InternalPorts: intports,
 		OS:            os,
+		Environment:   environment,
 	}
 
 	return plugin, nil

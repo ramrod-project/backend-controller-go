@@ -39,8 +39,9 @@ func getEnvByKey(k string) string {
 
 func pluginToConfig(plugin rethink.Plugin) (PluginServiceConfig, error) {
 	var (
-		proto swarm.PortConfigProtocol
-		mode  swarm.PortConfigPublishMode
+		proto       swarm.PortConfigProtocol
+		mode        swarm.PortConfigPublishMode
+		environment []string
 	)
 
 	// Windows must use host networking
@@ -66,16 +67,23 @@ func pluginToConfig(plugin rethink.Plugin) (PluginServiceConfig, error) {
 	} else {
 		proto = swarm.PortConfigProtocolUDP
 	}
+
+	// Concatonate environment variables (if provided)
+	environment = []string{
+		getEnvByKey("STAGE"),
+		getEnvByKey("LOGLEVEL"),
+		envString("PORT", fmt.Sprintf("%v", intPort)),
+		envString("PLUGIN", plugin.Name),
+	}
+	if len(plugin.Environment) > 0 {
+		environment = append(environment, plugin.Environment...)
+	}
+
 	return PluginServiceConfig{
-		Environment: []string{
-			getEnvByKey("STAGE"),
-			getEnvByKey("LOGLEVEL"),
-			envString("PORT", fmt.Sprintf("%v", intPort)),
-			envString("PLUGIN", plugin.Name),
-		},
-		Address: plugin.Address,
-		Network: "pcp",
-		OS:      plugin.OS,
+		Environment: environment,
+		Address:     plugin.Address,
+		Network:     "pcp",
+		OS:          plugin.OS,
 		Ports: []swarm.PortConfig{swarm.PortConfig{
 			Protocol:      proto,
 			TargetPort:    uint32(intPort),
