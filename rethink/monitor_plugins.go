@@ -15,7 +15,7 @@ type Plugin struct {
 	ServiceName   string
 	DesiredState  PluginDesiredState `json:",omitempty"`
 	State         PluginState        `json:",omitempty"`
-	Interface     string
+	Address       string
 	ExternalPorts []string
 	InternalPorts []string
 	OS            PluginOS
@@ -151,7 +151,7 @@ func newPlugin(change map[string]interface{}) (*Plugin, error) {
 		ServiceName:   change["ServiceName"].(string),
 		DesiredState:  desired,
 		State:         state,
-		Interface:     change["Interface"].(string),
+		Address:       change["Interface"].(string),
 		ExternalPorts: extports,
 		InternalPorts: intports,
 		OS:            os,

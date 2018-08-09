@@ -36,6 +36,7 @@ func (d dockerImageName) String() string {
 // for a plugin service.
 type PluginServiceConfig struct {
 	Environment []string
+	Address     string
 	Network     string
 	OS          rethink.PluginOS
 	Ports       []swarm.PortConfig `json:",omitempty"`
@@ -108,6 +109,11 @@ func generateServiceSpec(config *PluginServiceConfig) (*swarm.ServiceSpec, error
 		hosts = append(hosts, hostString("rethinkdb", getManagerIP()))
 	} else {
 		return &swarm.ServiceSpec{}, fmt.Errorf("invalid OS setting: %v", config.OS)
+	}
+
+	// Check if IP specified
+	if config.Address != "" {
+		placementConfig.Constraints = append(placementConfig.Constraints, "node.labels.ip=="+config.Address)
 	}
 
 	log.Printf("Creating service spec\n")

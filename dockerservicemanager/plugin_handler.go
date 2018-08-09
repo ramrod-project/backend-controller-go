@@ -73,6 +73,7 @@ func pluginToConfig(plugin rethink.Plugin) (PluginServiceConfig, error) {
 			envString("PORT", fmt.Sprintf("%v", intPort)),
 			envString("PLUGIN", plugin.Name),
 		},
+		Address: plugin.Address,
 		Network: "pcp",
 		OS:      plugin.OS,
 		Ports: []swarm.PortConfig{swarm.PortConfig{
