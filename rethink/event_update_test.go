@@ -9,34 +9,9 @@ import (
 
 	"github.com/docker/docker/api/types"
 	events "github.com/docker/docker/api/types/events"
-	"github.com/docker/docker/api/types/swarm"
 	"github.com/docker/docker/client"
 	r "gopkg.in/gorethink/gorethink.v4"
 )
-
-var brainSpec = swarm.ServiceSpec{
-	Annotations: swarm.Annotations{
-		Name: "rethinkdb",
-	},
-	TaskTemplate: swarm.TaskSpec{
-		ContainerSpec: swarm.ContainerSpec{
-			DNSConfig: &swarm.DNSConfig{},
-			Image:     getBrainImage(),
-		},
-		RestartPolicy: &swarm.RestartPolicy{
-			Condition: "on-failure",
-		},
-	},
-	EndpointSpec: &swarm.EndpointSpec{
-		Mode: swarm.ResolutionModeVIP,
-		Ports: []swarm.PortConfig{swarm.PortConfig{
-			Protocol:      swarm.PortConfigProtocolTCP,
-			TargetPort:    28015,
-			PublishedPort: 28015,
-			PublishMode:   swarm.PortConfigPublishModeIngress,
-		}},
-	},
-}
 
 func Test_handleEvent(t *testing.T) {
 	ctx := context.TODO()
