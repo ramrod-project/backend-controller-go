@@ -41,13 +41,10 @@ func Test_selectChange(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := selectChange(tt.args.plugin)
+			err := selectChange(tt.args.plugin)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("selectChange() error = %v, wantErr %v", err, tt.wantErr)
 				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("selectChange() = %v, want %v", got, tt.want)
 			}
 		})
 	}
