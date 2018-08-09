@@ -43,6 +43,8 @@ func getNodes() ([]map[string]interface{}, error) {
 	for i, n := range nodes {
 		hostname := n.Description.Hostname
 		ip := n.Status.Addr
+		version := n.Meta.Version
+		spec := n.Spec
 		if osname, ok := osMap[n.Description.Platform.OS]; ok {
 			entry := map[string]interface{}{
 				"Address":      ip,
@@ -52,6 +54,13 @@ func getNodes() ([]map[string]interface{}, error) {
 				"UDPPorts":     []string{},
 			}
 			entries[i] = entry
+			spec.Annotations.Labels = map[string]string{
+				"os": string(osname),
+			}
+			err = dockerClient.NodeUpdate(ctx, n.ID, version, spec)
+			if err != nil {
+				return nil, fmt.Errorf("could not assign label to node %v", hostname)
+			}
 		} else {
 			return nil, fmt.Errorf("OS not recognized for node %v", hostname)
 		}

@@ -156,6 +156,14 @@ func Test_getRethinkHost(t *testing.T) {
 }
 
 func Test_getNodes(t *testing.T) {
+
+	ctx := context.TODO()
+	dockerClient, err := client.NewEnvClient()
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+
 	tests := []struct {
 		name    string
 		wantErr bool
@@ -183,6 +191,12 @@ func Test_getNodes(t *testing.T) {
 			assert.Equal(t, []string{}, got[0]["TCPPorts"])
 			assert.IsType(t, []string{}, got[0]["UDPPorts"])
 			assert.Equal(t, []string{}, got[0]["UDPPorts"])
+			res, err := dockerClient.NodeList(ctx, types.NodeListOptions{})
+			if err != nil {
+				t.Errorf("%v", err)
+				return
+			}
+			assert.Equal(t, "posix", res[0].Spec.Annotations.Labels["os"])
 		})
 	}
 }
