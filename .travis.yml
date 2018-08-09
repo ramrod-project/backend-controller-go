@@ -44,8 +44,8 @@ before_script:
 
 script:
   - docker build -t ramrodpcp/backend-contoller:$TAG .
-  - docker run -d --name rethinkdb --network test -p 28015:28015 ramrodpcp/database-brain:$TAG
-  - docker run -d --name controller --network test -v /var/run/docker.sock:/var/run/docker.sock ramrodpcp/backend-contoller:$TAG
+  - docker run -d --name rethinkdb --network pcp -p 28015:28015 ramrodpcp/database-brain:$TAG
+  - docker run -d --name controller --network pcp -v /var/run/docker.sock:/var/run/docker.sock ramrodpcp/backend-contoller:$TAG
   - docker ps -a
   - docker logs controller
   - docker stop controller
