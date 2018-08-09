@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/docker/docker/api/types"
 	swarm "github.com/docker/docker/api/types/swarm"
@@ -59,12 +60,14 @@ func getNodes() ([]map[string]interface{}, error) {
 				"os": string(osname),
 				"ip": ip,
 			}
-			inspectNew, _, err := dockerClient.NodeInspectWithRaw(ctx, n.ID)
-			if err != nil {
-				log.Printf("%v", err)
-				return nil, fmt.Errorf("could not assign label to node %v", hostname)
+			start := time.Now()
+			for time.Since(start) < 5*time.Second {
+				inspectNew, _, _ := dockerClient.NodeInspectWithRaw(ctx, n.ID)
+				err = dockerClient.NodeUpdate(ctx, n.ID, swarm.Version{Index: inspectNew.Meta.Version.Index}, spec)
+				if err == nil {
+					break
+				}
 			}
-			err = dockerClient.NodeUpdate(ctx, n.ID, swarm.Version{Index: inspectNew.Meta.Version.Index}, spec)
 			if err != nil {
 				log.Printf("%v", err)
 				return nil, fmt.Errorf("could not assign label to node %v", hostname)
