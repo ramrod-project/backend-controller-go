@@ -1,17 +1,55 @@
 package rethink
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
+	"gopkg.in/gorethink/gorethink.v4"
+
+	"github.com/docker/docker/api/types"
 	events "github.com/docker/docker/api/types/events"
+	"github.com/docker/docker/client"
 	r "gopkg.in/gorethink/gorethink.v4"
 )
 
 func Test_handleEvent(t *testing.T) {
+	ctx := context.TODO()
+	dockerClient, err := client.NewEnvClient()
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+
+	// Start brain
+	result, err := dockerClient.ServiceCreate(ctx, brainSpec, types.ServiceCreateOptions{})
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+
 	testingSession, _ := r.Connect(r.ConnectOpts{
 		Address: getRethinkHost(),
 	})
+
+	testPlugin := map[string]interface{}{
+		"Name":          "TestPlugin",
+		"ServiceID":     "",
+		"ServiceName":   "",
+		"DesiredState":  "",
+		"State":         "Stopped",
+		"Interface":     "192.168.1.1",
+		"ExternalPorts": []string{"1080/tcp"},
+		"InternalPorts": []string{"1080/tcp"},
+		"OS":            string(PluginOSAll),
+	}
+
+	_, err = r.DB("Controller").Table("Plugins").Insert(testPlugin).RunWrite(testingSession)
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+
 	type args struct {
 		event   events.Message
 		session *r.Session
@@ -19,7 +57,7 @@ func Test_handleEvent(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    string
+		want    gorethink.WriteResponse
 		wantErr bool
 	}{
 		// TODO: Add test cases.
@@ -39,7 +77,9 @@ func Test_handleEvent(t *testing.T) {
 				session: testingSession,
 			},
 			wantErr: false,
-			want:    "updated",
+			want: gorethink.WriteResponse{
+				Updated: 1,
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -54,6 +94,8 @@ func Test_handleEvent(t *testing.T) {
 			}
 		})
 	}
+
+	dockerClient.ServiceRemove(ctx, result.ID)
 }
 
 func TestEventUpdate(t *testing.T) {
