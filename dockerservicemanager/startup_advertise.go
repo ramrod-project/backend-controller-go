@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 
 	"github.com/docker/docker/api/types"
+	swarm "github.com/docker/docker/api/types/swarm"
 	client "github.com/docker/docker/client"
 	rethink "github.com/ramrod-project/backend-controller-go/rethink"
 	r "gopkg.in/gorethink/gorethink.v4"
@@ -43,7 +45,6 @@ func getNodes() ([]map[string]interface{}, error) {
 	for i, n := range nodes {
 		hostname := n.Description.Hostname
 		ip := n.Status.Addr
-		version := n.Meta.Version
 		spec := n.Spec
 		if osname, ok := osMap[n.Description.Platform.OS]; ok {
 			entry := map[string]interface{}{
@@ -58,8 +59,14 @@ func getNodes() ([]map[string]interface{}, error) {
 				"os": string(osname),
 				"ip": ip,
 			}
-			err = dockerClient.NodeUpdate(ctx, n.ID, version, spec)
+			inspectNew, _, err := dockerClient.NodeInspectWithRaw(ctx, n.ID)
 			if err != nil {
+				log.Printf("%v", err)
+				return nil, fmt.Errorf("could not assign label to node %v", hostname)
+			}
+			err = dockerClient.NodeUpdate(ctx, n.ID, swarm.Version{Index: inspectNew.Meta.Version.Index}, spec)
+			if err != nil {
+				log.Printf("%v", err)
 				return nil, fmt.Errorf("could not assign label to node %v", hostname)
 			}
 		} else {

@@ -147,8 +147,14 @@ func newPlugin(change map[string]interface{}) (*Plugin, error) {
 		intports = append(intports, v.(string))
 	}
 
-	for _, v := range change["Environment"].([]interface{}) {
-		environment = append(environment, v.(string))
+	if fmt.Sprintf("%T", change["Environment"]) == "[]string" {
+		environment = change["Environment"].([]string)
+	} else if fmt.Sprintf("%T", change["Environment"]) == "[]interface {}" {
+		for _, v := range change["Environment"].([]interface{}) {
+			environment = append(environment, v.(string))
+		}
+	} else {
+		environment = []string{}
 	}
 
 	plugin := &Plugin{

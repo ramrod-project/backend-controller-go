@@ -169,7 +169,7 @@ func Test_getNodes(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name:    "Test getting the node",
+			name:    "Test getting the node and assigning",
 			wantErr: false,
 		},
 	}

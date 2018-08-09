@@ -24,7 +24,7 @@ func Test_CreatePluginService(t *testing.T) {
 		return
 	}
 
-	netRes, err := dockerClient.NetworkCreate(ctx, "test", types.NetworkCreate{
+	netRes, err := dockerClient.NetworkCreate(ctx, "test_create", types.NetworkCreate{
 		Driver:     "overlay",
 		Attachable: true,
 	})
@@ -53,7 +53,7 @@ func Test_CreatePluginService(t *testing.T) {
 						"PORT=5000",
 						"PLUGIN=Harness",
 					},
-					Network: "test",
+					Network: "test_create",
 					OS:      "posix",
 					Ports: []swarm.PortConfig{swarm.PortConfig{
 						Protocol:      swarm.PortConfigProtocolTCP,
@@ -105,7 +105,7 @@ func Test_CreatePluginService(t *testing.T) {
 						"PORT=5000",
 						"PLUGIN=Harness",
 					},
-					Network: "test",
+					Network: "test_create",
 					OS:      "posix",
 					Ports: []swarm.PortConfig{swarm.PortConfig{
 						Protocol:      swarm.PortConfigProtocolTCP,
@@ -153,7 +153,14 @@ func Test_CreatePluginService(t *testing.T) {
 			t.Errorf("%v", err)
 		}
 	}
-	dockerClient.NetworkRemove(ctx, netRes.ID)
+	start := time.Now()
+	for time.Since(start) < 5*time.Second {
+		err := dockerClient.NetworkRemove(ctx, netRes.ID)
+		if err == nil {
+			break
+		}
+		time.Sleep(time.Second)
+	}
 }
 
 func Test_generateServiceSpec(t *testing.T) {

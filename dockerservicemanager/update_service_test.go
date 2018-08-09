@@ -77,7 +77,7 @@ func TestUpdatePluginService(t *testing.T) {
 		return
 	}
 
-	netRes, err := dockerClient.NetworkCreate(ctx, "test", types.NetworkCreate{
+	netRes, err := dockerClient.NetworkCreate(ctx, "test_update", types.NetworkCreate{
 		Driver:     "overlay",
 		Attachable: true,
 	})
@@ -114,7 +114,7 @@ func TestUpdatePluginService(t *testing.T) {
 			Placement: placementConfig,
 			Networks: []swarm.NetworkAttachmentConfig{
 				swarm.NetworkAttachmentConfig{
-					Target: "test",
+					Target: "test_update",
 				},
 			},
 		},
@@ -163,7 +163,7 @@ func TestUpdatePluginService(t *testing.T) {
 						"PLUGIN=Harness",
 						"TEST=TEST",
 					},
-					Network: "test",
+					Network: "test_update",
 					OS:      "posix",
 					Ports: []swarm.PortConfig{swarm.PortConfig{
 						Protocol:      swarm.PortConfigProtocolTCP,
@@ -191,7 +191,7 @@ func TestUpdatePluginService(t *testing.T) {
 						"PLUGIN=Harness",
 						"TEST=TEST",
 					},
-					Network: "test",
+					Network: "test_update",
 					OS:      "posix",
 					Ports: []swarm.PortConfig{swarm.PortConfig{
 						Protocol:      swarm.PortConfigProtocolTCP,
@@ -219,7 +219,7 @@ func TestUpdatePluginService(t *testing.T) {
 						"PLUGIN=Harness",
 						"TEST=TEST",
 					},
-					Network: "test",
+					Network: "test_update",
 					OS:      "posix",
 					Ports: []swarm.PortConfig{swarm.PortConfig{
 						Protocol:      swarm.PortConfigProtocolTCP,
@@ -263,7 +263,14 @@ func TestUpdatePluginService(t *testing.T) {
 	if err != nil {
 		t.Errorf("%v", err)
 	}
-	dockerClient.NetworkRemove(ctx, netRes.ID)
+	start := time.Now()
+	for time.Since(start) < 5*time.Second {
+		err := dockerClient.NetworkRemove(ctx, netRes.ID)
+		if err == nil {
+			break
+		}
+		time.Sleep(time.Second)
+	}
 }
 
 func Test_checkReady(t *testing.T) {

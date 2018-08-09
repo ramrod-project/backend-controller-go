@@ -37,7 +37,7 @@ func TestRemovePluginService(t *testing.T) {
 		return
 	}
 
-	netRes, err := dockerClient.NetworkCreate(ctx, "test", types.NetworkCreate{
+	netRes, err := dockerClient.NetworkCreate(ctx, "test_remove", types.NetworkCreate{
 		Driver:     "overlay",
 		Attachable: true,
 	})
@@ -74,7 +74,7 @@ func TestRemovePluginService(t *testing.T) {
 			Placement: placementConfig,
 			Networks: []swarm.NetworkAttachmentConfig{
 				swarm.NetworkAttachmentConfig{
-					Target: "test",
+					Target: "test_remove",
 				},
 			},
 		},
@@ -134,5 +134,12 @@ func TestRemovePluginService(t *testing.T) {
 			}
 		})
 	}
-	dockerClient.NetworkRemove(ctx, netRes.ID)
+	start := time.Now()
+	for time.Since(start) < 5*time.Second {
+		err := dockerClient.NetworkRemove(ctx, netRes.ID)
+		if err == nil {
+			break
+		}
+		time.Sleep(time.Second)
+	}
 }

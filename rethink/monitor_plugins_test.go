@@ -141,6 +141,7 @@ func Test_newPlugin(t *testing.T) {
 					"ExternalPorts": []interface{}{"5000/tcp"},
 					"InternalPorts": []interface{}{"5000/tcp"},
 					"OS":            "all",
+					"Environment":   []string{},
 				},
 			},
 			want: &Plugin{
@@ -153,6 +154,7 @@ func Test_newPlugin(t *testing.T) {
 				ExternalPorts: []string{"5000/tcp"},
 				InternalPorts: []string{"5000/tcp"},
 				OS:            PluginOSAll,
+				Environment:   []string{},
 			},
 			wantErr: false,
 		},
@@ -169,6 +171,7 @@ func Test_newPlugin(t *testing.T) {
 					"ExternalPorts": []interface{}{"5000/tcp"},
 					"InternalPorts": []interface{}{"5000/tcp"},
 					"OS":            "all",
+					"Environment":   []string{},
 				},
 			},
 			want:    &Plugin{},
@@ -188,6 +191,7 @@ func Test_newPlugin(t *testing.T) {
 					"ExternalPorts": []interface{}{"5000/tcp"},
 					"InternalPorts": []interface{}{"5000/tcp"},
 					"OS":            "all",
+					"Environment":   []string{},
 				},
 			},
 			want:    &Plugin{},
@@ -195,7 +199,7 @@ func Test_newPlugin(t *testing.T) {
 			err:     NewControllerError(fmt.Sprintf("invalid desired state %v sent", "blah")),
 		},
 		{
-			name: "Bad desired state",
+			name: "Bad state",
 			args: args{
 				change: map[string]interface{}{
 					"Name":          "TestPlugin",
@@ -207,25 +211,7 @@ func Test_newPlugin(t *testing.T) {
 					"ExternalPorts": []interface{}{"5000/tcp"},
 					"InternalPorts": []interface{}{"5000/tcp"},
 					"OS":            "all",
-				},
-			},
-			want:    &Plugin{},
-			wantErr: true,
-			err:     NewControllerError(fmt.Sprintf("invalid state %v sent", "")),
-		},
-		{
-			name: "Bad desired state",
-			args: args{
-				change: map[string]interface{}{
-					"Name":          "TestPlugin",
-					"ServiceID":     "",
-					"ServiceName":   "TestPlugin-5000",
-					"DesiredState":  "",
-					"State":         "",
-					"Interface":     "192.168.1.1",
-					"ExternalPorts": []interface{}{"5000/tcp"},
-					"InternalPorts": []interface{}{"5000/tcp"},
-					"OS":            "all",
+					"Environment":   []string{},
 				},
 			},
 			want:    &Plugin{},
@@ -245,6 +231,7 @@ func Test_newPlugin(t *testing.T) {
 					"ExternalPorts": []interface{}{"5005/tcp", "5006/tcp", "5007/tcp", "5008/tcp"},
 					"InternalPorts": []interface{}{"5005/tcp", "5006/tcp", "5007/tcp", "5008/tcp"},
 					"OS":            "nt",
+					"Environment":   []string{"TEST=TEST", "TEST2=TEST2"},
 				},
 			},
 			want: &Plugin{
@@ -257,6 +244,7 @@ func Test_newPlugin(t *testing.T) {
 				ExternalPorts: []string{"5005/tcp", "5006/tcp", "5007/tcp", "5008/tcp"},
 				InternalPorts: []string{"5005/tcp", "5006/tcp", "5007/tcp", "5008/tcp"},
 				OS:            PluginOSWindows,
+				Environment:   []string{"TEST=TEST", "TEST2=TEST2"},
 			},
 			wantErr: false,
 		},
@@ -302,6 +290,7 @@ func Test_watchChanges(t *testing.T) {
 		"ExternalPorts": []string{"1080/tcp"},
 		"InternalPorts": []string{"1080/tcp"},
 		"OS":            string(PluginOSAll),
+		"Environment":   []string{"TEST=TEST", "TEST2=TEST2"},
 	}
 	_, err = r.DB("Controller").Table("Plugins").Insert(testPlugin).RunWrite(session)
 	if err != nil {
@@ -330,6 +319,7 @@ func Test_watchChanges(t *testing.T) {
 				ExternalPorts: []string{"1080/tcp"},
 				InternalPorts: []string{"1080/tcp"},
 				OS:            PluginOSAll,
+				Environment:   []string{"TEST=TEST", "TEST2=TEST2"},
 			},
 		},
 		{
@@ -347,6 +337,7 @@ func Test_watchChanges(t *testing.T) {
 				ExternalPorts: []string{"1080/tcp"},
 				InternalPorts: []string{"1080/tcp"},
 				OS:            PluginOSAll,
+				Environment:   []string{"TEST=TEST", "TEST2=TEST2"},
 			},
 		},
 		{
@@ -364,6 +355,7 @@ func Test_watchChanges(t *testing.T) {
 				ExternalPorts: []string{"1080/tcp"},
 				InternalPorts: []string{"1080/tcp"},
 				OS:            PluginOSAll,
+				Environment:   []string{"TEST=TEST", "TEST2=TEST2"},
 			},
 		},
 		{
@@ -382,6 +374,7 @@ func Test_watchChanges(t *testing.T) {
 				ExternalPorts: []string{"1080/tcp"},
 				InternalPorts: []string{"1080/tcp"},
 				OS:            PluginOSAll,
+				Environment:   []string{"TEST=TEST", "TEST2=TEST2"},
 			},
 		},
 		{
@@ -400,6 +393,25 @@ func Test_watchChanges(t *testing.T) {
 				ExternalPorts: []string{"1080/tcp", "2000/tcp"},
 				InternalPorts: []string{"1080/tcp", "2000/tcp"},
 				OS:            PluginOSAll,
+				Environment:   []string{"TEST=TEST", "TEST2=TEST2"},
+			},
+		},
+		{
+			name: "Env change",
+			change: map[string]interface{}{
+				"Environment": []string{"TEST1=TEST1", "TEST3=TEST3", "TEST4=TEST4"},
+			},
+			want: Plugin{
+				Name:          "TestPlugin",
+				ServiceID:     "some-random-id",
+				ServiceName:   "TestPluginService",
+				DesiredState:  DesiredStateNull,
+				State:         StateActive,
+				Address:       "192.168.1.1",
+				ExternalPorts: []string{"1080/tcp", "2000/tcp"},
+				InternalPorts: []string{"1080/tcp", "2000/tcp"},
+				OS:            PluginOSAll,
+				Environment:   []string{"TEST1=TEST1", "TEST3=TEST3", "TEST4=TEST4"},
 			},
 		},
 		{
@@ -417,6 +429,7 @@ func Test_watchChanges(t *testing.T) {
 				ExternalPorts: []string{"1080/tcp", "2000/tcp"},
 				InternalPorts: []string{"1080/tcp", "2000/tcp"},
 				OS:            PluginOSAll,
+				Environment:   []string{"TEST1=TEST1", "TEST3=TEST3", "TEST4=TEST4"},
 			},
 		},
 		{
@@ -435,6 +448,7 @@ func Test_watchChanges(t *testing.T) {
 				ExternalPorts: []string{"1080/tcp", "2000/tcp"},
 				InternalPorts: []string{"1080/tcp", "2000/tcp"},
 				OS:            PluginOSAll,
+				Environment:   []string{"TEST1=TEST1", "TEST3=TEST3", "TEST4=TEST4"},
 			},
 		},
 	}
@@ -517,6 +531,7 @@ func TestMonitorPlugins(t *testing.T) {
 				ExternalPorts: []string{"999/tcp"},
 				InternalPorts: []string{"999/tcp"},
 				OS:            PluginOSWindows,
+				Environment:   []string{},
 			},
 			wantErr: false,
 		},
@@ -532,6 +547,7 @@ func TestMonitorPlugins(t *testing.T) {
 				"ExternalPorts": []interface{}{"444/tcp", "444/udp"},
 				"InternalPorts": []interface{}{"444/tcp", "444/udp"},
 				"OS":            "all",
+				"Environment":   []string{"TEST=TEST"},
 			},
 			want: Plugin{
 				Name:          "TestPlugin2",
@@ -543,6 +559,7 @@ func TestMonitorPlugins(t *testing.T) {
 				ExternalPorts: []string{"444/tcp", "444/udp"},
 				InternalPorts: []string{"444/tcp", "444/udp"},
 				OS:            PluginOSAll,
+				Environment:   []string{"TEST=TEST"},
 			},
 			wantErr: false,
 		},
@@ -564,6 +581,7 @@ func TestMonitorPlugins(t *testing.T) {
 				ExternalPorts: []string{"999/tcp"},
 				InternalPorts: []string{"999/tcp"},
 				OS:            PluginOSWindows,
+				Environment:   []string{},
 			},
 			wantErr: false,
 		},
@@ -585,6 +603,7 @@ func TestMonitorPlugins(t *testing.T) {
 				ExternalPorts: []string{"444/tcp", "444/udp"},
 				InternalPorts: []string{"444/tcp", "444/udp"},
 				OS:            PluginOSAll,
+				Environment:   []string{"TEST=TEST"},
 			},
 			wantErr: false,
 		},
