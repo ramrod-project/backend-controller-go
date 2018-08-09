@@ -197,6 +197,7 @@ func Test_getNodes(t *testing.T) {
 				return
 			}
 			assert.Equal(t, "posix", res[0].Spec.Annotations.Labels["os"])
+			assert.Equal(t, got[0]["Address"], res[0].Spec.Annotations.Labels["ip"])
 		})
 	}
 }
@@ -278,7 +279,7 @@ func Test_advertiseIPs(t *testing.T) {
 			if err := advertiseIPs(tt.args.entries); (err != nil) != tt.wantErr {
 				t.Errorf("advertiseIPs() error = %v, wantErr %v", err, tt.wantErr)
 				return
-			} else {
+			} else if tt.wantErr {
 				assert.Equal(t, tt.err, err)
 				return
 			}
@@ -290,16 +291,20 @@ func Test_advertiseIPs(t *testing.T) {
 			var doc map[string]interface{}
 			i := 0
 			for cursor.Next(&doc) {
-				assert.Equal(t, tt.args.entries[i]["Address"], doc["Address"])
-				assert.Equal(t, tt.args.entries[i]["NodeHostName"], doc["NodeHostName"])
-				assert.Equal(t, tt.args.entries[i]["OS"], doc["OS"])
-				assert.Equal(t, len(tt.args.entries[i]["TCPPorts"].([]string)), len(doc["TCPPorts"].([]interface{})))
-				assert.Equal(t, len(tt.args.entries[i]["UDPPorts"].([]string)), len(doc["UDPPorts"].([]interface{})))
-				for i, v := range doc["TCPPorts"].([]interface{}) {
-					assert.Equal(t, tt.args.entries[i]["TCPPorts"].([]string)[i], v.(string))
+				index := 0
+				if doc["OS"] == "nt" {
+					index = 1
 				}
-				for i, v := range doc["UDPPorts"].([]interface{}) {
-					assert.Equal(t, tt.args.entries[i]["UDPPorts"].([]string)[i], v.(string))
+				assert.Equal(t, tt.args.entries[index]["Address"], doc["Address"])
+				assert.Equal(t, tt.args.entries[index]["NodeHostName"], doc["NodeHostName"])
+				assert.Equal(t, tt.args.entries[index]["OS"], doc["OS"])
+				assert.Equal(t, len(tt.args.entries[index]["TCPPorts"].([]string)), len(doc["TCPPorts"].([]interface{})))
+				assert.Equal(t, len(tt.args.entries[index]["UDPPorts"].([]string)), len(doc["UDPPorts"].([]interface{})))
+				for j, v := range doc["TCPPorts"].([]interface{}) {
+					assert.Equal(t, tt.args.entries[index]["TCPPorts"].([]string)[j], v.(string))
+				}
+				for j, v := range doc["UDPPorts"].([]interface{}) {
+					assert.Equal(t, tt.args.entries[index]["UDPPorts"].([]string)[j], v.(string))
 				}
 				i++
 			}

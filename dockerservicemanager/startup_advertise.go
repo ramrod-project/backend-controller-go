@@ -56,6 +56,7 @@ func getNodes() ([]map[string]interface{}, error) {
 			entries[i] = entry
 			spec.Annotations.Labels = map[string]string{
 				"os": string(osname),
+				"ip": ip,
 			}
 			err = dockerClient.NodeUpdate(ctx, n.ID, version, spec)
 			if err != nil {
