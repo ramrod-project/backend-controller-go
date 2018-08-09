@@ -34,8 +34,9 @@ install:
   - dep ensure
   - go vet
   - go build -race
-  - go test -v -parallel 1 github.com/ramrod-project/backend-controller-go/dockerservicemanager github.com/ramrod-project/backend-controller-go/rethink 
-    github.com/ramrod-project/backend-controller-go/errorhandler
+  - go test -v -parallel 1 github.com/ramrod-project/backend-controller-go/dockerservicemanager
+  - go test -v -parallel 1 github.com/ramrod-project/backend-controller-go/rethink
+  - go test -v -parallel 1 github.com/ramrod-project/backend-controller-go/errorhandler
   - make
 
 before_script:
