@@ -103,7 +103,7 @@ func Test_handleEvent(t *testing.T) {
 			},
 			wantErr: false,
 			want: gorethink.WriteResponse{
-				Updated: 1,
+				Replaced: 1,
 			},
 		},
 	}
