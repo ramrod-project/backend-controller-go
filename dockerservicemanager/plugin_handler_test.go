@@ -2,6 +2,8 @@ package dockerservicemanager
 
 import (
 	"context"
+	"fmt"
+	"log"
 	"os"
 	"testing"
 	"time"
@@ -137,6 +139,47 @@ func Test_pluginToConfig(t *testing.T) {
 	}
 }
 
+func validateService(config rethink.Plugin, result swarm.Service, netID string) error {
+	/*
+		{ID:pec41ecmr3m825wvcaop0ol0w Meta:{Version:{Index:13896} CreatedAt:2018-08-10 16:04:10.544978082 +0000 UTC UpdatedAt:2018-08-10 16:04:10.544978082 +0000 UTC} Spec:{Annotations:{Name:HarnessService1 Labels:map[]} TaskTemplate:{ContainerSpec:{Image:ramrodpcp/interpreter-plugin:latest Labels:map[] Command:[] Args:[] Hostname: Env:[STAGE=DEV LOGLEVEL=DEBUG PORT=5000 PLUGIN=Harness] Dir: User: Groups:[] TTY:false OpenStdin:false Mounts:[] StopGracePeriod:1s Healthcheck:0xc42032ba70 Hosts:[] DNSConfig:0xc4203640a0 Secrets:[]} Resources:<nil> RestartPolicy:0xc42032baa0 Placement:0xc420327360 Networks:[{Target:12s0v173wrom19rge8xuy0xm6 Aliases:[]}] LogDriver:<nil> ForceUpdate:0} Mode:{Replicated:0xc42033a568 Global:<nil>} UpdateConfig:0xc42032bad0 Networks:[] EndpointSpec:0xc42032bb00} PreviousSpec:<nil> Endpoint:{Spec:{Mode: Ports:[]} Ports:[] VirtualIPs:[]} UpdateStatus:{State: StartedAt:0001-01-01 00:00:00 +0000 UTC CompletedAt:0001-01-01 00:00:00 +0000 UTC Message:}}
+	*/
+	if result.ID == "" {
+		return fmt.Errorf("no service ID found")
+	} else if result.Spec.Annotations.Name != config.ServiceName {
+		return fmt.Errorf("servicename %v doesn't match config ServiceName %v", result.Spec.Annotations.Name, config.ServiceName)
+	} else if result.Spec.TaskTemplate.ContainerSpec.Image != "ramrodpcp/interpreter-plugin:"+getTagFromEnv() {
+		return fmt.Errorf("imagename %v doesn't match expected", result.Spec.TaskTemplate.ContainerSpec.Image)
+	} else if len(result.Spec.TaskTemplate.Networks) != 1 || result.Spec.TaskTemplate.Networks[0].Target != netID {
+		return fmt.Errorf("network %v doesn't match %v(pcp)", result.Spec.TaskTemplate.Networks[0].Target, netID)
+	}
+	for _, i := range config.Environment {
+		found := false
+		for _, j := range result.Spec.TaskTemplate.ContainerSpec.Env {
+			if i == j {
+				found = true
+				break
+			}
+		}
+		if found == false {
+			return fmt.Errorf("environment %v not found in service", i)
+		}
+	}
+	return nil
+}
+
+func getServiceID(ctx context.Context, dockerClient *client.Client, name string) string {
+	services, err := dockerClient.ServiceList(ctx, types.ServiceListOptions{})
+	if err != nil {
+		return ""
+	}
+	for _, service := range services {
+		if service.Spec.Annotations.Name == name {
+			return service.ID
+		}
+	}
+	return ""
+}
+
 func Test_selectChange(t *testing.T) {
 
 	ctx := context.TODO()
@@ -164,7 +207,7 @@ func Test_selectChange(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "Basic plugin (Harness)",
+			name: "Basic plugin start (Harness)",
 			args: args{
 				plugin: rethink.Plugin{
 					Name:          "Harness",
@@ -181,9 +224,53 @@ func Test_selectChange(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "Advanced plugin start (Harness)",
+			args: args{
+				plugin: rethink.Plugin{
+					Name:          "Harness",
+					ServiceID:     "",
+					ServiceName:   "HarnessService2",
+					DesiredState:  "Activate",
+					State:         "Available",
+					Address:       "",
+					ExternalPorts: []string{"5001/tcp"},
+					InternalPorts: []string{"5001/tcp"},
+					OS:            rethink.PluginOSPosix,
+					Environment: []string{
+						"TEST1=TEST1",
+						"TEST2=TEST2",
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Basic plugin update (Harness)",
+			args: args{
+				plugin: rethink.Plugin{
+					Name:          "Harness",
+					ServiceID:     "",
+					ServiceName:   "HarnessService1",
+					DesiredState:  "Restart",
+					State:         "Active",
+					Address:       "",
+					ExternalPorts: []string{"5000/tcp", "6000/tcp"},
+					InternalPorts: []string{"5000/tcp", "6000/tcp"},
+					OS:            rethink.PluginOSAll,
+					Environment:   []string{},
+				},
+			},
+			wantErr: false,
+		},
+		// Test by specifying IP
+
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.args.plugin.DesiredState == "Restart" {
+				tt.args.plugin.ServiceID = getServiceID(ctx, dockerClient, tt.args.plugin.ServiceName)
+			}
 			err := selectChange(tt.args.plugin)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("selectChange() error = %v, wantErr %v", err, tt.wantErr)
@@ -198,6 +285,13 @@ func Test_selectChange(t *testing.T) {
 			for _, service := range services {
 				if service.Spec.Annotations.Name == tt.args.plugin.ServiceName {
 					found = true
+					log.Printf("%+v", service)
+					err = nil
+					err = validateService(tt.args.plugin, service, netRes.ID)
+					if err != nil {
+						t.Errorf("%v", err)
+						return
+					}
 				}
 			}
 			assert.True(t, found)

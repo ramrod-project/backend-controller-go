@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"time"
 
@@ -98,7 +97,7 @@ func generateServiceSpec(config *PluginServiceConfig) (*swarm.ServiceSpec, error
 		stopGrace       = time.Second
 	)
 
-	log.Printf("Creating service %v with config %v\n", config.ServiceName, config)
+	// log.Printf("Creating service %v with config %v\n", config.ServiceName, config)
 
 	// Determine container image
 	if config.OS == rethink.PluginOSPosix || config.OS == rethink.PluginOSAll {
@@ -116,7 +115,7 @@ func generateServiceSpec(config *PluginServiceConfig) (*swarm.ServiceSpec, error
 		placementConfig.Constraints = append(placementConfig.Constraints, "node.labels.ip=="+config.Address)
 	}
 
-	log.Printf("Creating service spec\n")
+	// log.Printf("Creating service spec\n")
 
 	serviceSpec := &swarm.ServiceSpec{
 		Annotations: swarm.Annotations{
@@ -178,7 +177,7 @@ func CreatePluginService(config *PluginServiceConfig) (types.ServiceCreateRespon
 		return types.ServiceCreateResponse{}, err
 	}
 
-	log.Printf("Generating service spec\n")
+	// log.Printf("Generating service spec\n")
 
 	serviceSpec, err := generateServiceSpec(config)
 
@@ -186,7 +185,7 @@ func CreatePluginService(config *PluginServiceConfig) (types.ServiceCreateRespon
 		return types.ServiceCreateResponse{}, err
 	}
 
-	log.Printf("Service spec created: %v", serviceSpec)
+	// log.Printf("Service spec created: %v", serviceSpec)
 
 	resp, err := dockerClient.ServiceCreate(ctx, *serviceSpec, types.ServiceCreateOptions{})
 	return resp, err
