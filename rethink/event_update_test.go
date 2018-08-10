@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ramrod-project/backend-controller-go/test"
 	"github.com/stretchr/testify/assert"
 
 	events "github.com/docker/docker/api/types/events"
@@ -22,7 +23,7 @@ func Test_handleEvent(t *testing.T) {
 		return
 	}
 
-	session, brainID, err := startBrain(ctx, t, dockerClient)
+	session, brainID, err := test.StartBrain(ctx, t, dockerClient)
 	if err != nil {
 		t.Errorf("%v", err)
 		return
@@ -232,7 +233,7 @@ func Test_handleEvent(t *testing.T) {
 		})
 	}
 
-	killBrain(ctx, dockerClient, brainID)
+	test.KillBrain(ctx, dockerClient, brainID)
 }
 
 func TestEventUpdate(t *testing.T) {

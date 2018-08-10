@@ -1,121 +1,17 @@
 package rethink
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"os"
 	"reflect"
 	"testing"
-	"time"
 
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/swarm"
 	"github.com/docker/docker/client"
+	"github.com/ramrod-project/backend-controller-go/test"
 	"github.com/stretchr/testify/assert"
 	r "gopkg.in/gorethink/gorethink.v4"
 )
-
-func getBrainImage() string {
-	var stringBuf bytes.Buffer
-
-	tag := os.Getenv("TAG")
-	if tag == "" {
-		tag = os.Getenv("TRAVIS_BRANCH")
-	}
-	if tag == "" {
-		tag = "latest"
-	}
-
-	stringBuf.WriteString("ramrodpcp/database-brain:")
-	stringBuf.WriteString(tag)
-
-	return stringBuf.String()
-}
-
-func startBrain(ctx context.Context, t *testing.T, dockerClient *client.Client) (*r.Session, string, error) {
-	// Start brain
-	result, err := dockerClient.ServiceCreate(ctx, brainSpec, types.ServiceCreateOptions{})
-	if err != nil {
-		t.Errorf("%v", err)
-		return nil, "", err
-	}
-
-	// Test setup
-	session, err := r.Connect(r.ConnectOpts{
-		Address: "127.0.0.1",
-	})
-	start := time.Now()
-	if err != nil {
-		for {
-			if time.Since(start) >= 20*time.Second {
-				t.Errorf("%v", err)
-				return nil, "", err
-			}
-			session, err = r.Connect(r.ConnectOpts{
-				Address: "127.0.0.1",
-			})
-			if err == nil {
-				_, err := r.DB("Controller").Table("Plugins").Run(session)
-				if err == nil {
-					break
-				}
-			}
-			time.Sleep(time.Second)
-		}
-	}
-	return session, result.ID, err
-}
-
-func killBrain(ctx context.Context, dockerClient *client.Client, brainID string) {
-	start := time.Now()
-	for time.Since(start) < 10*time.Second {
-		err := dockerClient.ServiceRemove(ctx, brainID)
-		if err != nil {
-			break
-		}
-		time.Sleep(time.Second)
-	}
-	for time.Since(start) < 15*time.Second {
-		containers, err := dockerClient.ContainerList(ctx, types.ContainerListOptions{})
-		if err == nil {
-			if len(containers) == 0 {
-				break
-			}
-			for _, c := range containers {
-				err = dockerClient.ContainerKill(ctx, c.ID, "")
-				if err == nil {
-					dockerClient.ContainerRemove(ctx, c.ID, types.ContainerRemoveOptions{Force: true})
-				}
-			}
-		}
-		time.Sleep(time.Second)
-	}
-}
-
-var brainSpec = swarm.ServiceSpec{
-	Annotations: swarm.Annotations{
-		Name: "rethinkdb",
-	},
-	TaskTemplate: swarm.TaskSpec{
-		ContainerSpec: swarm.ContainerSpec{
-			DNSConfig: &swarm.DNSConfig{},
-			Image:     getBrainImage(),
-		},
-		RestartPolicy: &swarm.RestartPolicy{
-			Condition: "on-failure",
-		},
-	},
-	EndpointSpec: &swarm.EndpointSpec{
-		Mode: swarm.ResolutionModeVIP,
-		Ports: []swarm.PortConfig{swarm.PortConfig{
-			Protocol:      swarm.PortConfigProtocolTCP,
-			TargetPort:    28015,
-			PublishedPort: 28015,
-			PublishMode:   swarm.PortConfigPublishModeIngress,
-		}},
-	},
-}
 
 func Test_newPlugin(t *testing.T) {
 	type args struct {
@@ -274,7 +170,7 @@ func Test_watchChanges(t *testing.T) {
 		return
 	}
 
-	session, brainID, err := startBrain(ctx, t, dockerClient)
+	session, brainID, err := test.StartBrain(ctx, t, dockerClient)
 	if err != nil {
 		t.Errorf("%v", err)
 		return
@@ -479,7 +375,7 @@ func Test_watchChanges(t *testing.T) {
 			c.Close()
 		})
 	}
-	killBrain(ctx, dockerClient, brainID)
+	test.KillBrain(ctx, dockerClient, brainID)
 }
 
 func TestMonitorPlugins(t *testing.T) {
@@ -493,7 +389,7 @@ func TestMonitorPlugins(t *testing.T) {
 		return
 	}
 
-	session, brainID, err := startBrain(ctx, t, dockerClient)
+	session, brainID, err := test.StartBrain(ctx, t, dockerClient)
 	if err != nil {
 		t.Errorf("%v", err)
 		return
@@ -654,7 +550,7 @@ func TestMonitorPlugins(t *testing.T) {
 			}
 		})
 	}
-	killBrain(ctx, dockerClient, brainID)
+	test.KillBrain(ctx, dockerClient, brainID)
 	os.Setenv("STAGE", oldEnv)
 }
 

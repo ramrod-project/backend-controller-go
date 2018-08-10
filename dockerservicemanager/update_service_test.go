@@ -2,7 +2,6 @@ package dockerservicemanager
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -11,48 +10,9 @@ import (
 	container "github.com/docker/docker/api/types/container"
 	swarm "github.com/docker/docker/api/types/swarm"
 	client "github.com/docker/docker/client"
+	"github.com/ramrod-project/backend-controller-go/test"
 	"github.com/stretchr/testify/assert"
 )
-
-func SpecToString(s *swarm.ServiceSpec) string {
-	str := fmt.Sprintf(`
-			Name: %v,
-			TaskTemplate:
-				ContainerSpec:
-					DNSConfig: %v
-					Env: %v
-					Image: %v
-					Labels: %v
-					Mounts: %v
-				RestartPolicy:
-					Condition: %v
-					MaxAttempts: %v
-				Placement:
-					Constraints: %v
-				Networks:
-					Target: %v
-				Mode:
-					Replicas: %v
-				EndpointSpec:
-					Mode: %v
-					Ports: %v
-		`,
-		s.Annotations.Name,
-		s.TaskTemplate.ContainerSpec.DNSConfig,
-		s.TaskTemplate.ContainerSpec.Env,
-		s.TaskTemplate.ContainerSpec.Image,
-		s.TaskTemplate.ContainerSpec.Labels,
-		s.TaskTemplate.ContainerSpec.Mounts,
-		s.TaskTemplate.RestartPolicy.Condition,
-		s.TaskTemplate.RestartPolicy.MaxAttempts,
-		s.TaskTemplate.Placement.Constraints,
-		s.TaskTemplate.Networks,
-		*s.Mode.Replicated.Replicas,
-		s.EndpointSpec.Mode,
-		s.EndpointSpec.Ports,
-	)
-	return str
-}
 
 func TestUpdatePluginService(t *testing.T) {
 	var (
@@ -259,7 +219,7 @@ func TestUpdatePluginService(t *testing.T) {
 	}
 
 	//Docker cleanup
-	if err := dockerCleanUp(ctx, dockerClient, netRes.ID); err != nil {
+	if err := test.DockerCleanUp(ctx, dockerClient, netRes.ID); err != nil {
 		t.Errorf("cleanup error: %v", err)
 	}
 }

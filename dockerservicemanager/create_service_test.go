@@ -12,6 +12,7 @@ import (
 	container "github.com/docker/docker/api/types/container"
 	swarm "github.com/docker/docker/api/types/swarm"
 	client "github.com/docker/docker/client"
+	"github.com/ramrod-project/backend-controller-go/test"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -140,7 +141,7 @@ func Test_CreatePluginService(t *testing.T) {
 		})
 	}
 	//Docker cleanup
-	if err := dockerCleanUp(ctx, dockerClient, netRes.ID); err != nil {
+	if err := test.DockerCleanUp(ctx, dockerClient, netRes.ID); err != nil {
 		t.Errorf("cleanup error: %v", err)
 	}
 }

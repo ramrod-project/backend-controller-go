@@ -6,15 +6,53 @@ import (
 	"os"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/filters"
 	swarm "github.com/docker/docker/api/types/swarm"
 	client "github.com/docker/docker/client"
 	rethink "github.com/ramrod-project/backend-controller-go/rethink"
+	"github.com/ramrod-project/backend-controller-go/test"
 	"github.com/stretchr/testify/assert"
 )
+
+func validateService(config rethink.Plugin, result swarm.Service, netID string) error {
+	if result.ID == "" {
+		return fmt.Errorf("no service ID found")
+	} else if result.Spec.Annotations.Name != config.ServiceName {
+		return fmt.Errorf("servicename %v doesn't match config ServiceName %v", result.Spec.Annotations.Name, config.ServiceName)
+	} else if result.Spec.TaskTemplate.ContainerSpec.Image != "ramrodpcp/interpreter-plugin:"+getTagFromEnv() {
+		return fmt.Errorf("imagename %v doesn't match expected", result.Spec.TaskTemplate.ContainerSpec.Image)
+	} else if len(result.Spec.TaskTemplate.Networks) != 1 || result.Spec.TaskTemplate.Networks[0].Target != netID {
+		return fmt.Errorf("network %v doesn't match %v(pcp)", result.Spec.TaskTemplate.Networks[0].Target, netID)
+	}
+	if config.Address != "" {
+		ipFound := false
+		address := ""
+		for _, c := range result.Spec.TaskTemplate.Placement.Constraints {
+			address = strings.Split(c, "==")[1]
+			if address == config.Address {
+				ipFound = true
+				break
+			}
+		}
+		if !ipFound {
+			return fmt.Errorf("address %v doesn't match %v", address, config.Address)
+		}
+	}
+	for _, i := range config.Environment {
+		found := false
+		for _, j := range result.Spec.TaskTemplate.ContainerSpec.Env {
+			if i == j {
+				found = true
+				break
+			}
+		}
+		if found == false {
+			return fmt.Errorf("environment %v not found in service", i)
+		}
+	}
+	return nil
+}
 
 func Test_envString(t *testing.T) {
 	type args struct {
@@ -137,102 +175,6 @@ func Test_pluginToConfig(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
-}
-
-func validateService(config rethink.Plugin, result swarm.Service, netID string) error {
-	if result.ID == "" {
-		return fmt.Errorf("no service ID found")
-	} else if result.Spec.Annotations.Name != config.ServiceName {
-		return fmt.Errorf("servicename %v doesn't match config ServiceName %v", result.Spec.Annotations.Name, config.ServiceName)
-	} else if result.Spec.TaskTemplate.ContainerSpec.Image != "ramrodpcp/interpreter-plugin:"+getTagFromEnv() {
-		return fmt.Errorf("imagename %v doesn't match expected", result.Spec.TaskTemplate.ContainerSpec.Image)
-	} else if len(result.Spec.TaskTemplate.Networks) != 1 || result.Spec.TaskTemplate.Networks[0].Target != netID {
-		return fmt.Errorf("network %v doesn't match %v(pcp)", result.Spec.TaskTemplate.Networks[0].Target, netID)
-	}
-	if config.Address != "" {
-		ipFound := false
-		address := ""
-		for _, c := range result.Spec.TaskTemplate.Placement.Constraints {
-			address = strings.Split(c, "==")[1]
-			if address == config.Address {
-				ipFound = true
-				break
-			}
-		}
-		if !ipFound {
-			return fmt.Errorf("address %v doesn't match %v", address, config.Address)
-		}
-	}
-	for _, i := range config.Environment {
-		found := false
-		for _, j := range result.Spec.TaskTemplate.ContainerSpec.Env {
-			if i == j {
-				found = true
-				break
-			}
-		}
-		if found == false {
-			return fmt.Errorf("environment %v not found in service", i)
-		}
-	}
-	return nil
-}
-
-func getServiceID(ctx context.Context, dockerClient *client.Client, name string) string {
-	services, err := dockerClient.ServiceList(ctx, types.ServiceListOptions{})
-	if err != nil {
-		return ""
-	}
-	for _, service := range services {
-		if service.Spec.Annotations.Name == name {
-			return service.ID
-		}
-	}
-	return ""
-}
-
-func dockerCleanUp(ctx context.Context, dockerClient *client.Client, net string) error {
-	//Docker cleanup
-	services, err := dockerClient.ServiceList(ctx, types.ServiceListOptions{})
-	if err != nil {
-		return fmt.Errorf("%v", err)
-	}
-	for _, v := range services {
-		if v.ID == "" {
-			continue
-		}
-		err := dockerClient.ServiceRemove(ctx, v.ID)
-		if err != nil {
-			return fmt.Errorf("%v", err)
-		}
-	}
-	containers, err := dockerClient.ContainerList(ctx, types.ContainerListOptions{})
-	for _, c := range containers {
-		if c.ID == "" {
-			continue
-		}
-		err := dockerClient.ContainerKill(ctx, c.ID, "SIGKILL")
-		if err != nil {
-			return fmt.Errorf("%v", err)
-		}
-		err = dockerClient.ContainerRemove(ctx, c.ID, types.ContainerRemoveOptions{Force: true})
-		if err != nil {
-			return fmt.Errorf("%v", err)
-		}
-	}
-	start := time.Now()
-	for time.Since(start) < 10*time.Second {
-		dockerClient.NetworkRemove(ctx, net)
-		time.Sleep(time.Second)
-		_, err := dockerClient.NetworkInspect(ctx, net)
-		if err != nil {
-			_, err := dockerClient.NetworksPrune(ctx, filters.Args{})
-			if err != nil {
-				break
-			}
-		}
-	}
-	return nil
 }
 
 func Test_selectChange(t *testing.T) {
@@ -367,7 +309,7 @@ func Test_selectChange(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.args.plugin.DesiredState == "Restart" {
-				tt.args.plugin.ServiceID = getServiceID(ctx, dockerClient, tt.args.plugin.ServiceName)
+				tt.args.plugin.ServiceID = test.GetServiceID(ctx, dockerClient, tt.args.plugin.ServiceName)
 			}
 			err := selectChange(tt.args.plugin)
 			if (err != nil) != tt.wantErr {
@@ -396,7 +338,7 @@ func Test_selectChange(t *testing.T) {
 	}
 
 	//Docker cleanup
-	if err := dockerCleanUp(ctx, dockerClient, netRes.ID); err != nil {
+	if err := test.DockerCleanUp(ctx, dockerClient, netRes.ID); err != nil {
 		t.Errorf("cleanup error: %v", err)
 	}
 }
