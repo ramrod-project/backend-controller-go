@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/filters"
 	swarm "github.com/docker/docker/api/types/swarm"
 	client "github.com/docker/docker/client"
 	rethink "github.com/ramrod-project/backend-controller-go/rethink"
@@ -229,11 +230,15 @@ func Test_selectChange(t *testing.T) {
 		}
 	}
 	start := time.Now()
-	for time.Since(start) < 5*time.Second {
-		err := dockerClient.NetworkRemove(ctx, netRes.ID)
-		if err == nil {
-			break
-		}
+	for time.Since(start) < 10*time.Second {
+		dockerClient.NetworkRemove(ctx, netRes.ID)
 		time.Sleep(time.Second)
+		_, err := dockerClient.NetworkInspect(ctx, netRes.ID)
+		if err != nil {
+			_, err := dockerClient.NetworksPrune(ctx, filters.Args{})
+			if err != nil {
+				break
+			}
+		}
 	}
 }
