@@ -107,7 +107,7 @@ func Test_handleEvent(t *testing.T) {
 			},
 		},
 		{
-			name: "Test response to creating service",
+			name: "Test response to removing service",
 			args: args{
 				event: events.Message{
 					Type:   "service",
@@ -116,6 +116,46 @@ func Test_handleEvent(t *testing.T) {
 						ID: "hfaldfhak87dfhsddfvns0naef",
 						Attributes: map[string]string{
 							"name": "testing",
+						},
+					},
+				},
+				session: session,
+			},
+			wantErr: false,
+			want: gorethink.WriteResponse{
+				Replaced: 1,
+			},
+		},
+		{
+			name: "Test response to updating service",
+			args: args{
+				event: events.Message{
+					Type: "service",
+					Actor: events.Actor{
+						ID: "hfaldfhak87dfhsddfvns0naef",
+						Attributes: map[string]string{
+							"name":            "testing",
+							"updatestate.new": "updating",
+						},
+					},
+				},
+				session: session,
+			},
+			wantErr: false,
+			want: gorethink.WriteResponse{
+				Replaced: 1,
+			},
+		},
+		{
+			name: "Test response to completing service",
+			args: args{
+				event: events.Message{
+					Type: "service",
+					Actor: events.Actor{
+						ID: "hfaldfhak87dfhsddfvns0naef",
+						Attributes: map[string]string{
+							"name":            "testing",
+							"updatestate.new": "completed",
 						},
 					},
 				},
