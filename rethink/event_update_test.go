@@ -28,10 +28,31 @@ func Test_handleEvent(t *testing.T) {
 		return
 	}
 
-	testingSession, _ := r.Connect(r.ConnectOpts{
-		Address: getRethinkHost(),
+	// create a rethink connection
+	session, err := r.Connect(r.ConnectOpts{
+		Address: "127.0.0.1",
 	})
+	start := time.Now()
+	if err != nil {
+		for {
+			if time.Since(start) >= 20*time.Second {
+				t.Errorf("%v", err)
+				return
+			}
+			session, err = r.Connect(r.ConnectOpts{
+				Address: "127.0.0.1",
+			})
+			if err == nil {
+				_, err := r.DB("Controller").Table("Plugins").Run(session)
+				if err == nil {
+					break
+				}
+			}
+			time.Sleep(time.Second)
+		}
+	}
 
+	// a reuseable entry for the plugin table
 	testPlugin := map[string]interface{}{
 		"Name":          "TestPlugin",
 		"ServiceID":     "",
@@ -44,7 +65,8 @@ func Test_handleEvent(t *testing.T) {
 		"OS":            string(PluginOSAll),
 	}
 
-	_, err = r.DB("Controller").Table("Plugins").Insert(testPlugin).RunWrite(testingSession)
+	// insert a service to update
+	_, err = r.DB("Controller").Table("Plugins").Insert(testPlugin).RunWrite(session)
 	if err != nil {
 		t.Errorf("%v", err)
 		return
@@ -74,7 +96,7 @@ func Test_handleEvent(t *testing.T) {
 						},
 					},
 				},
-				session: testingSession,
+				session: session,
 			},
 			wantErr: false,
 			want: gorethink.WriteResponse{
