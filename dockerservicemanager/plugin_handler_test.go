@@ -180,6 +180,50 @@ func getServiceID(ctx context.Context, dockerClient *client.Client, name string)
 	return ""
 }
 
+func dockerCleanUp(ctx context.Context, dockerClient *client.Client, net string) error {
+	//Docker cleanup
+	services, err := dockerClient.ServiceList(ctx, types.ServiceListOptions{})
+	if err != nil {
+		return fmt.Errorf("%v", err)
+	}
+	for _, v := range services {
+		if v.ID == "" {
+			continue
+		}
+		err := dockerClient.ServiceRemove(ctx, v.ID)
+		if err != nil {
+			return fmt.Errorf("%v", err)
+		}
+	}
+	containers, err := dockerClient.ContainerList(ctx, types.ContainerListOptions{})
+	for _, c := range containers {
+		if c.ID == "" {
+			continue
+		}
+		err := dockerClient.ContainerKill(ctx, c.ID, "SIGKILL")
+		if err != nil {
+			return fmt.Errorf("%v", err)
+		}
+		err = dockerClient.ContainerRemove(ctx, c.ID, types.ContainerRemoveOptions{Force: true})
+		if err != nil {
+			return fmt.Errorf("%v", err)
+		}
+	}
+	start := time.Now()
+	for time.Since(start) < 10*time.Second {
+		dockerClient.NetworkRemove(ctx, net)
+		time.Sleep(time.Second)
+		_, err := dockerClient.NetworkInspect(ctx, net)
+		if err != nil {
+			_, err := dockerClient.NetworksPrune(ctx, filters.Args{})
+			if err != nil {
+				break
+			}
+		}
+	}
+	return nil
+}
+
 func Test_selectChange(t *testing.T) {
 
 	ctx := context.TODO()
@@ -299,40 +343,7 @@ func Test_selectChange(t *testing.T) {
 	}
 
 	//Docker cleanup
-	services, err := dockerClient.ServiceList(ctx, types.ServiceListOptions{})
-	for _, v := range services {
-		if v.ID == "" {
-			continue
-		}
-		err := dockerClient.ServiceRemove(ctx, v.ID)
-		if err != nil {
-			t.Errorf("%v", err)
-		}
-	}
-	containers, err := dockerClient.ContainerList(ctx, types.ContainerListOptions{})
-	for _, c := range containers {
-		if c.ID == "" {
-			continue
-		}
-		err := dockerClient.ContainerKill(ctx, c.ID, "SIGKILL")
-		if err != nil {
-			t.Errorf("%v", err)
-		}
-		err = dockerClient.ContainerRemove(ctx, c.ID, types.ContainerRemoveOptions{Force: true})
-		if err != nil {
-			t.Errorf("%v", err)
-		}
-	}
-	start := time.Now()
-	for time.Since(start) < 10*time.Second {
-		dockerClient.NetworkRemove(ctx, netRes.ID)
-		time.Sleep(time.Second)
-		_, err := dockerClient.NetworkInspect(ctx, netRes.ID)
-		if err != nil {
-			_, err := dockerClient.NetworksPrune(ctx, filters.Args{})
-			if err != nil {
-				break
-			}
-		}
+	if err := dockerCleanUp(ctx, dockerClient, netRes.ID); err != nil {
+		t.Errorf("cleanup error: %v", err)
 	}
 }

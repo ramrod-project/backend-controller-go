@@ -63,7 +63,7 @@ func startBrain(ctx context.Context, t *testing.T, dockerClient *client.Client) 
 			time.Sleep(time.Second)
 		}
 	}
-	return session, result.ID, err
+	return session, result.ID, nil
 }
 
 func killBrain(ctx context.Context, dockerClient *client.Client, brainID string) {
