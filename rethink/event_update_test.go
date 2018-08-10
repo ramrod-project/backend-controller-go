@@ -4,6 +4,7 @@ import (
 	"context"
 	"reflect"
 	"testing"
+	"time"
 
 	"gopkg.in/gorethink/gorethink.v4"
 
