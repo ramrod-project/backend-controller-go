@@ -1,6 +1,7 @@
 package rethink
 
 import (
+	"fmt"
 	"log"
 
 	events "github.com/docker/docker/api/types/events"
@@ -9,15 +10,31 @@ import (
 
 func handleEvent(event events.Message, session *r.Session) (r.WriteResponse, error) {
 	log.Printf("Event received: %v", event)
+	filter := make(map[string]string)
+	update := make(map[string]string)
+	if v, ok := event.Actor.Attributes["name"]; ok {
+		filter["ServiceName"] = v
+	} else {
+		return r.WriteResponse{}, fmt.Errorf("no Name Attribute")
+	}
 	if val, ok := event.Actor.Attributes["updatestate.new"]; ok {
-		filter := make(map[string]string)
-		update := make(map[string]string)
-		filter["ServiceName"] = event.Actor.Attributes["name"]
+		update["DesiredState"] = ""
 		if val == "updating" {
 			update["State"] = "Restarting"
 		} else if val == "completed" {
 			update["State"] = "Active"
 		}
+		res, err := r.DB("Controller").Table("Plugins").Filter(filter).Update(update).RunWrite(session)
+		return res, err
+	} else if event.Action == "create" {
+		update["State"] = "Active"
+		update["ServiceID"] = event.Actor.ID
+		update["DesiredState"] = ""
+		res, err := r.DB("Controller").Table("Plugins").Filter(filter).Update(update).RunWrite(session)
+		return res, err
+	} else if event.Action == "remove" {
+		update["State"] = "Stopped"
+		update["DesiredState"] = ""
 		res, err := r.DB("Controller").Table("Plugins").Filter(filter).Update(update).RunWrite(session)
 		return res, err
 	}

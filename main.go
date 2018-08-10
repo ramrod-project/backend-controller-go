@@ -9,7 +9,6 @@ import (
 )
 
 func main() {
-
 	// Advertise nodes to database
 	err := dockerservicemanager.NodeAdvertise()
 	if err != nil {
@@ -20,8 +19,10 @@ func main() {
 	// update services.
 
 	// Start the event monitor
+	eventData, eventErr := dockerservicemanager.EventMonitor()
 
 	// Start event handler
+	_, eventDBErr := rethink.EventUpdate(eventData)
 
 	// Start the plugin database change monitor
 	pluginData, pluginErr := rethink.MonitorPlugins()
@@ -30,7 +31,7 @@ func main() {
 	actionErr := dockerservicemanager.HandlePluginChanges(pluginData)
 
 	// Monitor all errors in the main loop
-	errChan := errorhandler.ErrorHandler(pluginErr, actionErr)
+	errChan := errorhandler.ErrorHandler(pluginErr, actionErr, eventErr, eventDBErr)
 
 	for err := range errChan {
 		if err != nil {
