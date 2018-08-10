@@ -134,6 +134,22 @@ func TestRemovePluginService(t *testing.T) {
 			}
 		})
 	}
+
+	// Docker cleanup
+	containers, err := dockerClient.ContainerList(ctx, types.ContainerListOptions{})
+	for _, c := range containers {
+		if c.ID == "" {
+			continue
+		}
+		err := dockerClient.ContainerKill(ctx, c.ID, "SIGKILL")
+		if err != nil {
+			t.Errorf("%v", err)
+		}
+		err = dockerClient.ContainerRemove(ctx, c.ID, types.ContainerRemoveOptions{Force: true})
+		if err != nil {
+			t.Errorf("%v", err)
+		}
+	}
 	start := time.Now()
 	for time.Since(start) < 5*time.Second {
 		err := dockerClient.NetworkRemove(ctx, netRes.ID)

@@ -1,10 +1,14 @@
 package dockerservicemanager
 
 import (
+	"context"
 	"os"
 	"testing"
+	"time"
 
+	"github.com/docker/docker/api/types"
 	swarm "github.com/docker/docker/api/types/swarm"
+	client "github.com/docker/docker/client"
 	rethink "github.com/ramrod-project/backend-controller-go/rethink"
 	"github.com/stretchr/testify/assert"
 )
@@ -133,16 +137,49 @@ func Test_pluginToConfig(t *testing.T) {
 }
 
 func Test_selectChange(t *testing.T) {
+
+	ctx := context.TODO()
+	dockerClient, err := client.NewEnvClient()
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+
+	netRes, err := dockerClient.NetworkCreate(ctx, "pcp", types.NetworkCreate{
+		Driver:     "overlay",
+		Attachable: true,
+	})
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+
 	type args struct {
 		plugin rethink.Plugin
 	}
 	tests := []struct {
 		name    string
 		args    args
-		want    interface{}
 		wantErr bool
 	}{
-		// TODO: Add test cases.
+		{
+			name: "Basic plugin (Harness)",
+			args: args{
+				plugin: rethink.Plugin{
+					Name:          "Harness",
+					ServiceID:     "",
+					ServiceName:   "HarnessService1",
+					DesiredState:  "Activate",
+					State:         "Available",
+					Address:       "",
+					ExternalPorts: []string{"5000/tcp"},
+					InternalPorts: []string{"5000/tcp"},
+					OS:            rethink.PluginOSAll,
+					Environment:   []string{},
+				},
+			},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -151,6 +188,52 @@ func Test_selectChange(t *testing.T) {
 				t.Errorf("selectChange() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
+			services, err := dockerClient.ServiceList(ctx, types.ServiceListOptions{})
+			if err != nil {
+				t.Errorf("couldn't get services")
+				return
+			}
+			found := false
+			for _, service := range services {
+				if service.Spec.Annotations.Name == tt.args.plugin.ServiceName {
+					found = true
+				}
+			}
+			assert.True(t, found)
 		})
+	}
+
+	//Docker cleanup
+	services, err := dockerClient.ServiceList(ctx, types.ServiceListOptions{})
+	for _, v := range services {
+		if v.ID == "" {
+			continue
+		}
+		err := dockerClient.ServiceRemove(ctx, v.ID)
+		if err != nil {
+			t.Errorf("%v", err)
+		}
+	}
+	containers, err := dockerClient.ContainerList(ctx, types.ContainerListOptions{})
+	for _, c := range containers {
+		if c.ID == "" {
+			continue
+		}
+		err := dockerClient.ContainerKill(ctx, c.ID, "SIGKILL")
+		if err != nil {
+			t.Errorf("%v", err)
+		}
+		err = dockerClient.ContainerRemove(ctx, c.ID, types.ContainerRemoveOptions{Force: true})
+		if err != nil {
+			t.Errorf("%v", err)
+		}
+	}
+	start := time.Now()
+	for time.Since(start) < 5*time.Second {
+		err := dockerClient.NetworkRemove(ctx, netRes.ID)
+		if err == nil {
+			break
+		}
+		time.Sleep(time.Second)
 	}
 }

@@ -140,15 +140,26 @@ func Test_CreatePluginService(t *testing.T) {
 		})
 	}
 	// Docker cleanup
-	if err != nil {
-		t.Errorf("%v", err)
-	}
 	for _, v := range generatedIDs {
 		if v == "" {
 			continue
 		}
 		log.Printf("Removing service %v\n", v)
 		err := dockerClient.ServiceRemove(ctx, v)
+		if err != nil {
+			t.Errorf("%v", err)
+		}
+	}
+	containers, err := dockerClient.ContainerList(ctx, types.ContainerListOptions{})
+	for _, c := range containers {
+		if c.ID == "" {
+			continue
+		}
+		err := dockerClient.ContainerKill(ctx, c.ID, "SIGKILL")
+		if err != nil {
+			t.Errorf("%v", err)
+		}
+		err = dockerClient.ContainerRemove(ctx, c.ID, types.ContainerRemoveOptions{Force: true})
 		if err != nil {
 			t.Errorf("%v", err)
 		}
