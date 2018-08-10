@@ -16,7 +16,12 @@ func main() {
 		panic(err)
 	}
 
+	// Populate with plugin data from manifest and
+	// update services.
+
 	// Start the event monitor
+
+	// Start event handler
 
 	// Start the plugin database change monitor
 	pluginData, pluginErr := rethink.MonitorPlugins()

@@ -3,8 +3,8 @@ package dockerservicemanager
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -140,9 +140,6 @@ func Test_pluginToConfig(t *testing.T) {
 }
 
 func validateService(config rethink.Plugin, result swarm.Service, netID string) error {
-	/*
-		{ID:pec41ecmr3m825wvcaop0ol0w Meta:{Version:{Index:13896} CreatedAt:2018-08-10 16:04:10.544978082 +0000 UTC UpdatedAt:2018-08-10 16:04:10.544978082 +0000 UTC} Spec:{Annotations:{Name:HarnessService1 Labels:map[]} TaskTemplate:{ContainerSpec:{Image:ramrodpcp/interpreter-plugin:latest Labels:map[] Command:[] Args:[] Hostname: Env:[STAGE=DEV LOGLEVEL=DEBUG PORT=5000 PLUGIN=Harness] Dir: User: Groups:[] TTY:false OpenStdin:false Mounts:[] StopGracePeriod:1s Healthcheck:0xc42032ba70 Hosts:[] DNSConfig:0xc4203640a0 Secrets:[]} Resources:<nil> RestartPolicy:0xc42032baa0 Placement:0xc420327360 Networks:[{Target:12s0v173wrom19rge8xuy0xm6 Aliases:[]}] LogDriver:<nil> ForceUpdate:0} Mode:{Replicated:0xc42033a568 Global:<nil>} UpdateConfig:0xc42032bad0 Networks:[] EndpointSpec:0xc42032bb00} PreviousSpec:<nil> Endpoint:{Spec:{Mode: Ports:[]} Ports:[] VirtualIPs:[]} UpdateStatus:{State: StartedAt:0001-01-01 00:00:00 +0000 UTC CompletedAt:0001-01-01 00:00:00 +0000 UTC Message:}}
-	*/
 	if result.ID == "" {
 		return fmt.Errorf("no service ID found")
 	} else if result.Spec.Annotations.Name != config.ServiceName {
@@ -151,6 +148,20 @@ func validateService(config rethink.Plugin, result swarm.Service, netID string) 
 		return fmt.Errorf("imagename %v doesn't match expected", result.Spec.TaskTemplate.ContainerSpec.Image)
 	} else if len(result.Spec.TaskTemplate.Networks) != 1 || result.Spec.TaskTemplate.Networks[0].Target != netID {
 		return fmt.Errorf("network %v doesn't match %v(pcp)", result.Spec.TaskTemplate.Networks[0].Target, netID)
+	}
+	if config.Address != "" {
+		ipFound := false
+		address := ""
+		for _, c := range result.Spec.TaskTemplate.Placement.Constraints {
+			address = strings.Split(c, "==")[1]
+			if address == config.Address {
+				ipFound = true
+				break
+			}
+		}
+		if !ipFound {
+			return fmt.Errorf("address %v doesn't match %v", address, config.Address)
+		}
 	}
 	for _, i := range config.Environment {
 		found := false
@@ -233,6 +244,9 @@ func Test_selectChange(t *testing.T) {
 		return
 	}
 
+	nodeInspect, err := dockerClient.NodeList(ctx, types.NodeListOptions{})
+	nodeIP := nodeInspect[0].Status.Addr
+
 	netRes, err := dockerClient.NetworkCreate(ctx, "pcp", types.NetworkCreate{
 		Driver:     "overlay",
 		Attachable: true,
@@ -307,8 +321,48 @@ func Test_selectChange(t *testing.T) {
 			},
 			wantErr: false,
 		},
-		// Test by specifying IP
-
+		{
+			name: "Advanced plugin update (Harness)",
+			args: args{
+				plugin: rethink.Plugin{
+					Name:          "Harness",
+					ServiceID:     "",
+					ServiceName:   "HarnessService2",
+					DesiredState:  "Restart",
+					State:         "Active",
+					Address:       "",
+					ExternalPorts: []string{"5001/tcp", "9999/tcp"},
+					InternalPorts: []string{"5001/tcp", "9999/tcp"},
+					OS:            rethink.PluginOSPosix,
+					Environment: []string{
+						"TEST1=TEST1",
+						"TEST2=TEST2",
+						"TEST3=TEST3",
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Select IP start (Harness)",
+			args: args{
+				plugin: rethink.Plugin{
+					Name:          "Harness",
+					ServiceID:     "",
+					ServiceName:   "HarnessService3",
+					DesiredState:  "Activate",
+					State:         "Available",
+					Address:       nodeIP,
+					ExternalPorts: []string{"5002/tcp"},
+					InternalPorts: []string{"5002/tcp"},
+					OS:            rethink.PluginOSAll,
+					Environment: []string{
+						"TEST1=TEST1",
+					},
+				},
+			},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -329,7 +383,6 @@ func Test_selectChange(t *testing.T) {
 			for _, service := range services {
 				if service.Spec.Annotations.Name == tt.args.plugin.ServiceName {
 					found = true
-					log.Printf("%+v", service)
 					err = nil
 					err = validateService(tt.args.plugin, service, netRes.ID)
 					if err != nil {
