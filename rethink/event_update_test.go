@@ -84,6 +84,7 @@ func Test_handleEvent(t *testing.T) {
 		args    args
 		want    map[string]interface{}
 		wantErr bool
+		err     error
 	}{
 		// TODO: Add test cases.
 		{
@@ -198,6 +199,31 @@ func Test_handleEvent(t *testing.T) {
 				"OS":            string(PluginOSAll),
 			},
 		},
+		{
+			name: "Test no name",
+			args: args{
+				event: events.Message{
+					Type:   "service",
+					Action: "create",
+					Actor: events.Actor{
+						ID: "hfaldfhak87dfhsddfvns0naef",
+					},
+				},
+				session: session,
+			},
+			wantErr: true,
+			want: map[string]interface{}{
+				"Name":          "TestPlugin",
+				"ServiceID":     "hfaldfhak87dfhsddfvns0naef",
+				"ServiceName":   "testing",
+				"DesiredState":  "",
+				"State":         "Active",
+				"Interface":     "192.168.1.1",
+				"ExternalPorts": []string{"1080/tcp"},
+				"InternalPorts": []string{"1080/tcp"},
+				"OS":            string(PluginOSAll),
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -205,6 +231,8 @@ func Test_handleEvent(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Errorf("handleEvent() error = %v, wantErr %v", err, tt.wantErr)
 				return
+			} else if tt.wantErr {
+				assert.Equal(t, tt.err, err)
 			}
 			filter := map[string]string{
 				"ServiceName": "testing",
@@ -219,8 +247,12 @@ func Test_handleEvent(t *testing.T) {
 				t.Errorf("handleEvent: Empty Cursor")
 				return
 			}
-			assert.Equal(t, tt.want["State"], doc["State"])
-			assert.Equal(t, tt.want["DesiredState"], doc["DesiredState"])
+			if _, ok := doc["State"]; ok {
+				assert.Equal(t, tt.want["State"], doc["State"])
+			}
+			if _, ok := doc["State"]; ok {
+				assert.Equal(t, tt.want["DesiredState"], doc["DesiredState"])
+			}
 		})
 	}
 
@@ -238,25 +270,6 @@ func TestEventUpdate(t *testing.T) {
 		want1 <-chan error
 	}{
 		// TODO: Add test cases.
-		// {
-		// 	name: "Eventhandle test",
-		// 	args: args{
-		// 		event: events.Message{
-		// 			Type:   "service",
-		// 			Action: "remove",
-		// 			Actor: events.Actor{
-		// 				ID: "hfaldfhak87dfhsddfvns0naef",
-		// 				Attributes: map[string]string{
-		// 					"name": "testing",
-		// 				},
-		// 			},
-		// 		},
-		// 	},
-		// 	want: gorethink.WriteResponse{
-		// 		Replaced: 1,
-		// 	},
-		// 	want1: nil,
-		// },
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
