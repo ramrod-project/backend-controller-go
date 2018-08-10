@@ -9,6 +9,54 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func Test_envString(t *testing.T) {
+	type args struct {
+		k string
+		v string
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		// TODO: Add test cases.
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := envString(tt.args.k, tt.args.v); got != tt.want {
+				t.Errorf("envString() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_getEnvByKey(t *testing.T) {
+
+	tests := []struct {
+		name string
+		set  string
+		key  string
+		want string
+	}{
+		{
+			name: "Test stage good",
+			set:  "TEST",
+			key:  "STAGE",
+			want: "STAGE=TEST",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			oldEnv := os.Getenv(tt.key)
+			os.Setenv(tt.key, tt.set)
+			if got := getEnvByKey(tt.key); got != tt.want {
+				t.Errorf("getEnvByKey() = %v, want %v", got, tt.want)
+			}
+			os.Setenv(tt.key, oldEnv)
+		})
+	}
+}
+
 func Test_pluginToConfig(t *testing.T) {
 	stage := os.Getenv("STAGE")
 	if stage == "" {
@@ -77,46 +125,6 @@ func Test_pluginToConfig(t *testing.T) {
 	}
 }
 
-func Test_getEnvByKey(t *testing.T) {
-	type args struct {
-		k string
-	}
-	tests := []struct {
-		name string
-		args args
-		want string
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := getEnvByKey(tt.args.k); got != tt.want {
-				t.Errorf("getEnvByKey() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_envString(t *testing.T) {
-	type args struct {
-		k string
-		v string
-	}
-	tests := []struct {
-		name string
-		args args
-		want string
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := envString(tt.args.k, tt.args.v); got != tt.want {
-				t.Errorf("envString() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
 func Test_selectChange(t *testing.T) {
 	type args struct {
 		plugin rethink.Plugin
