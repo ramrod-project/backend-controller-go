@@ -19,7 +19,14 @@ func Test_envString(t *testing.T) {
 		args args
 		want string
 	}{
-		// TODO: Add test cases.
+		{
+			name: "Basi key value",
+			args: args{
+				k: "KEY",
+				v: "VALUE",
+			},
+			want: "KEY=VALUE",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
