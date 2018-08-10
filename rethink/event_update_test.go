@@ -9,7 +9,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/docker/docker/api/types"
 	events "github.com/docker/docker/api/types/events"
 	"github.com/docker/docker/client"
 	r "gopkg.in/gorethink/gorethink.v4"
@@ -23,35 +22,10 @@ func Test_handleEvent(t *testing.T) {
 		return
 	}
 
-	// Start brain
-	result, err := dockerClient.ServiceCreate(ctx, brainSpec, types.ServiceCreateOptions{})
+	session, brainID, err := startBrain(ctx, t, dockerClient)
 	if err != nil {
 		t.Errorf("%v", err)
 		return
-	}
-
-	// create a rethink connection
-	session, err := r.Connect(r.ConnectOpts{
-		Address: "127.0.0.1",
-	})
-	start := time.Now()
-	if err != nil {
-		for {
-			if time.Since(start) >= 20*time.Second {
-				t.Errorf("%v", err)
-				return
-			}
-			session, err = r.Connect(r.ConnectOpts{
-				Address: "127.0.0.1",
-			})
-			if err == nil {
-				_, err := r.DB("Controller").Table("Plugins").Run(session)
-				if err == nil {
-					break
-				}
-			}
-			time.Sleep(time.Second)
-		}
 	}
 
 	// a reuseable entry for the plugin table
@@ -258,7 +232,7 @@ func Test_handleEvent(t *testing.T) {
 		})
 	}
 
-	dockerClient.ServiceRemove(ctx, result.ID)
+	killBrain(ctx, dockerClient, brainID)
 }
 
 func TestEventUpdate(t *testing.T) {

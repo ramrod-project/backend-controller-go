@@ -469,7 +469,7 @@ func Test_watchChanges(t *testing.T) {
 			}
 			select {
 			case recvData := <-resChan:
-				assert.Equal(t, recvData, tt.want)
+				assert.Equal(t, tt.want, recvData)
 			case recvErr := <-errChan:
 				t.Errorf("%v", recvErr)
 			default:
