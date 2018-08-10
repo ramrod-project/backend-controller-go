@@ -57,7 +57,7 @@ func Test_handleEvent(t *testing.T) {
 	testPlugin := map[string]interface{}{
 		"Name":          "TestPlugin",
 		"ServiceID":     "",
-		"ServiceName":   "",
+		"ServiceName":   "testing",
 		"DesiredState":  "",
 		"State":         "Stopped",
 		"Interface":     "192.168.1.1",
@@ -72,6 +72,8 @@ func Test_handleEvent(t *testing.T) {
 		t.Errorf("%v", err)
 		return
 	}
+
+	time.Sleep(5 * time.Second)
 
 	type args struct {
 		event   events.Message
