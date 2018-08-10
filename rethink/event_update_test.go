@@ -2,6 +2,7 @@ package rethink
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -223,6 +224,7 @@ func Test_handleEvent(t *testing.T) {
 				"InternalPorts": []string{"1080/tcp"},
 				"OS":            string(PluginOSAll),
 			},
+			err: fmt.Errorf("no Name Attribute"),
 		},
 	}
 	for _, tt := range tests {
