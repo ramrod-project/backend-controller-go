@@ -106,6 +106,26 @@ func Test_handleEvent(t *testing.T) {
 				Replaced: 1,
 			},
 		},
+		{
+			name: "Test response to creating service",
+			args: args{
+				event: events.Message{
+					Type:   "service",
+					Action: "remove",
+					Actor: events.Actor{
+						ID: "hfaldfhak87dfhsddfvns0naef",
+						Attributes: map[string]string{
+							"name": "testing",
+						},
+					},
+				},
+				session: session,
+			},
+			wantErr: false,
+			want: gorethink.WriteResponse{
+				Replaced: 1,
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
