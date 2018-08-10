@@ -13,6 +13,7 @@ func handleEvent(event events.Message, session *r.Session) (r.WriteResponse, err
 		filter := make(map[string]string)
 		update := make(map[string]string)
 		filter["ServiceName"] = event.Actor.Attributes["name"]
+		update["DesiredState"] = ""
 		if val == "updating" {
 			update["State"] = "Restarting"
 		} else if val == "completed" {
@@ -25,6 +26,8 @@ func handleEvent(event events.Message, session *r.Session) (r.WriteResponse, err
 		update := make(map[string]string)
 		filter["ServiceName"] = event.Actor.Attributes["name"]
 		update["State"] = "Active"
+		update["ServiceID"] = event.Actor.ID
+		update["DesiredState"] = ""
 		res, err := r.DB("Controller").Table("Plugins").Filter(filter).Update(update).RunWrite(session)
 		return res, err
 	} else if event.Action == "remove" {
@@ -32,6 +35,7 @@ func handleEvent(event events.Message, session *r.Session) (r.WriteResponse, err
 		update := make(map[string]string)
 		filter["ServiceName"] = event.Actor.Attributes["name"]
 		update["State"] = "Stopped"
+		update["DesiredState"] = ""
 		res, err := r.DB("Controller").Table("Plugins").Filter(filter).Update(update).RunWrite(session)
 		return res, err
 	}

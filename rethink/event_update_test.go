@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"gopkg.in/gorethink/gorethink.v4"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/docker/docker/api/types"
 	events "github.com/docker/docker/api/types/events"
@@ -59,7 +59,7 @@ func Test_handleEvent(t *testing.T) {
 		"ServiceID":     "",
 		"ServiceName":   "testing",
 		"DesiredState":  "",
-		"State":         "Stopped",
+		"State":         "Available",
 		"Interface":     "192.168.1.1",
 		"ExternalPorts": []string{"1080/tcp"},
 		"InternalPorts": []string{"1080/tcp"},
@@ -82,7 +82,7 @@ func Test_handleEvent(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    gorethink.WriteResponse
+		want    map[string]interface{}
 		wantErr bool
 	}{
 		// TODO: Add test cases.
@@ -102,8 +102,16 @@ func Test_handleEvent(t *testing.T) {
 				session: session,
 			},
 			wantErr: false,
-			want: gorethink.WriteResponse{
-				Replaced: 1,
+			want: map[string]interface{}{
+				"Name":          "TestPlugin",
+				"ServiceID":     "hfaldfhak87dfhsddfvns0naef",
+				"ServiceName":   "testing",
+				"DesiredState":  "",
+				"State":         "Active",
+				"Interface":     "192.168.1.1",
+				"ExternalPorts": []string{"1080/tcp"},
+				"InternalPorts": []string{"1080/tcp"},
+				"OS":            string(PluginOSAll),
 			},
 		},
 		{
@@ -122,8 +130,16 @@ func Test_handleEvent(t *testing.T) {
 				session: session,
 			},
 			wantErr: false,
-			want: gorethink.WriteResponse{
-				Replaced: 1,
+			want: map[string]interface{}{
+				"Name":          "TestPlugin",
+				"ServiceID":     "hfaldfhak87dfhsddfvns0naef",
+				"ServiceName":   "testing",
+				"DesiredState":  "",
+				"State":         "Stopped",
+				"Interface":     "192.168.1.1",
+				"ExternalPorts": []string{"1080/tcp"},
+				"InternalPorts": []string{"1080/tcp"},
+				"OS":            string(PluginOSAll),
 			},
 		},
 		{
@@ -142,8 +158,16 @@ func Test_handleEvent(t *testing.T) {
 				session: session,
 			},
 			wantErr: false,
-			want: gorethink.WriteResponse{
-				Replaced: 1,
+			want: map[string]interface{}{
+				"Name":          "TestPlugin",
+				"ServiceID":     "hfaldfhak87dfhsddfvns0naef",
+				"ServiceName":   "testing",
+				"DesiredState":  "",
+				"State":         "Restarting",
+				"Interface":     "192.168.1.1",
+				"ExternalPorts": []string{"1080/tcp"},
+				"InternalPorts": []string{"1080/tcp"},
+				"OS":            string(PluginOSAll),
 			},
 		},
 		{
@@ -162,21 +186,41 @@ func Test_handleEvent(t *testing.T) {
 				session: session,
 			},
 			wantErr: false,
-			want: gorethink.WriteResponse{
-				Replaced: 1,
+			want: map[string]interface{}{
+				"Name":          "TestPlugin",
+				"ServiceID":     "hfaldfhak87dfhsddfvns0naef",
+				"ServiceName":   "testing",
+				"DesiredState":  "",
+				"State":         "Active",
+				"Interface":     "192.168.1.1",
+				"ExternalPorts": []string{"1080/tcp"},
+				"InternalPorts": []string{"1080/tcp"},
+				"OS":            string(PluginOSAll),
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := handleEvent(tt.args.event, tt.args.session)
+			_, err := handleEvent(tt.args.event, tt.args.session)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("handleEvent() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("handleEvent() = %v, want %v", got, tt.want)
+			filter := map[string]string{
+				"ServiceName": "testing",
 			}
+			res, err := r.DB("Controller").Table("Plugins").Filter(filter).Run(session)
+			if err != nil {
+				t.Errorf("handleEvent fail: %v", err)
+				return
+			}
+			var doc map[string]interface{}
+			if ok := res.Next(&doc); !ok {
+				t.Errorf("handleEvent: Empty Cursor")
+				return
+			}
+			assert.Equal(t, tt.want["State"], doc["State"])
+			assert.Equal(t, tt.want["DesiredState"], doc["DesiredState"])
 		})
 	}
 
@@ -194,6 +238,25 @@ func TestEventUpdate(t *testing.T) {
 		want1 <-chan error
 	}{
 		// TODO: Add test cases.
+		// {
+		// 	name: "Eventhandle test",
+		// 	args: args{
+		// 		event: events.Message{
+		// 			Type:   "service",
+		// 			Action: "remove",
+		// 			Actor: events.Actor{
+		// 				ID: "hfaldfhak87dfhsddfvns0naef",
+		// 				Attributes: map[string]string{
+		// 					"name": "testing",
+		// 				},
+		// 			},
+		// 		},
+		// 	},
+		// 	want: gorethink.WriteResponse{
+		// 		Replaced: 1,
+		// 	},
+		// 	want1: nil,
+		// },
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
