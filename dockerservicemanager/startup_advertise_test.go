@@ -13,7 +13,6 @@ import (
 	"github.com/docker/docker/api/types"
 	client "github.com/docker/docker/client"
 	"github.com/ramrod-project/backend-controller-go/rethink"
-	rethink "github.com/ramrod-project/backend-controller-go/rethink"
 	"github.com/ramrod-project/backend-controller-go/test"
 	"github.com/stretchr/testify/assert"
 	r "gopkg.in/gorethink/gorethink.v4"
@@ -224,6 +223,8 @@ func Test_advertiseIPs(t *testing.T) {
 	}
 	test.KillService(ctx, dockerClient, brainID)
 	os.Setenv("STAGE", oldEnv)
+
+	test.DockerCleanUp(ctx, dockerClient, "")
 }
 
 func Test_getPlugins(t *testing.T) {
@@ -457,20 +458,22 @@ func Test_advertisePlugins(t *testing.T) {
 
 	test.KillService(ctx, dockerClient, brainID)
 	os.Setenv("STAGE", oldEnv)
+
+	test.DockerCleanUp(ctx, dockerClient, "")
 }
 
-func TestPluginAdvertise(t *testing.T) {
+/*func TestPluginAdvertise(t *testing.T) {
 	tests := []struct {
 		name    string
 		wantErr bool
 	}{
 		// TODO: Add test cases.
 	}
-	for range tests {
+	for tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := PluginAdvertise(); (err != nil) != tt.wantErr {
 				t.Errorf("PluginAdvertise() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
-}
+}*/

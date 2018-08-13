@@ -72,7 +72,7 @@ func Test_newPlugin(t *testing.T) {
 			},
 			want:    &Plugin{},
 			wantErr: true,
-			err:     NewControllerError("plugin service must have ServiceName"),
+			err:     NewControllerError("service name must not be blank"),
 		},
 		{
 			name: "Bad desired state",
