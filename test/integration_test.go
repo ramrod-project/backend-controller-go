@@ -16,6 +16,28 @@ import (
 	r "gopkg.in/gorethink/gorethink.v4"
 )
 
+func dumpEverything(t *testing.T, ctx context.Context, dockerClient *client.Client, session *r.Session) {
+	var doc map[string]interface{}
+
+	t.Errorf("Dumping services...")
+	services, _ := dockerClient.ServiceList(ctx, types.ServiceListOptions{})
+	for _, service := range services {
+		t.Errorf("Service %v: %+v", service.Spec.Annotations.Name, service)
+	}
+
+	t.Errorf("Dumping ports table...")
+	cursor, _ := r.DB("Controller").Table("Ports").Run(session)
+	for cursor.Next(&doc) {
+		t.Errorf("Port entry: %+v", doc)
+	}
+
+	t.Errorf("Dumping plugins table...")
+	cursor, _ = r.DB("Controller").Table("Plugins").Run(session)
+	for cursor.Next(&doc) {
+		t.Errorf("Plugin entry: %+v", doc)
+	}
+}
+
 func Test_Integration(t *testing.T) {
 
 	ctx := context.TODO()
@@ -122,6 +144,7 @@ func Test_Integration(t *testing.T) {
 					time.Sleep(time.Second)
 				}
 				t.Errorf("None of %v found in db.", ips)
+				dumpEverything(t, ctx, dockerClient, session)
 				return false
 			},
 			timeout: 10 * time.Second,
@@ -138,7 +161,7 @@ func Test_Integration(t *testing.T) {
 					cursor, err := r.DB("Controller").Table("Plugins").Run(session)
 					if err != nil {
 						t.Errorf("%v", err)
-						return false
+						break
 					}
 
 					// Get all plugins from the db (should only be one)
@@ -157,7 +180,7 @@ func Test_Integration(t *testing.T) {
 
 					if len(pluginEntries) != 1 {
 						t.Errorf("shouldn't be %v plugins", len(pluginEntries))
-						return false
+						break
 					}
 
 					assert.Equal(t, "Harness", pluginEntries[0]["Name"].(string))
@@ -167,10 +190,10 @@ func Test_Integration(t *testing.T) {
 					assert.Equal(t, string(rethink.StateAvailable), pluginEntries[0]["State"].(string))
 					assert.Equal(t, "", pluginEntries[0]["Address"].(string))
 					assert.Equal(t, string(rethink.PluginOSAll), pluginEntries[0]["OS"].(string))
-					break
+					return true
 				}
-
-				return true
+				dumpEverything(t, ctx, dockerClient, session)
+				return false
 			},
 			timeout: 10 * time.Second,
 		},
