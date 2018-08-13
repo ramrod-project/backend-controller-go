@@ -48,8 +48,12 @@ script:
   - docker service create --name rethinkdb --network pcp -p 28015:28015 -e "STAGE=DEV" -e "LOGLEVEL=DEBUG" ramrodpcp/database-brain:$TAG
   - docker service create --name controller --network pcp -e "STAGE=DEV" -e "LOGLEVEL=DEBUG" -e "TAG=${TAG}" ramrodpcp/backend-controller:$TAG
   - sleep 10
+  - go test -parallel 1 github.com/ramrod-project/backend-controller-go/test -run dumpDBs
   - docker service logs controller
   - docker service logs rethinkdb
+  - docker service rm controller rethinkdb
+  - sleep 10
+  - docker network prune -f
   # integration tests
   - go test -v -parallel 1 github.com/ramrod-project/backend-controller-go/test
 
