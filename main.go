@@ -17,6 +17,10 @@ func main() {
 
 	// Populate with plugin data from manifest and
 	// update services.
+	err = dockerservicemanager.PluginAdvertise()
+	if err != nil {
+		panic(err)
+	}
 
 	// Start the event monitor
 	eventData, eventErr := dockerservicemanager.EventMonitor()

@@ -165,11 +165,30 @@ func advertiseIPs(entries []map[string]interface{}) error {
 // it to the Controller.Ports database.
 func NodeAdvertise() error {
 
+	// Read the current info from the nodes
+	// in the swarm and create entries
 	nodes, err := getNodes()
 	if err != nil {
 		return err
 	}
 
+	// Populate database with node entries
 	err = advertiseIPs(nodes)
+	return err
+}
+
+// PluginAdvertise reads manifest.json and
+// populates the database with proper plugin entries
+func PluginAdvertise() error {
+
+	// Read the manifest
+	manifest, err := getPlugins()
+	if err != nil {
+		return err
+	}
+
+	// Populate the database with the manifest
+	// plugins
+	err = advertisePlugins(manifest)
 	return err
 }
