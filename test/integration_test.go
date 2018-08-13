@@ -2,7 +2,6 @@ package test
 
 import (
 	"context"
-	"io/ioutil"
 	"log"
 	"net"
 	"strings"
@@ -24,19 +23,7 @@ func dumpEverything(t *testing.T, ctx context.Context, dockerClient *client.Clie
 	services, _ := dockerClient.ServiceList(ctx, types.ServiceListOptions{})
 	for _, service := range services {
 		t.Errorf("Service %v: %+v", service.Spec.Annotations.Name, service)
-	}
-
-	t.Errorf("Dumping container logs...")
-	containers, _ := dockerClient.ContainerList(ctx, types.ContainerListOptions{})
-	for _, container := range containers {
-		r, _ := dockerClient.ContainerLogs(ctx, container.ID, types.ContainerLogsOptions{})
-		if r == nil {
-			t.Errorf("Couldnt read logs %v", container.ID)
-		} else if b, err := ioutil.ReadAll(r); err == nil {
-			t.Errorf("Container %v logs: %v", container.ID, b)
-		} else {
-			t.Errorf("Couldnt read logs %v: %v", container.ID, err)
-		}
+		t.Errorf("Replicas: %v", *service.Spec.Mode.Replicated.Replicas)
 	}
 
 	t.Errorf("Dumping ports table...")
