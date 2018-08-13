@@ -8,11 +8,11 @@ import (
 	"os"
 	"reflect"
 	"testing"
-
-	"github.com/ramrod-project/backend-controller-go/rethink"
+	"time"
 
 	"github.com/docker/docker/api/types"
 	client "github.com/docker/docker/client"
+	"github.com/ramrod-project/backend-controller-go/rethink"
 	"github.com/ramrod-project/backend-controller-go/test"
 	"github.com/stretchr/testify/assert"
 	r "gopkg.in/gorethink/gorethink.v4"
@@ -300,4 +300,160 @@ func Test_getPlugins(t *testing.T) {
 			os.Remove("manifest.json")
 		})
 	}
+}
+
+func Test_advertisePlugins(t *testing.T) {
+	oldEnv := os.Getenv("STAGE")
+	os.Setenv("STAGE", "TESTING")
+
+	ctx := context.TODO()
+	dockerClient, err := client.NewEnvClient()
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+
+	session, brainID, err := test.StartBrain(ctx, t, dockerClient, test.BrainSpec)
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+
+	tests := []struct {
+		name     string
+		manifest []ManifestPlugin
+		want     []map[string]interface{}
+		wantErr  bool
+		err      error
+	}{
+		{
+			name: "One plugin",
+			manifest: []ManifestPlugin{
+				ManifestPlugin{
+					Name: "TestPlugin",
+					OS:   rethink.PluginOSAll,
+				},
+			},
+			want: []map[string]interface{}{
+				map[string]interface{}{
+					"Name":          "TestPlugin",
+					"ServiceID":     "",
+					"ServiceName":   "",
+					"DesiredState":  "",
+					"State":         "Available",
+					"Address":       "",
+					"ExternalPorts": []string{},
+					"InternalPorts": []string{},
+					"OS":            string(rethink.PluginOSAll),
+					"Environment":   []string{},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Two plugin",
+			manifest: []ManifestPlugin{
+				ManifestPlugin{
+					Name: "TestPlugin2",
+					OS:   rethink.PluginOSPosix,
+				},
+				ManifestPlugin{
+					Name: "TestPlugin3",
+					OS:   rethink.PluginOSWindows,
+				},
+			},
+			want: []map[string]interface{}{
+				map[string]interface{}{
+					"Name":          "TestPlugin2",
+					"ServiceID":     "",
+					"ServiceName":   "",
+					"DesiredState":  "",
+					"State":         "Available",
+					"Address":       "",
+					"ExternalPorts": []string{},
+					"InternalPorts": []string{},
+					"OS":            string(rethink.PluginOSPosix),
+					"Environment":   []string{},
+				},
+				map[string]interface{}{
+					"Name":          "TestPlugin3",
+					"ServiceID":     "",
+					"ServiceName":   "",
+					"DesiredState":  "",
+					"State":         "Available",
+					"Address":       "",
+					"ExternalPorts": []string{},
+					"InternalPorts": []string{},
+					"OS":            string(rethink.PluginOSWindows),
+					"Environment":   []string{},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name:     "No plugin",
+			manifest: []ManifestPlugin{},
+			wantErr:  true,
+			err:      errors.New("no plugins to advertise"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := advertisePlugins(tt.manifest)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("%v", err)
+				return
+			} else if tt.wantErr {
+				assert.Equal(t, tt.err, err)
+				return
+			}
+			time.Sleep(time.Second)
+
+			cursor, err := r.DB("Controller").Table("Plugins").Run(session)
+
+			var (
+				doc   map[string]interface{}
+				count int
+			)
+			for cursor.Next(&doc) {
+				index := 0
+				found := false
+				for i, v := range tt.want {
+					if v["Name"].(string) == doc["Name"].(string) {
+						found = true
+						index = i
+						count++
+						break
+					}
+				}
+				if !found {
+					t.Errorf("Plugin %v not in wanted", doc["Name"])
+					continue
+				}
+
+				assert.Equal(t, tt.want[index]["Name"], doc["Name"].(string))
+				assert.Equal(t, tt.want[index]["ServiceID"], doc["ServiceID"].(string))
+				assert.Equal(t, tt.want[index]["ServiceName"], doc["ServiceName"].(string))
+				assert.Equal(t, tt.want[index]["DesiredState"], doc["DesiredState"].(string))
+				assert.Equal(t, tt.want[index]["State"], doc["State"].(string))
+				assert.Equal(t, tt.want[index]["Address"], doc["Address"].(string))
+				assert.Equal(t, tt.want[index]["OS"], doc["OS"].(string))
+				for j, v := range doc["ExternalPorts"].([]interface{}) {
+					assert.Equal(t, tt.want[index]["ExternalPorts"].([]string)[j], v.(string))
+				}
+				for j, v := range doc["InternalPorts"].([]interface{}) {
+					assert.Equal(t, tt.want[index]["InternalPorts"].([]string)[j], v.(string))
+				}
+				for j, v := range doc["Environment"].([]interface{}) {
+					assert.Equal(t, tt.want[index]["Environment"].([]string)[j], v.(string))
+				}
+			}
+			assert.Equal(t, len(tt.want), count)
+			r.DB("Controller").Table("Plugins").Delete().Run(session)
+			time.Sleep(time.Second)
+		})
+	}
+
+	test.KillService(ctx, dockerClient, brainID)
+	os.Setenv("STAGE", oldEnv)
 }

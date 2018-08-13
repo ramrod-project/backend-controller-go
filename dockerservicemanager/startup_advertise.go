@@ -107,6 +107,41 @@ func getPlugins() ([]ManifestPlugin, error) {
 	return plugins, nil
 }
 
+func advertisePlugins(manifest []ManifestPlugin) error {
+	var plugins []map[string]interface{}
+
+	if len(manifest) < 1 {
+		return errors.New("no plugins to advertise")
+	}
+
+	session, err := r.Connect(r.ConnectOpts{
+		Address: getRethinkHost(),
+	})
+	if err != nil {
+		return err
+	}
+
+	for _, plugin := range manifest {
+		plugins = append(plugins, map[string]interface{}{
+			"Name":          plugin.Name,
+			"ServiceID":     "",
+			"ServiceName":   "",
+			"DesiredState":  "",
+			"State":         "Available",
+			"Address":       "",
+			"ExternalPorts": []string{},
+			"InternalPorts": []string{},
+			"OS":            string(plugin.OS),
+			"Environment":   []string{},
+		})
+	}
+
+	_, err = r.DB("Controller").Table("Plugins").Insert(plugins).Run(session)
+
+	return err
+
+}
+
 func advertiseIPs(entries []map[string]interface{}) error {
 
 	if len(entries) < 1 {
