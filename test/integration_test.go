@@ -64,14 +64,15 @@ func Test_dumpDBs(t *testing.T) {
 	log.Printf("Dumping ports table...")
 	cursor, _ := r.DB("Controller").Table("Ports").Run(session)
 	for cursor.Next(&doc) {
-		log.Printf("Port entry: %+v", doc)
+		t.Errorf("Port entry: %+v", doc)
 	}
 
 	log.Printf("Dumping plugins table...")
 	cursor, _ = r.DB("Controller").Table("Plugins").Run(session)
 	for cursor.Next(&doc) {
-		log.Printf("Plugin entry: %+v", doc)
+		t.Errorf("Plugin entry: %+v", doc)
 	}
+	assert.True(t, false)
 }
 
 func Test_Integration(t *testing.T) {
