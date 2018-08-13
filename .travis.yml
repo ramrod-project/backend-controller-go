@@ -41,7 +41,6 @@ install:
 before_script:
   - travis_wait 10 docker pull ramrodpcp/database-brain:$TAG
   - docker network prune -f
-  - docker network create --driver=overlay --attachable pcp
 
 script:
   - docker build -t ramrodpcp/backend-contoller:$TAG .
