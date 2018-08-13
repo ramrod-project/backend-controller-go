@@ -70,20 +70,12 @@ func Test_Integration(t *testing.T) {
 		{
 			name: "Startup ports",
 			run: func(t *testing.T) bool {
-				var ips []string
-				var portEntries []string
-				cursor, err := r.DB("Controller").Table("Ports").Run(session)
-				if err != nil {
-					t.Errorf("%v", err)
-					return false
-				}
-
-				// Get all port entry addresses from the db
-				var doc map[string]interface{}
-				for cursor.Next(&doc) {
-					log.Printf("Port DB entry: %+v", doc)
-					portEntries = append(portEntries, doc["Address"].(string))
-				}
+				return true
+			},
+			wait: func(t *testing.T, timeout time.Duration) bool {
+				var (
+					ips []string
+				)
 
 				// get local interfaces from node
 				ifaces, err := net.Interfaces()
@@ -102,65 +94,85 @@ func Test_Integration(t *testing.T) {
 					}
 				}
 
-				found := false
-				for _, ip := range ips {
-					for _, pEntry := range portEntries {
-						if pEntry == ip {
-							found = true
-							break
+				start := time.Now()
+
+				for time.Now().Before(start.Add(timeout)) {
+					// Get all port entry addresses from the db
+					var portEntries []string
+					var doc map[string]interface{}
+
+					cursor, err := r.DB("Controller").Table("Ports").Run(session)
+					if err != nil {
+						t.Errorf("%v", err)
+						return false
+					}
+
+					for cursor.Next(&doc) {
+						log.Printf("Port DB entry: %+v", doc)
+						portEntries = append(portEntries, doc["Address"].(string))
+					}
+
+					for _, ip := range ips {
+						for _, pEntry := range portEntries {
+							if pEntry == ip {
+								return true
+							}
 						}
 					}
-					if found {
-						return found
-					}
+					time.Sleep(time.Second)
 				}
-
-				if !found {
-					t.Errorf("None of %v found in db.", ips)
-				}
-				return found
+				t.Errorf("None of %v found in db.", ips)
+				return false
 			},
-			wait: func(t *testing.T, timeout time.Duration) bool {
-				return true
-			},
-			timeout: 1 * time.Second,
+			timeout: 10 * time.Second,
 		},
 		{
 			name: "Startup plugins",
 			run: func(t *testing.T) bool {
-				var pluginEntries []map[string]interface{}
-				cursor, err := r.DB("Controller").Table("Plugins").Run(session)
-				if err != nil {
-					t.Errorf("%v", err)
-					return false
-				}
-
-				// Get all plugins from the db (should only be one)
-				var doc map[string]interface{}
-				for cursor.Next(&doc) {
-					log.Printf("Plugin DB entry: %+v", doc)
-					pluginEntries = append(pluginEntries, doc)
-				}
-
-				if len(pluginEntries) < 1 {
-					t.Errorf("no plugin entries in db")
-					return false
-				}
-
-				assert.Equal(t, "Harness", pluginEntries[0]["Name"].(string))
-				assert.Equal(t, "", pluginEntries[0]["ServiceID"].(string))
-				assert.Equal(t, "", pluginEntries[0]["ServiceName"].(string))
-				assert.Equal(t, string(rethink.DesiredStateNull), pluginEntries[0]["DesiredState"].(string))
-				assert.Equal(t, string(rethink.StateAvailable), pluginEntries[0]["State"].(string))
-				assert.Equal(t, "", pluginEntries[0]["Address"].(string))
-				assert.Equal(t, string(rethink.PluginOSAll), pluginEntries[0]["OS"].(string))
-
 				return true
 			},
 			wait: func(t *testing.T, timeout time.Duration) bool {
+				start := time.Now()
+
+				for time.Now().Before(start.Add(timeout)) {
+					cursor, err := r.DB("Controller").Table("Plugins").Run(session)
+					if err != nil {
+						t.Errorf("%v", err)
+						return false
+					}
+
+					// Get all plugins from the db (should only be one)
+					var pluginEntries []map[string]interface{}
+					var doc map[string]interface{}
+
+					for cursor.Next(&doc) {
+						log.Printf("Plugin DB entry: %+v", doc)
+						pluginEntries = append(pluginEntries, doc)
+					}
+
+					if len(pluginEntries) < 1 {
+						time.Sleep(time.Second)
+						continue
+					}
+
+					if len(pluginEntries) != 1 {
+						t.Errorf("shouldn't be %v plugins", len(pluginEntries))
+						return false
+					}
+
+					assert.Equal(t, "Harness", pluginEntries[0]["Name"].(string))
+					assert.Equal(t, "", pluginEntries[0]["ServiceID"].(string))
+					assert.Equal(t, "", pluginEntries[0]["ServiceName"].(string))
+					assert.Equal(t, string(rethink.DesiredStateNull), pluginEntries[0]["DesiredState"].(string))
+					assert.Equal(t, string(rethink.StateAvailable), pluginEntries[0]["State"].(string))
+					assert.Equal(t, "", pluginEntries[0]["Address"].(string))
+					assert.Equal(t, string(rethink.PluginOSAll), pluginEntries[0]["OS"].(string))
+					break
+				}
+
 				return true
 			},
-			timeout: 1 * time.Second,
+			timeout: 10 * time.Second,
 		},
 		{
 			name: "Create service",
@@ -300,6 +312,14 @@ func Test_Integration(t *testing.T) {
 		{
 			name: "Update service",
 			run: func(t *testing.T) bool {
+				_, err := r.DB("Controller").Table("Plugins").Filter(map[string]string{"ServiceName": "TestPlugin"}).Update(map[string]interface{}{
+					"Environment": []string{"TEST=TEST"},
+				}).Run(session)
+				if err != nil {
+					t.Errorf("%v", err)
+					return false
+				}
+
 				return true
 			},
 			wait: func(t *testing.T, timeout time.Duration) bool {
