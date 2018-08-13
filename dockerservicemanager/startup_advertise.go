@@ -2,6 +2,7 @@ package dockerservicemanager
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -14,6 +15,11 @@ import (
 	rethink "github.com/ramrod-project/backend-controller-go/rethink"
 	r "gopkg.in/gorethink/gorethink.v4"
 )
+
+type ManifestPlugin struct {
+	Name string           `json:"Name",omitempty`
+	OS   rethink.PluginOS `json:"OS",omitempty`
+}
 
 var osMap = map[string]rethink.PluginOS{
 	"linux":   rethink.PluginOSPosix,
@@ -78,6 +84,27 @@ func getNodes() ([]map[string]interface{}, error) {
 	}
 
 	return entries, nil
+}
+
+func getPlugins() ([]ManifestPlugin, error) {
+	var plugins []ManifestPlugin
+
+	// Open Manifest file (should be in same directory)
+	manifest, err := os.Open("manifest.json")
+	if err != nil {
+		return nil, err
+	}
+
+	jsonParser := json.NewDecoder(manifest)
+	if err = jsonParser.Decode(&plugins); err != nil {
+		return nil, err
+	}
+
+	if len(plugins) < 1 {
+		return plugins, fmt.Errorf("no plugins found in manifest.json")
+	}
+
+	return plugins, nil
 }
 
 func advertiseIPs(entries []map[string]interface{}) error {

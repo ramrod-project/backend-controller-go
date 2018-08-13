@@ -2,9 +2,14 @@ package dockerservicemanager
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"io/ioutil"
 	"os"
+	"reflect"
 	"testing"
+
+	"github.com/ramrod-project/backend-controller-go/rethink"
 
 	"github.com/docker/docker/api/types"
 	client "github.com/docker/docker/client"
@@ -218,4 +223,81 @@ func Test_advertiseIPs(t *testing.T) {
 	}
 	test.KillService(ctx, dockerClient, brainID)
 	os.Setenv("STAGE", oldEnv)
+}
+
+func Test_getPlugins(t *testing.T) {
+	tests := []struct {
+		name    string
+		content []byte
+		want    []ManifestPlugin
+		wantErr bool
+		err     error
+	}{
+		{
+			name: "Basic",
+			content: []byte(`
+				[{"Name":"Harness", "OS":"all"}]
+			`),
+			want: []ManifestPlugin{
+				ManifestPlugin{
+					Name: "Harness",
+					OS:   rethink.PluginOSAll,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Advanced",
+			content: []byte(`
+				[{"Name":"Harness", "OS":"all"},{"Name":"OtherPlugin", "OS":"nt"},{"Name":"OtherPlugin2", "OS":"posix"}]
+			`),
+			want: []ManifestPlugin{
+				ManifestPlugin{
+					Name: "Harness",
+					OS:   rethink.PluginOSAll,
+				},
+				ManifestPlugin{
+					Name: "OtherPlugin",
+					OS:   rethink.PluginOSWindows,
+				},
+				ManifestPlugin{
+					Name: "OtherPlugin2",
+					OS:   rethink.PluginOSPosix,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Empty",
+			content: []byte(`
+				[]
+			`),
+			want:    []ManifestPlugin{},
+			wantErr: true,
+			err:     errors.New("no plugins found in manifest.json"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			plugins := []ManifestPlugin{}
+			err := json.Unmarshal(tt.content, &plugins)
+			if err != nil {
+				t.Errorf("%v", err)
+				return
+			}
+			pluginJSON, _ := json.Marshal(plugins)
+			err = ioutil.WriteFile("manifest.json", pluginJSON, 0644)
+			got, err := getPlugins()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("getPlugins() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			} else if tt.wantErr {
+				assert.Equal(t, tt.err, err)
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("getPlugins() = %v, want %v", got, tt.want)
+			}
+			os.Remove("manifest.json")
+		})
+	}
 }
