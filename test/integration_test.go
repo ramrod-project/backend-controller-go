@@ -1,6 +1,7 @@
 package test
 
 import (
+	"bytes"
 	"context"
 	"log"
 	"net"
@@ -23,6 +24,15 @@ func dumpEverything(t *testing.T, ctx context.Context, dockerClient *client.Clie
 	services, _ := dockerClient.ServiceList(ctx, types.ServiceListOptions{})
 	for _, service := range services {
 		t.Errorf("Service %v: %+v", service.Spec.Annotations.Name, service)
+	}
+
+	t.Errorf("Dumping container logs...")
+	containers, _ := dockerClient.ContainerList(ctx, types.ContainerListOptions{})
+	for _, container := range containers {
+		r, _ := dockerClient.ContainerLogs(ctx, container.ID, types.ContainerLogsOptions{})
+		buf := new(bytes.Buffer)
+		buf.ReadFrom(r)
+		t.Errorf("Container %v, logs: %+v", container.Names, buf.String())
 	}
 
 	t.Errorf("Dumping ports table...")
