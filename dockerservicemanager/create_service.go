@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"time"
 
@@ -170,6 +171,8 @@ func generateServiceSpec(config *PluginServiceConfig) (*swarm.ServiceSpec, error
 // CreatePluginService creates a service for a plugin
 // given a PluginServiceConfig.
 func CreatePluginService(config *PluginServiceConfig) (types.ServiceCreateResponse, error) {
+
+	// log.Printf("Entering CreatePluginService")
 	ctx := context.TODO()
 	dockerClient, err := client.NewEnvClient()
 
@@ -188,6 +191,8 @@ func CreatePluginService(config *PluginServiceConfig) (types.ServiceCreateRespon
 	// log.Printf("Service spec created: %v", serviceSpec)
 
 	resp, err := dockerClient.ServiceCreate(ctx, *serviceSpec, types.ServiceCreateOptions{})
+	log.Printf("Started service %+v", resp)
+
 	return resp, err
 
 }

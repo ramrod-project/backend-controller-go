@@ -99,6 +99,7 @@ func selectChange(plugin rethink.Plugin) error {
 	if plugin.ServiceName == "" {
 		return nil
 	}
+	// log.Printf("Selecing change for plugin %+v", plugin)
 	switch plugin.DesiredState {
 	case rethink.DesiredStateActivate:
 		config, err := pluginToConfig(plugin)

@@ -2,6 +2,7 @@ package rethink
 
 import (
 	"fmt"
+	"log"
 	"os"
 
 	r "gopkg.in/gorethink/gorethink.v4"
@@ -87,6 +88,10 @@ func getRethinkHost() string {
 
 func newPlugin(change map[string]interface{}) (*Plugin, error) {
 	var (
+		name        string
+		serviceID   string
+		serviceName string
+		address     string
 		desired     PluginDesiredState
 		extports    []string
 		intports    []string
@@ -94,13 +99,6 @@ func newPlugin(change map[string]interface{}) (*Plugin, error) {
 		os          PluginOS
 		state       PluginState
 	)
-
-	if change["ServiceName"] == "" {
-		return &Plugin{}, NewControllerError("plugin service must have ServiceName")
-	}
-	if change["Name"] == "" {
-		return &Plugin{}, NewControllerError("plugin name must not be blank")
-	}
 
 	switch change["DesiredState"] {
 	case string(DesiredStateActivate):
@@ -139,6 +137,41 @@ func newPlugin(change map[string]interface{}) (*Plugin, error) {
 		return &Plugin{}, NewControllerError(fmt.Sprintf("invalid OS setting %v sent", change["OS"]))
 	}
 
+	switch t := change["Name"].(type) {
+	case string:
+		name = change["Name"].(string)
+		if name == "" {
+			return &Plugin{}, NewControllerError("plugin name must not be blank")
+		}
+	case nil:
+		return &Plugin{}, NewControllerError(fmt.Sprintf("plugin name must be string, is %v", t))
+	}
+
+	switch t := change["ServiceID"].(type) {
+	case string:
+		serviceID = change["ServiceID"].(string)
+	default:
+		return &Plugin{}, NewControllerError(fmt.Sprintf("plugin service id must be string, is %v", t))
+	}
+
+	switch t := change["ServiceName"].(type) {
+	case string:
+		serviceName = change["ServiceName"].(string)
+		if serviceName == "" {
+			return &Plugin{}, NewControllerError("service name must not be blank")
+		}
+	default:
+		return &Plugin{}, NewControllerError(fmt.Sprintf("plugin service name must be string, is %v", t))
+	}
+
+	switch t := change["Address"].(type) {
+	case string:
+		address = change["Address"].(string)
+	default:
+		log.Printf("address %v of type %v passed", change["Address"], t)
+		address = ""
+	}
+
 	for _, v := range change["ExternalPorts"].([]interface{}) {
 		extports = append(extports, v.(string))
 	}
@@ -158,12 +191,12 @@ func newPlugin(change map[string]interface{}) (*Plugin, error) {
 	}
 
 	plugin := &Plugin{
-		Name:          change["Name"].(string),
-		ServiceID:     change["ServiceID"].(string),
-		ServiceName:   change["ServiceName"].(string),
+		Name:          name,
+		ServiceID:     serviceID,
+		ServiceName:   serviceName,
 		DesiredState:  desired,
 		State:         state,
-		Address:       change["Interface"].(string),
+		Address:       address,
 		ExternalPorts: extports,
 		InternalPorts: intports,
 		OS:            os,
@@ -184,6 +217,7 @@ func watchChanges(res *r.Cursor) (<-chan Plugin, <-chan error) {
 				if err != nil {
 					errChan <- err
 				}
+				// log.Printf("made new plugin %+v", plugin)
 				out <- *plugin
 			}
 		}
