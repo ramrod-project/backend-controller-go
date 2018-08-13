@@ -30,7 +30,9 @@ func dumpEverything(t *testing.T, ctx context.Context, dockerClient *client.Clie
 	containers, _ := dockerClient.ContainerList(ctx, types.ContainerListOptions{})
 	for _, container := range containers {
 		r, _ := dockerClient.ContainerLogs(ctx, container.ID, types.ContainerLogsOptions{})
-		if b, err := ioutil.ReadAll(r); err == nil {
+		if r == nil {
+			t.Errorf("Couldnt read logs %v", container.ID)
+		} else if b, err := ioutil.ReadAll(r); err == nil {
 			t.Errorf("Container %v logs: %v", container.ID, b)
 		} else {
 			t.Errorf("Couldnt read logs %v: %v", container.ID, err)
