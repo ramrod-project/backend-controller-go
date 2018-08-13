@@ -110,7 +110,7 @@ func Test_advertiseIPs(t *testing.T) {
 		return
 	}
 
-	session, brainID, err := test.StartBrain(ctx, t, dockerClient)
+	session, brainID, err := test.StartBrain(ctx, t, dockerClient, test.BrainSpec)
 	if err != nil {
 		t.Errorf("%v", err)
 		return
@@ -216,6 +216,6 @@ func Test_advertiseIPs(t *testing.T) {
 			}
 		})
 	}
-	test.KillBrain(ctx, dockerClient, brainID)
+	test.KillService(ctx, dockerClient, brainID)
 	os.Setenv("STAGE", oldEnv)
 }

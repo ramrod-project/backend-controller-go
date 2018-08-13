@@ -10,6 +10,7 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
+	mount "github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/docker/docker/client"
 	r "gopkg.in/gorethink/gorethink.v4"
@@ -83,7 +84,7 @@ func DockerCleanUp(ctx context.Context, dockerClient *client.Client, net string)
 	return nil
 }
 
-func GetBrainImage() string {
+func GetImage(image string) string {
 	var stringBuf bytes.Buffer
 
 	tag := os.Getenv("TAG")
@@ -94,15 +95,16 @@ func GetBrainImage() string {
 		tag = "latest"
 	}
 
-	stringBuf.WriteString("ramrodpcp/database-brain:")
+	stringBuf.WriteString(image)
+	stringBuf.WriteString(":")
 	stringBuf.WriteString(tag)
 
 	return stringBuf.String()
 }
 
-func StartBrain(ctx context.Context, t *testing.T, dockerClient *client.Client) (*r.Session, string, error) {
+func StartBrain(ctx context.Context, t *testing.T, dockerClient *client.Client, spec swarm.ServiceSpec) (*r.Session, string, error) {
 	// Start brain
-	result, err := dockerClient.ServiceCreate(ctx, brainSpec, types.ServiceCreateOptions{})
+	result, err := dockerClient.ServiceCreate(ctx, spec, types.ServiceCreateOptions{})
 	if err != nil {
 		t.Errorf("%v", err)
 		return nil, "", err
@@ -134,10 +136,10 @@ func StartBrain(ctx context.Context, t *testing.T, dockerClient *client.Client) 
 	return session, result.ID, nil
 }
 
-func KillBrain(ctx context.Context, dockerClient *client.Client, brainID string) {
+func KillService(ctx context.Context, dockerClient *client.Client, svcID string) {
 	start := time.Now()
 	for time.Since(start) < 10*time.Second {
-		err := dockerClient.ServiceRemove(ctx, brainID)
+		err := dockerClient.ServiceRemove(ctx, svcID)
 		if err != nil {
 			break
 		}
@@ -160,14 +162,24 @@ func KillBrain(ctx context.Context, dockerClient *client.Client, brainID string)
 	}
 }
 
-var brainSpec = swarm.ServiceSpec{
+func StartIntegrationTestService(ctx context.Context, dockerClient *client.Client, spec swarm.ServiceSpec) (string, error) {
+
+	// Start service
+	result, err := dockerClient.ServiceCreate(ctx, spec, types.ServiceCreateOptions{})
+	if err != nil {
+		return "", err
+	}
+	return result.ID, nil
+}
+
+var BrainSpec = swarm.ServiceSpec{
 	Annotations: swarm.Annotations{
 		Name: "rethinkdb",
 	},
 	TaskTemplate: swarm.TaskSpec{
 		ContainerSpec: swarm.ContainerSpec{
 			DNSConfig: &swarm.DNSConfig{},
-			Image:     GetBrainImage(),
+			Image:     GetImage("ramrodpcp/database-brain"),
 		},
 		RestartPolicy: &swarm.RestartPolicy{
 			Condition: "on-failure",
@@ -181,5 +193,35 @@ var brainSpec = swarm.ServiceSpec{
 			PublishedPort: 28015,
 			PublishMode:   swarm.PortConfigPublishModeIngress,
 		}},
+	},
+}
+
+var controllerSpec = swarm.ServiceSpec{
+	Annotations: swarm.Annotations{
+		Name: "controller",
+	},
+	TaskTemplate: swarm.TaskSpec{
+		ContainerSpec: swarm.ContainerSpec{
+			DNSConfig: &swarm.DNSConfig{},
+			Image:     GetImage("ramrodpcp/backend-controller"),
+			Mounts: []mount.Mount{
+				mount.Mount{
+					Type:   mount.TypeBind,
+					Source: "/var/run/docker.sock",
+					Target: "/var/run/docker.sock",
+				},
+			},
+		},
+		Networks: []swarm.NetworkAttachmentConfig{
+			swarm.NetworkAttachmentConfig{
+				Target: "pcp",
+			},
+		},
+		RestartPolicy: &swarm.RestartPolicy{
+			Condition: "on-failure",
+		},
+	},
+	EndpointSpec: &swarm.EndpointSpec{
+		Mode: swarm.ResolutionModeVIP,
 	},
 }

@@ -45,13 +45,14 @@ before_script:
 
 script:
   - docker build -t ramrodpcp/backend-contoller:$TAG .
-  - docker service create --name rethinkdb --network pcp -p 28015:28015 -e "STAGE=DEV" -e "LOGLEVEL=DEBUG" ramrodpcp/database-brain:$TAG
-  - docker service create --name controller --network pcp -e "STAGE=DEV" -e "LOGLEVEL=DEBUG" --mount type=bind,source=/var/run/docker.sock,destination=/var/run/docker.sock ramrodpcp/backend-contoller:$TAG
-  - sleep 15
-  - docker service ls
-  - docker service logs controller
-  - docker service rm controller
-  - docker service rm rethinkdb
+  - go test -v -parallel 1 github.com/ramrod-project/backend-controller-go/test
+  # - docker service create --name rethinkdb --network pcp -p 28015:28015 -e "STAGE=DEV" -e "LOGLEVEL=DEBUG" ramrodpcp/database-brain:$TAG
+  # - docker service create --name controller --network pcp -e "STAGE=DEV" -e "LOGLEVEL=DEBUG" --mount type=bind,source=/var/run/docker.sock,destination=/var/run/docker.sock ramrodpcp/backend-contoller:$TAG
+  # - sleep 15
+  # - docker service ls
+  # - docker service logs controller
+  # - docker service rm controller
+  # - docker service rm rethinkdb
 
 notifications:
   slack: ramrod-project:GDF82rRYDg3KSekrT3GA24qO

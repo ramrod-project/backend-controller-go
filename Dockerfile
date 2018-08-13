@@ -6,5 +6,6 @@ RUN apk update \
 WORKDIR /run
 
 COPY ./controller .
+COPY ./manifest.json .
 
 CMD ["./controller"]
