@@ -10,6 +10,7 @@ import (
 // RemovePluginService removes a service for a plugin
 // given a service ID.
 func RemovePluginService(serviceID string) error {
+	log.Printf("removing: %v", serviceID)
 	ctx := context.Background()
 	dockerClient, err := client.NewEnvClient()
 
