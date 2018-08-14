@@ -382,7 +382,7 @@ func Test_Integration(t *testing.T) {
 			},
 			wait: func(t *testing.T, timeout time.Duration) bool {
 				var (
-					rD, rDB, rDu, rDBu bool = false, true, true, true
+					rD, rDB, rDu, rDBu bool = false, false, false, true
 				)
 
 				// Initialize parent context (with timeout)
@@ -404,7 +404,6 @@ func Test_Integration(t *testing.T) {
 					for {
 						select {
 						case <-cntxt.Done():
-							log.Printf("Done (routine)")
 							return false
 						case e := <-errChan:
 							log.Println(fmt.Errorf("%v", e))
@@ -413,7 +412,6 @@ func Test_Integration(t *testing.T) {
 							if e.Type != "service" {
 								break
 							}
-							log.Printf("service event received: %+v", e)
 							if e.Action != "update" {
 								break
 							}
@@ -436,7 +434,7 @@ func Test_Integration(t *testing.T) {
 						time.Sleep(100 * time.Millisecond)
 					}
 				})
-				/*restartDB := timoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
+				restartDB := timoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
 					sessionTest, err := r.Connect(r.ConnectOpts{
 						Address: "127.0.0.1",
 					})
@@ -520,10 +518,10 @@ func Test_Integration(t *testing.T) {
 							}
 							return true
 						}
-						time.Sleep(time.Second)
+						time.Sleep(100 * time.Millisecond)
 					}
 				})
-				restartedDBUpdated := timoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
+				/*restartedDBUpdated := timoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
 					sessionTest, err := r.Connect(r.ConnectOpts{
 						Address: "127.0.0.1",
 					})
@@ -578,25 +576,28 @@ func Test_Integration(t *testing.T) {
 				for {
 					select {
 					case <-timeoutCtx.Done():
-						log.Printf("Done (main)")
-						rD = <-restartDocker
-						log.Printf("Done - received %v(main)", rD)
-						/*<-restartDB
+						<-restartDocker
+						/*<-restartDB*/
 						<-restartedDockerUpdated
-						<-restartedDBUpdated*/
+						/*<-restartedDBUpdated*/
+						log.Printf("Done (main)")
 						break L
 					case v := <-restartDocker:
-						log.Printf("Setting rD to %v", v)
-						rD = v
+						if v {
+							log.Printf("Setting rD to %v", v)
+							rD = v
+						}
 					/*case v := <-restartDB:
-						rDB = v
-						break
+					rDB = v
+					break*/
 					case v := <-restartedDockerUpdated:
-						rDu = v
-						break
-					case v := <-restartedDBUpdated:
-						rDBu = v
-						break*/
+						if v {
+							log.Printf("Setting rDu to %v", v)
+							rDu = v
+						}
+					/*case v := <-restartedDBUpdated:
+					rDBu = v
+					break*/
 					default:
 						break
 					}
@@ -649,6 +650,7 @@ func Test_Integration(t *testing.T) {
 			res := make(chan bool)
 			go func() {
 				res <- tt.wait(t, tt.timeout)
+				close(res)
 				return
 			}()
 			assert.True(t, tt.run(t))
