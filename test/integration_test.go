@@ -377,6 +377,8 @@ func Test_Integration(t *testing.T) {
 			},
 			wait: func(t *testing.T, timeout time.Duration) bool {
 				services, _ := dockerClient.ServiceList(ctx, types.ServiceListOptions{})
+				servCount := len(services)
+				count := 0
 				for _, service := range services {
 					//check database to see if the service state is stopped
 					filter := make(map[string]string)
@@ -385,15 +387,16 @@ func Test_Integration(t *testing.T) {
 					if err != nil {
 						return false
 					}
-					if cursor.IsNil() {
-						return false
-					}
 					var res map[string]interface{}
 					for cursor.Next(&res) {
 						if res["State"] != "Stopped" {
 							return false
 						}
+						count++
 					}
+				}
+				if count < servCount {
+					return false
 				}
 				return true
 			},
