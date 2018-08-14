@@ -162,8 +162,7 @@ func Test_Integration(t *testing.T) {
 
 					cursor, err := r.DB("Controller").Table("Ports").Run(session)
 					if err != nil {
-						t.Errorf("%v", err)
-						return false
+						continue
 					}
 
 					for cursor.Next(&doc) {
@@ -197,8 +196,7 @@ func Test_Integration(t *testing.T) {
 				for time.Now().Before(start.Add(timeout)) {
 					cursor, err := r.DB("Controller").Table("Plugins").Run(session)
 					if err != nil {
-						t.Errorf("%v", err)
-						break
+						continue
 					}
 
 					// Get all plugins from the db (should only be one)
