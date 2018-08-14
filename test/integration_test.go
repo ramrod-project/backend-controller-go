@@ -320,9 +320,34 @@ func Test_Integration(t *testing.T) {
 		{
 			name: "Stop services",
 			run: func(t *testing.T) bool {
+				services, _ := dockerClient.ServiceList(ctx, types.ServiceListOptions{})
+				for _, service := range services {
+					//remove service
+					filter := make(map[string]string)
+					update := make(map[string]string)
+					filter["ServiceID"] = service.ID
+					update["DesiredState"] = "Stop"
+					r.DB("Controller").Table("Plugins").Filter(filter).Update(update).Run(session)
+				}
 				return true
 			},
 			wait: func(t *testing.T, timeout time.Duration) bool {
+				services, _ := dockerClient.ServiceList(ctx, types.ServiceListOptions{})
+				for _, service := range services {
+					//check database to see if the service state is stopped
+					filter := make(map[string]string)
+					filter["ServiceID"] = service.ID
+					cursor, err := r.DB("Controller").Table("Plugins").Filter(filter).Run(session)
+					if err != nil {
+						return false
+					}
+					var res map[string]interface{}
+					for cursor.Next(&res) {
+						if res["State"] != "Stopped" {
+							return false
+						}
+					}
+				}
 				return true
 			},
 			timeout: 1 * time.Second,
