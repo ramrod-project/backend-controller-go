@@ -127,7 +127,8 @@ func Test_Integration(t *testing.T) {
 			},
 			wait: func(t *testing.T, timeout time.Duration) bool {
 				var (
-					ips []string
+					ips        []string
+					portsFound bool = true
 				)
 
 				// get local interfaces from node
@@ -147,36 +148,86 @@ func Test_Integration(t *testing.T) {
 					}
 				}
 
-				start := time.Now()
+				// Initialize parent context (with timeout)
+				timeoutCtx, cancel := context.WithTimeout(context.Background(), timeout)
 
-				for time.Now().Before(start.Add(timeout)) {
-					// Get all port entry addresses from the db
-					var portEntries []string
-					var doc map[string]interface{}
-
-					cursor, err := r.DB("Controller").Table("Ports").Run(session)
+				portsDB := timoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
+					sessionTest, err := r.Connect(r.ConnectOpts{
+						Address: "127.0.0.1",
+					})
 					if err != nil {
-						log.Printf("db err: %v", err)
-						continue
+						t.Errorf("%v", err)
+						return false
 					}
-
-					for cursor.Next(&doc) {
-						// log.Printf("Port DB entry: %+v", doc)
-						portEntries = append(portEntries, doc["Address"].(string))
-					}
-
-					for _, ip := range ips {
-						for _, pEntry := range portEntries {
-							if pEntry == ip {
-								return true
+					cntxt := args[0].(context.Context)
+					changeChan, errChan := func(s *r.Session) (<-chan map[string]interface{}, <-chan error) {
+						changes := make(chan map[string]interface{})
+						errs := make(chan error)
+						go func() {
+							cursor, err := r.DB("Controller").Table("Ports").Run(s)
+							if err != nil {
+								log.Println(fmt.Errorf("%v", err))
+								errs <- err
 							}
+							var doc map[string]interface{}
+							for cursor.Next(&doc) {
+								changes <- doc
+							}
+						}()
+						return changes, errs
+					}(sessionTest)
+
+					for {
+						select {
+						case <-cntxt.Done():
+							return false
+						case e := <-errChan:
+							log.Println(fmt.Errorf("%v", e))
+							return false
+						case d := <-changeChan:
+							for _, ip := range ips {
+								if d["Address"].(string) == ip {
+									return true
+								}
+							}
+							return false
+						default:
+							break
 						}
+						time.Sleep(100 * time.Millisecond)
 					}
-					time.Sleep(time.Second)
+				})
+
+				defer cancel()
+
+				// for loop that iterates until context <-Done()
+				// once <-Done() then get return from all goroutines
+			L:
+				for {
+					select {
+					case <-timeoutCtx.Done():
+						<-portsDB
+						log.Printf("Done (main)")
+						break L
+					case v := <-portsDB:
+						if v {
+							log.Printf("Setting foundService to %v", v)
+							portsFound = v
+						}
+					default:
+						break
+					}
+					if portsFound {
+						break L
+					}
+					time.Sleep(100 * time.Millisecond)
 				}
-				t.Errorf("None of %v found in db.", ips)
-				dumpEverything(ctx, t, dockerClient, session)
-				return false
+
+				if !portsFound {
+					t.Errorf("Plugins (Harness) not found in DB.")
+				}
+
+				return portsFound
 			},
 			timeout: 20 * time.Second,
 		},
@@ -186,45 +237,107 @@ func Test_Integration(t *testing.T) {
 				return true
 			},
 			wait: func(t *testing.T, timeout time.Duration) bool {
-				start := time.Now()
+				var (
+					pluginsFound bool = true
+				)
 
-				for time.Now().Before(start.Add(timeout)) {
-					cursor, err := r.DB("Controller").Table("Plugins").Run(session)
+				// Initialize parent context (with timeout)
+				timeoutCtx, cancel := context.WithTimeout(context.Background(), timeout)
+
+				pluginsDB := timoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
+					sessionTest, err := r.Connect(r.ConnectOpts{
+						Address: "127.0.0.1",
+					})
 					if err != nil {
-						log.Printf("db err: %v", err)
-						continue
+						t.Errorf("%v", err)
+						return false
 					}
+					cntxt := args[0].(context.Context)
+					changeChan, errChan := func(s *r.Session) (<-chan map[string]interface{}, <-chan error) {
+						changes := make(chan map[string]interface{})
+						errs := make(chan error)
+						go func() {
+							cursor, err := r.DB("Controller").Table("Plugins").Run(s)
+							if err != nil {
+								log.Println(fmt.Errorf("%v", err))
+								errs <- err
+							}
+							var doc map[string]interface{}
+							for cursor.Next(&doc) {
+								changes <- doc
+							}
+						}()
+						return changes, errs
+					}(sessionTest)
 
-					// Get all plugins from the db (should only be one)
-					var pluginEntries []map[string]interface{}
-					var doc map[string]interface{}
-
-					for cursor.Next(&doc) {
-						// log.Printf("Plugin DB entry: %+v", doc)
-						pluginEntries = append(pluginEntries, doc)
+					for {
+						select {
+						case <-cntxt.Done():
+							return false
+						case e := <-errChan:
+							log.Println(fmt.Errorf("%v", e))
+							return false
+						case d := <-changeChan:
+							if d["Name"].(string) != "Harness" {
+								break
+							}
+							if d["ServiceID"].(string) != "" {
+								break
+							}
+							if d["ServiceName"].(string) != "" {
+								break
+							}
+							if d["DesiredState"].(string) != string(rethink.DesiredStateNull) {
+								break
+							}
+							if d["State"].(string) != string(rethink.StateAvailable) {
+								break
+							}
+							if d["Address"].(string) != "" {
+								break
+							}
+							if d["OS"].(string) != string(rethink.PluginOSAll) {
+								break
+							}
+							return true
+						default:
+							break
+						}
+						time.Sleep(100 * time.Millisecond)
 					}
+				})
 
-					if len(pluginEntries) < 1 {
-						time.Sleep(time.Second)
-						continue
-					}
+				defer cancel()
 
-					if len(pluginEntries) != 1 {
-						t.Errorf("shouldn't be %v plugins", len(pluginEntries))
+				// for loop that iterates until context <-Done()
+				// once <-Done() then get return from all goroutines
+			L:
+				for {
+					select {
+					case <-timeoutCtx.Done():
+						<-pluginsDB
+						log.Printf("Done (main)")
+						break L
+					case v := <-pluginsDB:
+						if v {
+							log.Printf("Setting foundService to %v", v)
+							pluginsFound = v
+						}
+					default:
 						break
 					}
-
-					assert.Equal(t, "Harness", pluginEntries[0]["Name"].(string))
-					assert.Equal(t, "", pluginEntries[0]["ServiceID"].(string))
-					assert.Equal(t, "", pluginEntries[0]["ServiceName"].(string))
-					assert.Equal(t, string(rethink.DesiredStateNull), pluginEntries[0]["DesiredState"].(string))
-					assert.Equal(t, string(rethink.StateAvailable), pluginEntries[0]["State"].(string))
-					assert.Equal(t, "", pluginEntries[0]["Address"].(string))
-					assert.Equal(t, string(rethink.PluginOSAll), pluginEntries[0]["OS"].(string))
-					return true
+					if pluginsFound {
+						break L
+					}
+					time.Sleep(100 * time.Millisecond)
 				}
-				dumpEverything(ctx, t, dockerClient, session)
-				return false
+
+				if !pluginsFound {
+					t.Errorf("Plugins (Harness) not found in DB.")
+				}
+
+				return pluginsFound
+
 			},
 			timeout: 20 * time.Second,
 		},
