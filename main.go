@@ -30,7 +30,7 @@ func main() {
 	log.Printf("Event monitor started...")
 
 	// Start event handler
-	_, eventDBErr := rethink.EventUpdate(eventData)
+	eventDBErr := rethink.EventUpdate(eventData)
 
 	log.Printf("Event handler started...")
 
@@ -49,7 +49,7 @@ func main() {
 
 	for err := range errChan {
 		if err != nil {
-			log.Printf("Error: %v\n", err)
+			log.Fatalf("Error: %v\n", err)
 		}
 	}
 }

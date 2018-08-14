@@ -2,6 +2,7 @@ package test
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net"
 	"strings"
@@ -16,7 +17,7 @@ import (
 	r "gopkg.in/gorethink/gorethink.v4"
 )
 
-func dumpEverything(t *testing.T, ctx context.Context, dockerClient *client.Client, session *r.Session) {
+func dumpEverything(ctx context.Context, t *testing.T, dockerClient *client.Client, session *r.Session) {
 	var doc map[string]interface{}
 
 	t.Errorf("Dumping services...")
@@ -37,6 +38,35 @@ func dumpEverything(t *testing.T, ctx context.Context, dockerClient *client.Clie
 	for cursor.Next(&doc) {
 		t.Errorf("Plugin entry: %+v", doc)
 	}
+}
+
+func timoutTester(ctx context.Context, args []interface{}, f func(args ...interface{}) bool) <-chan bool {
+	done := make(chan bool)
+
+	go func() {
+		for {
+			recv := make(chan bool)
+
+			go func() {
+				recv <- f(args...)
+				close(recv)
+				return
+			}()
+
+			select {
+			case <-ctx.Done():
+				done <- false
+				close(done)
+				return
+			case b := <-recv:
+				done <- b
+				close(done)
+				return
+			}
+		}
+	}()
+
+	return done
 }
 
 func Test_Integration(t *testing.T) {
@@ -131,7 +161,7 @@ func Test_Integration(t *testing.T) {
 					}
 
 					for cursor.Next(&doc) {
-						log.Printf("Port DB entry: %+v", doc)
+						// log.Printf("Port DB entry: %+v", doc)
 						portEntries = append(portEntries, doc["Address"].(string))
 					}
 
@@ -145,7 +175,7 @@ func Test_Integration(t *testing.T) {
 					time.Sleep(time.Second)
 				}
 				t.Errorf("None of %v found in db.", ips)
-				dumpEverything(t, ctx, dockerClient, session)
+				dumpEverything(ctx, t, dockerClient, session)
 				return false
 			},
 			timeout: 10 * time.Second,
@@ -170,7 +200,7 @@ func Test_Integration(t *testing.T) {
 					var doc map[string]interface{}
 
 					for cursor.Next(&doc) {
-						log.Printf("Plugin DB entry: %+v", doc)
+						// log.Printf("Plugin DB entry: %+v", doc)
 						pluginEntries = append(pluginEntries, doc)
 					}
 
@@ -193,7 +223,7 @@ func Test_Integration(t *testing.T) {
 					assert.Equal(t, string(rethink.PluginOSAll), pluginEntries[0]["OS"].(string))
 					return true
 				}
-				dumpEverything(t, ctx, dockerClient, session)
+				dumpEverything(ctx, t, dockerClient, session)
 				return false
 			},
 			timeout: 10 * time.Second,
@@ -233,7 +263,7 @@ func Test_Integration(t *testing.T) {
 					for _, service := range services {
 						if service.Spec.Annotations.Name == "TestPlugin" {
 							targetService = service
-							log.Printf("Found service by ID %v", service.ID)
+							// log.Printf("Found service by ID %v", service.ID)
 							foundService = true
 							break
 						}
@@ -273,7 +303,7 @@ func Test_Integration(t *testing.T) {
 					if inspect.Spec.TaskTemplate.Networks[0].Target != netRes.ID {
 						continue
 					}
-					log.Printf("Verified service %+v", inspect)
+					// log.Printf("Verified service %+v", inspect)
 					serviceVerify = true
 					break
 				}
@@ -291,18 +321,18 @@ func Test_Integration(t *testing.T) {
 							continue
 						}
 						if doc["ServiceID"].(string) == "" {
-							log.Printf("empty id")
+							// log.Printf("empty id")
 							break
 						}
 						if doc["State"].(string) != "Active" {
-							log.Printf("bad state: %v", doc["State"])
+							// log.Printf("bad state: %v", doc["State"])
 							break
 						}
 						if doc["DesiredState"].(string) != "" {
-							log.Printf("bad desiredstate: %v", doc["DesiredState"])
+							// log.Printf("bad desiredstate: %v", doc["DesiredState"])
 							break
 						}
-						log.Printf("DB update verified %+v", doc)
+						// log.Printf("DB update verified %+v", doc)
 						dbUpdated = true
 						break
 					}
@@ -337,7 +367,7 @@ func Test_Integration(t *testing.T) {
 			name: "Update service",
 			run: func(t *testing.T) bool {
 				_, err := r.DB("Controller").Table("Plugins").Filter(map[string]string{"ServiceName": "TestPlugin"}).Update(map[string]interface{}{
-					"Environment": []string{"TEST=TEST"},
+					"DesiredState": "Restart", "Environment": []string{"TEST=TEST"},
 				}).Run(session)
 				if err != nil {
 					t.Errorf("%v", err)
@@ -347,9 +377,256 @@ func Test_Integration(t *testing.T) {
 				return true
 			},
 			wait: func(t *testing.T, timeout time.Duration) bool {
-				return true
+				var (
+					rD, rDB, rDu, rDBu bool = false, false, false, true
+				)
+
+				// Initialize parent context (with timeout)
+				timeoutCtx, cancel := context.WithTimeout(context.Background(), timeout)
+				log.Printf("starting timeout tests")
+
+				// Create goroutine for each condition we want to satisfy
+				// and pass same parent context
+				// goroutines return <-chan bool
+				restartDocker := timoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
+					dc, err := client.NewEnvClient()
+					if err != nil {
+						t.Errorf("%v", err)
+						return false
+					}
+					cntxt := args[0].(context.Context)
+					eventChan, errChan := dc.Events(cntxt, types.EventsOptions{})
+
+					for {
+						select {
+						case <-cntxt.Done():
+							return false
+						case e := <-errChan:
+							log.Println(fmt.Errorf("%v", e))
+							return false
+						case e := <-eventChan:
+							if e.Type != "service" {
+								break
+							}
+							if e.Action != "update" {
+								break
+							}
+							if v, ok := e.Actor.Attributes["name"]; ok {
+								if v != "TestPlugin" {
+									break
+								}
+							} else {
+								break
+							}
+							if v, ok := e.Actor.Attributes["updatestate.new"]; ok {
+								if v != "updating" {
+									break
+								}
+							} else {
+								break
+							}
+							return true
+						}
+						time.Sleep(100 * time.Millisecond)
+					}
+				})
+				restartDB := timoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
+					sessionTest, err := r.Connect(r.ConnectOpts{
+						Address: "127.0.0.1",
+					})
+					if err != nil {
+						t.Errorf("%v", err)
+						return false
+					}
+					cntxt := args[0].(context.Context)
+					changeChan, errChan := func(s *r.Session) (<-chan map[string]interface{}, <-chan error) {
+						changes := make(chan map[string]interface{})
+						errs := make(chan error)
+						go func() {
+							cursor, err := r.DB("Controller").Table("Plugins").Changes().Run(s)
+							if err != nil {
+								log.Println(fmt.Errorf("%v", err))
+								errs <- err
+							}
+							var doc map[string]interface{}
+							for cursor.Next(&doc) {
+								changes <- doc
+							}
+						}()
+						return changes, errs
+					}(sessionTest)
+
+					for {
+						select {
+						case <-cntxt.Done():
+							return false
+						case e := <-errChan:
+							log.Println(fmt.Errorf("%v", e))
+							return false
+						case d := <-changeChan:
+							log.Printf("doc received: %+v", d)
+							if _, ok := d["new_val"]; !ok {
+								break
+							}
+							if d["new_val"].(map[string]interface{})["ServiceName"].(string) != "TestPlugin" {
+								break
+							}
+							if d["new_val"].(map[string]interface{})["State"].(string) != "Restarting" {
+								break
+							}
+							return true
+						default:
+							break
+						}
+						time.Sleep(100 * time.Millisecond)
+					}
+				})
+				restartedDockerUpdated := timoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
+					dc, err := client.NewEnvClient()
+					if err != nil {
+						t.Errorf("%v", err)
+						return false
+					}
+					cntxt := args[0].(context.Context)
+					eventChan, errChan := dc.Events(cntxt, types.EventsOptions{})
+					for {
+						select {
+						case <-cntxt.Done():
+							return false
+						case e := <-errChan:
+							log.Println(fmt.Errorf("%v", e))
+							return false
+						case e := <-eventChan:
+							if e.Type != "service" {
+								break
+							}
+							if e.Action != "update" {
+								break
+							}
+							if v, ok := e.Actor.Attributes["name"]; ok {
+								if v != "TestPlugin" {
+									break
+								}
+							} else {
+								break
+							}
+							if v, ok := e.Actor.Attributes["updatestate.new"]; ok {
+								if v != "completed" {
+									break
+								}
+							} else {
+								break
+							}
+							return true
+						}
+						time.Sleep(100 * time.Millisecond)
+					}
+				})
+				/*restartedDBUpdated := timoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
+					sessionTest, err := r.Connect(r.ConnectOpts{
+						Address: "127.0.0.1",
+					})
+					if err != nil {
+						t.Errorf("%v", err)
+						return false
+					}
+					cntxt := args[0].(context.Context)
+					changeChan, errChan := func(s *r.Session) (<-chan map[string]interface{}, <-chan error) {
+						changes := make(chan map[string]interface{})
+						errs := make(chan error)
+						go func() {
+							cursor, err := r.DB("Controller").Table("Plugins").Changes().Run(s)
+							if err != nil {
+								log.Println(fmt.Errorf("%v", err))
+								errs <- err
+							}
+							var doc map[string]interface{}
+							for cursor.Next(&doc) {
+								changes <- doc
+							}
+						}()
+						return changes, errs
+					}(sessionTest)
+
+					for {
+						select {
+						case <-cntxt.Done():
+							return false
+						case e := <-errChan:
+							log.Println(fmt.Errorf("%v", e))
+							return false
+						case d := <-changeChan:
+							if d["ServiceName"] != "TestPlugin" {
+								continue
+							}
+							if d["State"] != "Restarting" {
+								continue
+							}
+							return true
+						default:
+							continue
+						}
+					}
+				})*/
+
+				defer cancel()
+
+				// for loop that iterates until context <-Done()
+				// once <-Done() then get return from all goroutines
+			L:
+				for {
+					select {
+					case <-timeoutCtx.Done():
+						<-restartDocker
+						<-restartDB
+						<-restartedDockerUpdated
+						/*<-restartedDBUpdated*/
+						log.Printf("Done (main)")
+						break L
+					case v := <-restartDocker:
+						if v {
+							log.Printf("Setting rD to %v", v)
+							rD = v
+						}
+					case v := <-restartDB:
+						if v {
+							log.Printf("Setting rDB to %v", v)
+							rDB = v
+							break
+						}
+					case v := <-restartedDockerUpdated:
+						if v {
+							log.Printf("Setting rDu to %v", v)
+							rDu = v
+						}
+					/*case v := <-restartedDBUpdated:
+					rDBu = v
+					break*/
+					default:
+						break
+					}
+					if rD && rDB && rDu && rDBu {
+						break L
+					}
+					time.Sleep(100 * time.Millisecond)
+				}
+
+				if !rD {
+					t.Errorf("Docker restart event not detected")
+				}
+				if !rDB {
+					t.Errorf("Database restart event not detected")
+				}
+				if !rDu {
+					t.Errorf("Docker restart complete event not detected")
+				}
+				if !rDBu {
+					t.Errorf("Database restart complete event not detected")
+				}
+
+				return rD && rDB && rDu && rDBu
 			},
-			timeout: 1 * time.Second,
+			timeout: 20 * time.Second,
 		},
 		{
 			name: "Create another service",
@@ -417,8 +694,16 @@ func Test_Integration(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			res := make(chan bool)
+			go func() {
+				res <- tt.wait(t, tt.timeout)
+				close(res)
+				return
+			}()
+			time.Sleep(3 * time.Second)
 			assert.True(t, tt.run(t))
-			assert.True(t, tt.wait(t, tt.timeout))
+			assert.True(t, <-res)
+			time.Sleep(3 * time.Second)
 		})
 	}
 
