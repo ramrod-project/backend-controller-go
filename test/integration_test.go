@@ -39,42 +39,6 @@ func dumpEverything(t *testing.T, ctx context.Context, dockerClient *client.Clie
 	}
 }
 
-func Test_dumpDBs(t *testing.T) {
-	session, err := r.Connect(r.ConnectOpts{
-		Address: "127.0.0.1",
-	})
-	start := time.Now()
-	if err != nil {
-		for {
-			if time.Since(start) >= 20*time.Second {
-				t.Errorf("%v", err)
-				return
-			}
-			session, err = r.Connect(r.ConnectOpts{
-				Address: "127.0.0.1",
-			})
-			if err == nil {
-				break
-			}
-			time.Sleep(time.Second)
-		}
-	}
-
-	var doc map[string]interface{}
-	log.Printf("Dumping ports table...")
-	cursor, _ := r.DB("Controller").Table("Ports").Run(session)
-	for cursor.Next(&doc) {
-		t.Errorf("Port entry: %+v", doc)
-	}
-
-	log.Printf("Dumping plugins table...")
-	cursor, _ = r.DB("Controller").Table("Plugins").Run(session)
-	for cursor.Next(&doc) {
-		t.Errorf("Plugin entry: %+v", doc)
-	}
-	assert.True(t, false)
-}
-
 func Test_Integration(t *testing.T) {
 
 	ctx := context.TODO()

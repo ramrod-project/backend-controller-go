@@ -50,7 +50,6 @@ script:
   - sleep 10
   - docker service ls
   - docker service ps --no-trunc controller
-  - go test -parallel 1 github.com/ramrod-project/backend-controller-go/test -run dumpDBs
   - docker service logs controller
   - docker service logs rethinkdb
   - docker service rm controller rethinkdb
