@@ -116,7 +116,7 @@ func Test_Integration(t *testing.T) {
 	}
 	var serviceIDs = []string{brainID, contID}
 
-	time.Sleep(5 * time.Second)
+	time.Sleep(10 * time.Second)
 
 	tests := []struct {
 		name string
@@ -162,6 +162,7 @@ func Test_Integration(t *testing.T) {
 
 					cursor, err := r.DB("Controller").Table("Ports").Run(session)
 					if err != nil {
+						log.Printf("db err: %v", err)
 						continue
 					}
 
@@ -196,6 +197,7 @@ func Test_Integration(t *testing.T) {
 				for time.Now().Before(start.Add(timeout)) {
 					cursor, err := r.DB("Controller").Table("Plugins").Run(session)
 					if err != nil {
+						log.Printf("db err: %v", err)
 						continue
 					}
 
