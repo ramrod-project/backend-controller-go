@@ -385,12 +385,14 @@ func Test_Integration(t *testing.T) {
 				// filter["ServiceID"] = service.ID
 				cursor, err := r.DB("Controller").Table("Plugins").Run(session)
 				if err != nil {
-					log.Printf("error getting cursor")
+					log.Printf("error getting cursor\n")
 					return false
 				}
+				log.Printf("comparing\n")
 				var res map[string]interface{}
 				for cursor.Next(&res) {
 					if res["State"] != "Stopped" {
+						log.Printf("Error in cursor\n")
 						return false
 					}
 					count++
@@ -400,7 +402,7 @@ func Test_Integration(t *testing.T) {
 				// 	log.Printf("services: %v\tcount: %v\n", servCount, count)
 				// 	return false
 				// }
-				log.Printf("%v", count)
+				log.Printf("count %v\n", count)
 				return true
 			},
 			timeout: 1 * time.Second,
