@@ -43,7 +43,7 @@ before_script:
   - docker network prune -f
 
 script:
-  - docker build -t ramrodpcp/backend-contoller:$TAG .
+  - docker build -t ramrodpcp/backend-controller:$TAG .
   - docker network create --driver=overlay pcp
   - docker service create --name rethinkdb --network pcp -p 28015:28015 -e "STAGE=DEV" -e "LOGLEVEL=DEBUG" ramrodpcp/database-brain:$TAG
   - docker service create --name controller --network pcp -e "STAGE=DEV" -e "LOGLEVEL=DEBUG" -e "TAG=${TAG}" ramrodpcp/backend-controller:$TAG
