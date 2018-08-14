@@ -938,8 +938,6 @@ func Test_Integration(t *testing.T) {
 						case d := <-changeChan:
 							if v, ok := d["new_val"]; !ok {
 								break
-							} else {
-								log.Printf("change doc: %+v", v)
 							}
 							if d["new_val"].(map[string]interface{})["ServiceName"].(string) != "TestPlugin2" {
 								break
@@ -1154,8 +1152,6 @@ func Test_Integration(t *testing.T) {
 						case d := <-changeChan:
 							if v, ok := d["new_val"]; !ok {
 								break
-							} else {
-								log.Printf("change doc: %+v", v)
 							}
 							if d["new_val"].(map[string]interface{})["ServiceName"].(string) != "TestPlugin" {
 								break
