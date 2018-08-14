@@ -954,35 +954,151 @@ func Test_Integration(t *testing.T) {
 				update := make(map[string]string)
 				filter["ServiceName"] = "TestPlugin"
 				update["DesiredState"] = "Stop"
-				res, _ := r.DB("Controller").Table("Plugins").Filter(filter).Update(update).RunWrite(session)
-				log.Printf("%+v", res)
+				_, err := r.DB("Controller").Table("Plugins").Filter(filter).Update(update).RunWrite(session)
+				if err != nil {
+					t.Errorf("db error: %v", err)
+					return false
+				}
 				return true
 			},
 			wait: func(t *testing.T, timeout time.Duration) bool {
-				time.Sleep(40 * time.Second)
-				count := 0
-				filter := make(map[string]string)
-				filter["ServiceName"] = "TestPlugin"
-				cursor, err := r.DB("Controller").Table("Plugins").Filter(filter).Run(session)
-				if err != nil {
-					log.Printf("error getting cursor\n")
-					return false
-				}
-				log.Printf("comparing\n")
-				var res map[string]interface{}
-				for cursor.Next(&res) {
-					if res["State"] != "Stopped" {
-						log.Printf("Error in cursor\n")
-						log.Printf("state: %v\n", res["State"])
-						log.Printf("desired state: %v\n", res["DesiredState"])
+				var (
+					dockerStopped, dbStopped bool = false, false
+				)
+
+				// Initialize parent context (with timeout)
+				timeoutCtx, cancel := context.WithTimeout(context.Background(), timeout)
+
+				stopDocker := timoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
+					dc, err := client.NewEnvClient()
+					if err != nil {
+						t.Errorf("%v", err)
 						return false
 					}
-					count++
+					cntxt := args[0].(context.Context)
+					eventChan, errChan := dc.Events(cntxt, types.EventsOptions{})
+
+					for {
+						select {
+						case <-cntxt.Done():
+							return false
+						case e := <-errChan:
+							log.Println(fmt.Errorf("%v", e))
+							return false
+						case e := <-eventChan:
+							if e.Type != "service" {
+								break
+							}
+							if e.Action != "remove" {
+								break
+							}
+							if v, ok := e.Actor.Attributes["name"]; ok {
+								if v != "TestPlugin" {
+									break
+								}
+							} else {
+								break
+							}
+							return true
+						}
+						time.Sleep(100 * time.Millisecond)
+					}
+				})
+
+				stopDB := timoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
+					sessionTest, err := r.Connect(r.ConnectOpts{
+						Address: "127.0.0.1",
+					})
+					if err != nil {
+						t.Errorf("%v", err)
+						return false
+					}
+					cntxt := args[0].(context.Context)
+					changeChan, errChan := func(s *r.Session) (<-chan map[string]interface{}, <-chan error) {
+						changes := make(chan map[string]interface{})
+						errs := make(chan error)
+						go func() {
+							cursor, err := r.DB("Controller").Table("Plugins").Changes().Run(s)
+							if err != nil {
+								log.Println(fmt.Errorf("%v", err))
+								errs <- err
+							}
+							var doc map[string]interface{}
+							for cursor.Next(&doc) {
+								changes <- doc
+							}
+						}()
+						return changes, errs
+					}(sessionTest)
+
+					for {
+						select {
+						case <-cntxt.Done():
+							return false
+						case e := <-errChan:
+							log.Println(fmt.Errorf("%v", e))
+							return false
+						case d := <-changeChan:
+							if v, ok := d["new_val"]; !ok {
+								break
+							} else {
+								log.Printf("change doc: %+v", v)
+							}
+							if d["new_val"].(map[string]interface{})["ServiceName"].(string) != "TestPlugin" {
+								break
+							}
+							if d["new_val"].(map[string]interface{})["State"].(string) != "Stopped" {
+								break
+							}
+							return true
+						default:
+							break
+						}
+						time.Sleep(100 * time.Millisecond)
+					}
+				})
+
+				defer cancel()
+
+				// for loop that iterates until context <-Done()
+				// once <-Done() then get return from all goroutines
+			L:
+				for {
+					select {
+					case <-timeoutCtx.Done():
+						<-stopDocker
+						<-stopDB
+						log.Printf("Done (main)")
+						break L
+					case v := <-stopDocker:
+						if v {
+							log.Printf("Setting dockerStopped to %v", v)
+							dockerStopped = v
+						}
+					case v := <-stopDB:
+						if v {
+							log.Printf("Setting dbStopped to %v", v)
+							dbStopped = v
+						}
+					default:
+						break
+					}
+					if dockerStopped && dbStopped {
+						break L
+					}
+					time.Sleep(100 * time.Millisecond)
 				}
-				log.Printf("count %v\n", count)
-				return true
+
+				if !dockerStopped {
+					t.Errorf("Docker stop event not detected")
+				}
+				if !dbStopped {
+					t.Errorf("Database stop event not detected")
+				}
+
+				return dockerStopped && dbStopped
 			},
-			timeout: 1 * time.Second,
+			timeout: 60 * time.Second,
 		},
 	}
 	for _, tt := range tests {
