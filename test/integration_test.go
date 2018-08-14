@@ -658,7 +658,7 @@ func Test_Integration(t *testing.T) {
 			wait: func(t *testing.T, timeout time.Duration) bool {
 				// services, _ := dockerClient.ServiceList(ctx, types.ServiceListOptions{})
 				// servCount := len(services)
-				time.Sleep(6 * time.Second)
+				time.Sleep(40 * time.Second)
 				// dumpEverything(t, ctx, dockerClient, session)
 				count := 0
 				// for _, service := range services {
