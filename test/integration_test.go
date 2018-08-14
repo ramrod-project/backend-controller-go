@@ -253,113 +253,196 @@ func Test_Integration(t *testing.T) {
 			wait: func(t *testing.T, timeout time.Duration) bool {
 				var (
 					foundService, dbUpdated, serviceVerify bool = false, false, false
-					doc                                    map[string]interface{}
-					targetService                          swarm.Service
+					targetService                          string
 				)
-				start := time.Now()
 
-				for time.Now().Before(start.Add(timeout)) {
-					services, _ := dockerClient.ServiceList(ctx, types.ServiceListOptions{})
-					for _, service := range services {
-						if service.Spec.Annotations.Name == "TestPlugin" {
-							targetService = service
-							// log.Printf("Found service by ID %v", service.ID)
-							foundService = true
-							break
-						}
-					}
-					if foundService {
-						break
-					}
-					time.Sleep(time.Second)
-				}
+				// Initialize parent context (with timeout)
+				timeoutCtx, cancel := context.WithTimeout(context.Background(), timeout)
 
-				var inspect swarm.Service
-				for time.Now().Before(start.Add(timeout)) {
-					time.Sleep(time.Second)
-					// Check docker service
-					inspect, _, _ = dockerClient.ServiceInspectWithRaw(ctx, targetService.ID)
-					if *inspect.Spec.Mode.Replicated.Replicas != uint64(1) {
-						continue
-					}
-					if len(inspect.Endpoint.Ports) < 1 {
-						continue
-					}
-					if inspect.Endpoint.Ports[0].Protocol != swarm.PortConfigProtocolTCP {
-						continue
-					}
-					if inspect.Endpoint.Ports[0].PublishedPort != uint32(5000) {
-						continue
-					}
-					if inspect.Endpoint.Ports[0].TargetPort != uint32(5000) {
-						continue
-					}
-					if inspect.Endpoint.Ports[0].PublishMode != swarm.PortConfigPublishModeIngress {
-						continue
-					}
-					if len(inspect.Spec.TaskTemplate.Networks) < 1 {
-						continue
-					}
-					if inspect.Spec.TaskTemplate.Networks[0].Target != netRes.ID {
-						continue
-					}
-					// log.Printf("Verified service %+v", inspect)
-					serviceVerify = true
-					break
-				}
-
-				for time.Now().Before(start.Add(timeout)) {
-					// Check database entry
-					cursor, err := r.DB("Controller").Table("Plugins").Run(session)
+				startDocker := timoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
+					dc, err := client.NewEnvClient()
 					if err != nil {
 						t.Errorf("%v", err)
 						return false
 					}
-					// Check cursor for the desired plugin entry
-					for cursor.Next(&doc) {
-						if doc["ServiceName"].(string) != "TestPlugin" {
-							continue
-						}
-						if doc["ServiceID"].(string) == "" {
-							// log.Printf("empty id")
-							break
-						}
-						if doc["State"].(string) != "Active" {
-							// log.Printf("bad state: %v", doc["State"])
-							break
-						}
-						if doc["DesiredState"].(string) != "" {
-							// log.Printf("bad desiredstate: %v", doc["DesiredState"])
-							break
-						}
-						// log.Printf("DB update verified %+v", doc)
-						dbUpdated = true
-						break
-					}
-					if dbUpdated {
-						break
-					}
-					time.Sleep(time.Second)
-				}
+					cntxt := args[0].(context.Context)
+					eventChan, errChan := dc.Events(cntxt, types.EventsOptions{})
 
-				if !foundService || !serviceVerify {
-					log.Printf("Inspect results: %+v", inspect)
-					t.Errorf("Didn't find service before timeout")
-				}
-				if !dbUpdated {
-					cursor, err := r.DB("Controller").Table("Plugins").Run(session)
+					for {
+						select {
+						case <-cntxt.Done():
+							return false
+						case e := <-errChan:
+							log.Println(fmt.Errorf("%v", e))
+							return false
+						case e := <-eventChan:
+							if e.Type != "service" {
+								break
+							}
+							if e.Action != "create" {
+								break
+							}
+							if v, ok := e.Actor.Attributes["name"]; ok {
+								if v != "TestPlugin" {
+									break
+								}
+							} else {
+								break
+							}
+							targetService = e.Actor.ID
+							return true
+						}
+						time.Sleep(100 * time.Millisecond)
+					}
+				})
+
+				var startDockerVerify <-chan bool
+
+				startDB := timoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
+					sessionTest, err := r.Connect(r.ConnectOpts{
+						Address: "127.0.0.1",
+					})
 					if err != nil {
 						t.Errorf("%v", err)
-					} else {
-						var res map[string]interface{}
-						for cursor.Next(&res) {
-							log.Printf("DB item: %+v", res)
-						}
+						return false
 					}
-					t.Errorf("Didn't update database before timeout")
+					cntxt := args[0].(context.Context)
+					changeChan, errChan := func(s *r.Session) (<-chan map[string]interface{}, <-chan error) {
+						changes := make(chan map[string]interface{})
+						errs := make(chan error)
+						go func() {
+							cursor, err := r.DB("Controller").Table("Plugins").Changes().Run(s)
+							if err != nil {
+								log.Println(fmt.Errorf("%v", err))
+								errs <- err
+							}
+							var doc map[string]interface{}
+							for cursor.Next(&doc) {
+								changes <- doc
+							}
+						}()
+						return changes, errs
+					}(sessionTest)
+
+					for {
+						select {
+						case <-cntxt.Done():
+							return false
+						case e := <-errChan:
+							log.Println(fmt.Errorf("%v", e))
+							return false
+						case d := <-changeChan:
+							if _, ok := d["new_val"]; !ok {
+								break
+							}
+							if d["new_val"].(map[string]interface{})["ServiceName"].(string) != "TestPlugin" {
+								break
+							}
+							if d["new_val"].(map[string]interface{})["State"].(string) != "Active" {
+								break
+							}
+							return true
+						default:
+							break
+						}
+						time.Sleep(100 * time.Millisecond)
+					}
+				})
+
+				defer cancel()
+
+				// for loop that iterates until context <-Done()
+				// once <-Done() then get return from all goroutines
+			L:
+				for {
+					select {
+					case <-timeoutCtx.Done():
+						<-startDocker
+						<-startDockerVerify
+						<-startDB
+						log.Printf("Done (main)")
+						break L
+					case v := <-startDocker:
+						if v {
+							log.Printf("Setting foundService to %v", v)
+							startDockerVerify = timoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
+								dc, err := client.NewEnvClient()
+								if err != nil {
+									t.Errorf("%v", err)
+									return false
+								}
+								cntxt := args[0].(context.Context)
+
+								for {
+									time.Sleep(100 * time.Millisecond)
+									select {
+									case <-cntxt.Done():
+										return false
+									default:
+										break
+									}
+
+									inspect, _, _ := dc.ServiceInspectWithRaw(cntxt, targetService)
+									if *inspect.Spec.Mode.Replicated.Replicas != uint64(1) {
+										continue
+									}
+									if len(inspect.Endpoint.Ports) < 1 {
+										continue
+									}
+									if inspect.Endpoint.Ports[0].Protocol != swarm.PortConfigProtocolTCP {
+										continue
+									}
+									if inspect.Endpoint.Ports[0].PublishedPort != uint32(5000) {
+										continue
+									}
+									if inspect.Endpoint.Ports[0].TargetPort != uint32(5000) {
+										continue
+									}
+									if inspect.Endpoint.Ports[0].PublishMode != swarm.PortConfigPublishModeIngress {
+										continue
+									}
+									if len(inspect.Spec.TaskTemplate.Networks) < 1 {
+										continue
+									}
+									if inspect.Spec.TaskTemplate.Networks[0].Target != netRes.ID {
+										continue
+									}
+									return true
+								}
+							})
+							foundService = v
+						}
+					case v := <-startDockerVerify:
+						if v {
+							log.Printf("Setting serviceVerify to %v", v)
+							serviceVerify = v
+						}
+					case v := <-startDB:
+						if v {
+							log.Printf("Setting dbUpdated to %v", v)
+							dbUpdated = v
+						}
+					default:
+						break
+					}
+					if foundService && serviceVerify && dbUpdated {
+						break L
+					}
+					time.Sleep(100 * time.Millisecond)
 				}
 
-				return foundService && dbUpdated && serviceVerify
+				if !foundService {
+					t.Errorf("Docker start event not detected")
+				}
+				if !serviceVerify {
+					t.Errorf("Database start event not verified with params")
+				}
+				if !dbUpdated {
+					t.Errorf("Docker start db not updated")
+				}
+
+				return foundService && serviceVerify && dbUpdated
+
 			},
 			timeout: 20 * time.Second,
 		},
@@ -383,7 +466,6 @@ func Test_Integration(t *testing.T) {
 
 				// Initialize parent context (with timeout)
 				timeoutCtx, cancel := context.WithTimeout(context.Background(), timeout)
-				log.Printf("starting timeout tests")
 
 				// Create goroutine for each condition we want to satisfy
 				// and pass same parent context
@@ -534,7 +616,7 @@ func Test_Integration(t *testing.T) {
 						<-restartDocker
 						<-restartDB
 						<-restartedDockerUpdated
-						/*<-restartedDBUpdated*/
+						<-restartedDBUpdated
 						log.Printf("Done (main)")
 						break L
 					case v := <-restartDocker:
