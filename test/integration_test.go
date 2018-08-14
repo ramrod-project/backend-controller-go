@@ -626,7 +626,7 @@ func Test_Integration(t *testing.T) {
 
 				return rD && rDB && rDu && rDBu
 			},
-			timeout: 20 * time.Second,
+			timeout: 30 * time.Second,
 		},
 		{
 			name: "Create another service",
@@ -650,7 +650,7 @@ func Test_Integration(t *testing.T) {
 					filter["ServiceName"] = "TestPlugin"
 					update["DesiredState"] = "Stop"
 					log.Printf("Filter servID: %v\n", service.ID)
-					res, _ := r.DB("Controller").Table("Plugins").Filter(filter).Update(update).Run(session)
+					res, _ := r.DB("Controller").Table("Plugins").Filter(filter).Update(update).RunWrite(session)
 					log.Printf("%+v", res)
 				}
 				return true
