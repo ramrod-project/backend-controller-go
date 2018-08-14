@@ -373,7 +373,8 @@ func Test_Integration(t *testing.T) {
 					filter["ServiceName"] = "TestPlugin"
 					update["DesiredState"] = "Stop"
 					log.Printf("Filter servID: %v\n", service.ID)
-					r.DB("Controller").Table("Plugins").Filter(filter).Update(update).Run(session)
+					res, _ := r.DB("Controller").Table("Plugins").Filter(filter).Update(update).Run(session)
+					log.Printf("%v", res)
 				}
 				return true
 			},
