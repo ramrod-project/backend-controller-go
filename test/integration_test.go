@@ -663,9 +663,9 @@ func Test_Integration(t *testing.T) {
 				count := 0
 				// for _, service := range services {
 				//check database to see if the service state is stopped
-				// filter := make(map[string]string)
-				// filter["ServiceID"] = service.ID
-				cursor, err := r.DB("Controller").Table("Plugins").Run(session)
+				filter := make(map[string]string)
+				filter["ServiceName"] = "TestPlugin"
+				cursor, err := r.DB("Controller").Table("Plugins").Filter(filter).Run(session)
 				if err != nil {
 					log.Printf("error getting cursor\n")
 					return false
