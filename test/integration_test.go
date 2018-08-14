@@ -395,6 +395,7 @@ func Test_Integration(t *testing.T) {
 					if res["State"] != "Stopped" {
 						log.Printf("Error in cursor\n")
 						log.Printf("state: %v\n", res["State"])
+						log.Printf("desired state: %v\n", res["DesiredState"])
 						return false
 					}
 					count++
