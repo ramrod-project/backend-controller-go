@@ -2,6 +2,7 @@ package dockerservicemanager
 
 import (
 	"context"
+	"log"
 
 	client "github.com/docker/docker/client"
 )
@@ -16,7 +17,7 @@ func RemovePluginService(serviceID string) error {
 		return err
 	}
 
-	// log.Printf("Removing service %v\n", serviceID)
+	log.Printf("Removing service %v\n", serviceID)
 
 	err = dockerClient.ServiceRemove(ctx, serviceID)
 

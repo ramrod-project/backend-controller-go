@@ -950,9 +950,36 @@ func Test_Integration(t *testing.T) {
 		{
 			name: "Stop services",
 			run: func(t *testing.T) bool {
+				filter := make(map[string]string)
+				update := make(map[string]string)
+				filter["ServiceName"] = "TestPlugin"
+				update["DesiredState"] = "Stop"
+				res, _ := r.DB("Controller").Table("Plugins").Filter(filter).Update(update).RunWrite(session)
+				log.Printf("%+v", res)
 				return true
 			},
 			wait: func(t *testing.T, timeout time.Duration) bool {
+				time.Sleep(40 * time.Second)
+				count := 0
+				filter := make(map[string]string)
+				filter["ServiceName"] = "TestPlugin"
+				cursor, err := r.DB("Controller").Table("Plugins").Filter(filter).Run(session)
+				if err != nil {
+					log.Printf("error getting cursor\n")
+					return false
+				}
+				log.Printf("comparing\n")
+				var res map[string]interface{}
+				for cursor.Next(&res) {
+					if res["State"] != "Stopped" {
+						log.Printf("Error in cursor\n")
+						log.Printf("state: %v\n", res["State"])
+						log.Printf("desired state: %v\n", res["DesiredState"])
+						return false
+					}
+					count++
+				}
+				log.Printf("count %v\n", count)
 				return true
 			},
 			timeout: 1 * time.Second,
