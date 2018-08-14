@@ -378,7 +378,7 @@ func Test_Integration(t *testing.T) {
 			},
 			wait: func(t *testing.T, timeout time.Duration) bool {
 				var (
-					rD, rDB, rDu, rDBu bool = false, false, false, true
+					rD, rDB, rDu, rDBu bool = false, false, false, false
 				)
 
 				// Initialize parent context (with timeout)
@@ -464,7 +464,6 @@ func Test_Integration(t *testing.T) {
 							log.Println(fmt.Errorf("%v", e))
 							return false
 						case d := <-changeChan:
-							log.Printf("doc received: %+v", d)
 							if _, ok := d["new_val"]; !ok {
 								break
 							}
@@ -522,52 +521,7 @@ func Test_Integration(t *testing.T) {
 						time.Sleep(100 * time.Millisecond)
 					}
 				})
-				/*restartedDBUpdated := timoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
-					sessionTest, err := r.Connect(r.ConnectOpts{
-						Address: "127.0.0.1",
-					})
-					if err != nil {
-						t.Errorf("%v", err)
-						return false
-					}
-					cntxt := args[0].(context.Context)
-					changeChan, errChan := func(s *r.Session) (<-chan map[string]interface{}, <-chan error) {
-						changes := make(chan map[string]interface{})
-						errs := make(chan error)
-						go func() {
-							cursor, err := r.DB("Controller").Table("Plugins").Changes().Run(s)
-							if err != nil {
-								log.Println(fmt.Errorf("%v", err))
-								errs <- err
-							}
-							var doc map[string]interface{}
-							for cursor.Next(&doc) {
-								changes <- doc
-							}
-						}()
-						return changes, errs
-					}(sessionTest)
-
-					for {
-						select {
-						case <-cntxt.Done():
-							return false
-						case e := <-errChan:
-							log.Println(fmt.Errorf("%v", e))
-							return false
-						case d := <-changeChan:
-							if d["ServiceName"] != "TestPlugin" {
-								continue
-							}
-							if d["State"] != "Restarting" {
-								continue
-							}
-							return true
-						default:
-							continue
-						}
-					}
-				})*/
+				var restartedDBUpdated = make(<-chan bool)
 
 				defer cancel()
 
@@ -591,17 +545,70 @@ func Test_Integration(t *testing.T) {
 					case v := <-restartDB:
 						if v {
 							log.Printf("Setting rDB to %v", v)
+							restartedDBUpdated = timoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
+								sessionTest, err := r.Connect(r.ConnectOpts{
+									Address: "127.0.0.1",
+								})
+								if err != nil {
+									t.Errorf("%v", err)
+									return false
+								}
+								cntxt := args[0].(context.Context)
+								changeChan, errChan := func(s *r.Session) (<-chan map[string]interface{}, <-chan error) {
+									changes := make(chan map[string]interface{})
+									errs := make(chan error)
+									go func() {
+										cursor, err := r.DB("Controller").Table("Plugins").Changes().Run(s)
+										if err != nil {
+											log.Println(fmt.Errorf("%v", err))
+											errs <- err
+										}
+										var doc map[string]interface{}
+										for cursor.Next(&doc) {
+											changes <- doc
+										}
+									}()
+									return changes, errs
+								}(sessionTest)
+
+								for {
+									select {
+									case <-cntxt.Done():
+										return false
+									case e := <-errChan:
+										log.Println(fmt.Errorf("%v", e))
+										return false
+									case d := <-changeChan:
+										if _, ok := d["new_val"]; !ok {
+											break
+										} else {
+											log.Printf("change doc: %+v", d["new_val"])
+										}
+										if d["new_val"].(map[string]interface{})["ServiceName"].(string) != "TestPlugin" {
+											break
+										}
+										if d["new_val"].(map[string]interface{})["State"].(string) != "Active" {
+											break
+										}
+										return true
+									default:
+										break
+									}
+									time.Sleep(100 * time.Millisecond)
+								}
+							})
 							rDB = v
-							break
 						}
 					case v := <-restartedDockerUpdated:
 						if v {
 							log.Printf("Setting rDu to %v", v)
 							rDu = v
 						}
-					/*case v := <-restartedDBUpdated:
-					rDBu = v
-					break*/
+					case v := <-restartedDBUpdated:
+						if v {
+							log.Printf("Setting rDBu to %v", v)
+							rDBu = v
+						}
 					default:
 						break
 					}
