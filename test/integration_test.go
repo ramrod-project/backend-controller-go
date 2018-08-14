@@ -385,6 +385,9 @@ func Test_Integration(t *testing.T) {
 					if err != nil {
 						return false
 					}
+					if cursor.IsNil() {
+						return false
+					}
 					var res map[string]interface{}
 					for cursor.Next(&res) {
 						if res["State"] != "Stopped" {
