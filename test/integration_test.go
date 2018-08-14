@@ -396,6 +396,7 @@ func Test_Integration(t *testing.T) {
 					}
 				}
 				if count < servCount {
+					log.Printf("services: %v\tcount: %v\n", servCount, count)
 					return false
 				}
 				return true
