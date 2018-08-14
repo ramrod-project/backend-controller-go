@@ -1,6 +1,7 @@
 package rethink
 
 import (
+	"fmt"
 	"log"
 	"os"
 
@@ -11,13 +12,15 @@ import (
 // in the database.
 type Plugin struct {
 	Name          string
+	ServiceID     string
 	ServiceName   string
-	DesiredState  PluginDesiredState `json:",omitempty`
-	State         PluginState        `json:",omitempty`
-	Interface     string
+	DesiredState  PluginDesiredState `json:",omitempty"`
+	State         PluginState        `json:",omitempty"`
+	Address       string
 	ExternalPorts []string
 	InternalPorts []string
 	OS            PluginOS
+	Environment   []string
 }
 
 // PluginOS is the supported OS for the plugin
@@ -78,18 +81,23 @@ func (e *ControllerError) Error() string {
 func getRethinkHost() string {
 	temp := os.Getenv("STAGE")
 	if temp == "TESTING" {
-		return "localhost"
+		return "127.0.0.1"
 	}
 	return "rethinkdb"
 }
 
 func newPlugin(change map[string]interface{}) (*Plugin, error) {
 	var (
-		desired  PluginDesiredState
-		extports []string
-		intports []string
-		os       PluginOS
-		state    PluginState
+		name        string
+		serviceID   string
+		serviceName string
+		address     string
+		desired     PluginDesiredState
+		extports    []string
+		intports    []string
+		environment []string
+		os          PluginOS
+		state       PluginState
 	)
 
 	switch change["DesiredState"] {
@@ -102,7 +110,7 @@ func newPlugin(change map[string]interface{}) (*Plugin, error) {
 	case "":
 		desired = DesiredStateNull
 	default:
-		return &Plugin{}, NewControllerError("Invalid desired state sent!")
+		return &Plugin{}, NewControllerError(fmt.Sprintf("invalid desired state %v sent", change["DesiredState"]))
 	}
 
 	switch change["State"] {
@@ -115,7 +123,7 @@ func newPlugin(change map[string]interface{}) (*Plugin, error) {
 	case string(StateStopped):
 		state = StateStopped
 	default:
-		return &Plugin{}, NewControllerError("Invalid state sent!")
+		return &Plugin{}, NewControllerError(fmt.Sprintf("invalid state %v sent", change["State"]))
 	}
 
 	switch change["OS"] {
@@ -126,7 +134,42 @@ func newPlugin(change map[string]interface{}) (*Plugin, error) {
 	case string(PluginOSAll):
 		os = PluginOSAll
 	default:
-		return &Plugin{}, NewControllerError("Invalid desired state sent!")
+		return &Plugin{}, NewControllerError(fmt.Sprintf("invalid OS setting %v sent", change["OS"]))
+	}
+
+	switch t := change["Name"].(type) {
+	case string:
+		name = change["Name"].(string)
+		if name == "" {
+			return &Plugin{}, NewControllerError("plugin name must not be blank")
+		}
+	case nil:
+		return &Plugin{}, NewControllerError(fmt.Sprintf("plugin name must be string, is %v", t))
+	}
+
+	switch t := change["ServiceID"].(type) {
+	case string:
+		serviceID = change["ServiceID"].(string)
+	default:
+		return &Plugin{}, NewControllerError(fmt.Sprintf("plugin service id must be string, is %v", t))
+	}
+
+	switch t := change["ServiceName"].(type) {
+	case string:
+		serviceName = change["ServiceName"].(string)
+		if serviceName == "" {
+			return &Plugin{}, NewControllerError("service name must not be blank")
+		}
+	default:
+		return &Plugin{}, NewControllerError(fmt.Sprintf("plugin service name must be string, is %v", t))
+	}
+
+	switch t := change["Address"].(type) {
+	case string:
+		address = change["Address"].(string)
+	default:
+		log.Printf("address %v of type %v passed", change["Address"], t)
+		address = ""
 	}
 
 	for _, v := range change["ExternalPorts"].([]interface{}) {
@@ -134,18 +177,30 @@ func newPlugin(change map[string]interface{}) (*Plugin, error) {
 	}
 
 	for _, v := range change["InternalPorts"].([]interface{}) {
-		extports = append(intports, v.(string))
+		intports = append(intports, v.(string))
+	}
+
+	if fmt.Sprintf("%T", change["Environment"]) == "[]string" {
+		environment = change["Environment"].([]string)
+	} else if fmt.Sprintf("%T", change["Environment"]) == "[]interface {}" {
+		for _, v := range change["Environment"].([]interface{}) {
+			environment = append(environment, v.(string))
+		}
+	} else {
+		environment = []string{}
 	}
 
 	plugin := &Plugin{
-		Name:          change["Name"].(string),
-		ServiceName:   change["ServiceName"].(string),
+		Name:          name,
+		ServiceID:     serviceID,
+		ServiceName:   serviceName,
 		DesiredState:  desired,
 		State:         state,
-		Interface:     change["Interface"].(string),
+		Address:       address,
 		ExternalPorts: extports,
 		InternalPorts: intports,
 		OS:            os,
+		Environment:   environment,
 	}
 
 	return plugin, nil
@@ -157,12 +212,12 @@ func watchChanges(res *r.Cursor) (<-chan Plugin, <-chan error) {
 	go func(cursor *r.Cursor) {
 		var doc map[string]interface{}
 		for cursor.Next(&doc) {
-			log.Printf("Change: %v, Type: %T", doc, doc)
 			if v, ok := doc["new_val"]; ok {
 				plugin, err := newPlugin(v.(map[string]interface{}))
 				if err != nil {
 					errChan <- err
 				}
+				// log.Printf("made new plugin %+v", plugin)
 				out <- *plugin
 			}
 		}

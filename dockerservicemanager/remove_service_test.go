@@ -11,6 +11,7 @@ import (
 	container "github.com/docker/docker/api/types/container"
 	swarm "github.com/docker/docker/api/types/swarm"
 	client "github.com/docker/docker/client"
+	"github.com/ramrod-project/backend-controller-go/test"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -32,6 +33,20 @@ func TestRemovePluginService(t *testing.T) {
 
 	ctx := context.Background()
 	dockerClient, err := client.NewEnvClient()
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+
+	netRes, err := dockerClient.NetworkCreate(ctx, "test_remove", types.NetworkCreate{
+		Driver:     "overlay",
+		Attachable: true,
+	})
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+
 	serviceSpec := &swarm.ServiceSpec{
 		Annotations: swarm.Annotations{
 			Name: "GoodService",
@@ -60,7 +75,7 @@ func TestRemovePluginService(t *testing.T) {
 			Placement: placementConfig,
 			Networks: []swarm.NetworkAttachmentConfig{
 				swarm.NetworkAttachmentConfig{
-					Target: "test",
+					Target: "test_remove",
 				},
 			},
 		},
@@ -119,5 +134,10 @@ func TestRemovePluginService(t *testing.T) {
 				assert.Equal(t, tt.err, err)
 			}
 		})
+	}
+
+	//Docker cleanup
+	if err := test.DockerCleanUp(ctx, dockerClient, netRes.ID); err != nil {
+		t.Errorf("cleanup error: %v", err)
 	}
 }

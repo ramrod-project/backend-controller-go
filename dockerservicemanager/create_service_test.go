@@ -12,10 +12,28 @@ import (
 	container "github.com/docker/docker/api/types/container"
 	swarm "github.com/docker/docker/api/types/swarm"
 	client "github.com/docker/docker/client"
+	"github.com/ramrod-project/backend-controller-go/test"
 	"github.com/stretchr/testify/assert"
 )
 
 func Test_CreatePluginService(t *testing.T) {
+
+	ctx := context.TODO()
+	dockerClient, err := client.NewEnvClient()
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+
+	netRes, err := dockerClient.NetworkCreate(ctx, "test_create", types.NetworkCreate{
+		Driver:     "overlay",
+		Attachable: true,
+	})
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+
 	type args struct {
 		config PluginServiceConfig
 	}
@@ -36,7 +54,7 @@ func Test_CreatePluginService(t *testing.T) {
 						"PORT=5000",
 						"PLUGIN=Harness",
 					},
-					Network: "test",
+					Network: "test_create",
 					OS:      "posix",
 					Ports: []swarm.PortConfig{swarm.PortConfig{
 						Protocol:      swarm.PortConfigProtocolTCP,
@@ -88,7 +106,7 @@ func Test_CreatePluginService(t *testing.T) {
 						"PORT=5000",
 						"PLUGIN=Harness",
 					},
-					Network: "test",
+					Network: "test_create",
 					OS:      "posix",
 					Ports: []swarm.PortConfig{swarm.PortConfig{
 						Protocol:      swarm.PortConfigProtocolTCP,
@@ -122,21 +140,9 @@ func Test_CreatePluginService(t *testing.T) {
 			generatedIDs[i] = got.ID
 		})
 	}
-	// Docker cleanup
-	ctx := context.Background()
-	dockerClient, err := client.NewEnvClient()
-	if err != nil {
-		t.Errorf("%v", err)
-	}
-	for _, v := range generatedIDs {
-		if v == "" {
-			continue
-		}
-		log.Printf("Removing service %v\n", v)
-		err := dockerClient.ServiceRemove(ctx, v)
-		if err != nil {
-			t.Errorf("%v", err)
-		}
+	//Docker cleanup
+	if err := test.DockerCleanUp(ctx, dockerClient, netRes.ID); err != nil {
+		t.Errorf("cleanup error: %v", err)
 	}
 }
 

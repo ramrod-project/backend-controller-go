@@ -1,22 +1,55 @@
 package main
 
 import (
-	"fmt"
+	"log"
 
-	dockerservicemanager "github.com/ramrod-project/backend-controller-go/dockerservicemanager"
+	"github.com/ramrod-project/backend-controller-go/dockerservicemanager"
 	"github.com/ramrod-project/backend-controller-go/errorhandler"
 	"github.com/ramrod-project/backend-controller-go/rethink"
 )
 
 func main() {
+	// Advertise nodes to database
+	err := dockerservicemanager.NodeAdvertise()
+	if err != nil {
+		panic(err)
+	}
 
-	eventChan, dockError := dockerservicemanager.EventMonitor()
+	// Populate with plugin data from manifest and
+	// update services.
+	err = dockerservicemanager.PluginAdvertise()
+	if err != nil {
+		panic(err)
+	}
 
-	fromDB, dbError := rethink.EventUpdate(eventChan)
+	log.Printf("Advertisement complete without errors...")
 
-	go errorhandler.ErrorHandler(dbError, dockError)
+	// Start the event monitor
+	eventData, eventErr := dockerservicemanager.EventMonitor()
 
-	for resp := range fromDB {
-		fmt.Printf("DB response: %v\n", resp)
+	log.Printf("Event monitor started...")
+
+	// Start event handler
+	_, eventDBErr := rethink.EventUpdate(eventData)
+
+	log.Printf("Event handler started...")
+
+	// Start the plugin database change monitor
+	pluginData, pluginErr := rethink.MonitorPlugins()
+
+	log.Printf("Plugin monitor started...")
+
+	// Start the plugin action handler
+	actionErr := dockerservicemanager.HandlePluginChanges(pluginData)
+
+	log.Printf("Plugin handler started...")
+
+	// Monitor all errors in the main loop
+	errChan := errorhandler.ErrorHandler(pluginErr, actionErr, eventErr, eventDBErr)
+
+	for err := range errChan {
+		if err != nil {
+			log.Printf("Error: %v\n", err)
+		}
 	}
 }
