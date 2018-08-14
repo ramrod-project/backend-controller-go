@@ -374,7 +374,7 @@ func Test_Integration(t *testing.T) {
 					update["DesiredState"] = "Stop"
 					log.Printf("Filter servID: %v\n", service.ID)
 					res, _ := r.DB("Controller").Table("Plugins").Filter(filter).Update(update).Run(session)
-					log.Printf("%v", res)
+					log.Printf("%v", string(res))
 				}
 				return true
 			},
