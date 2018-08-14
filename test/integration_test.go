@@ -369,7 +369,8 @@ func Test_Integration(t *testing.T) {
 					//remove service
 					filter := make(map[string]string)
 					update := make(map[string]string)
-					filter["ServiceID"] = service.ID
+					// filter["ServiceID"] = service.ID
+					filter["ServiceName"] = "TestPlugin"
 					update["DesiredState"] = "Stop"
 					log.Printf("Filter servID: %v\n", service.ID)
 					r.DB("Controller").Table("Plugins").Filter(filter).Update(update).Run(session)
