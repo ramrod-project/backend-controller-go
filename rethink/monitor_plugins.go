@@ -217,7 +217,6 @@ func watchChanges(res *r.Cursor) (<-chan Plugin, <-chan error) {
 				if err != nil {
 					errChan <- err
 				}
-				// log.Printf("made new plugin %+v", plugin)
 				out <- *plugin
 			}
 		}

@@ -55,16 +55,12 @@ func timoutTester(ctx context.Context, args []interface{}, f func(args ...interf
 
 			select {
 			case <-ctx.Done():
-				log.Printf("Context done (wrapper), closing channels")
 				done <- false
 				close(done)
-				log.Printf("Context done (wrapper), sent and closed channels")
 				return
 			case b := <-recv:
-				log.Printf("Received %v from test, sending and closing channels", b)
 				done <- b
 				close(done)
-				log.Printf("Received (wrapper), sent and closed channels")
 				return
 			}
 		}
@@ -468,16 +464,21 @@ func Test_Integration(t *testing.T) {
 							log.Println(fmt.Errorf("%v", e))
 							return false
 						case d := <-changeChan:
-							if d["ServiceName"] != "TestPlugin" {
-								continue
+							log.Printf("doc received: %+v", d)
+							if _, ok := d["new_val"]; !ok {
+								break
 							}
-							if d["State"] != "Restarting" {
-								continue
+							if d["new_val"].(map[string]interface{})["ServiceName"].(string) != "TestPlugin" {
+								break
+							}
+							if d["new_val"].(map[string]interface{})["State"].(string) != "Restarting" {
+								break
 							}
 							return true
 						default:
-							continue
+							break
 						}
+						time.Sleep(100 * time.Millisecond)
 					}
 				})
 				restartedDockerUpdated := timoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
@@ -577,7 +578,7 @@ func Test_Integration(t *testing.T) {
 					select {
 					case <-timeoutCtx.Done():
 						<-restartDocker
-						/*<-restartDB*/
+						<-restartDB
 						<-restartedDockerUpdated
 						/*<-restartedDBUpdated*/
 						log.Printf("Done (main)")
@@ -587,9 +588,12 @@ func Test_Integration(t *testing.T) {
 							log.Printf("Setting rD to %v", v)
 							rD = v
 						}
-					/*case v := <-restartDB:
-					rDB = v
-					break*/
+					case v := <-restartDB:
+						if v {
+							log.Printf("Setting rDB to %v", v)
+							rDB = v
+							break
+						}
 					case v := <-restartedDockerUpdated:
 						if v {
 							log.Printf("Setting rDu to %v", v)
@@ -622,7 +626,7 @@ func Test_Integration(t *testing.T) {
 
 				return rD && rDB && rDu && rDBu
 			},
-			timeout: 10 * time.Second,
+			timeout: 20 * time.Second,
 		},
 		{
 			name: "Create another service",
@@ -653,8 +657,10 @@ func Test_Integration(t *testing.T) {
 				close(res)
 				return
 			}()
+			time.Sleep(3 * time.Second)
 			assert.True(t, tt.run(t))
 			assert.True(t, <-res)
+			time.Sleep(3 * time.Second)
 		})
 	}
 
