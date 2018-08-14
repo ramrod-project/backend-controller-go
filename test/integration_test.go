@@ -641,18 +641,18 @@ func Test_Integration(t *testing.T) {
 		{
 			name: "Stop services",
 			run: func(t *testing.T) bool {
-				services, _ := dockerClient.ServiceList(ctx, types.ServiceListOptions{})
-				for _, service := range services {
-					//remove service
-					filter := make(map[string]string)
-					update := make(map[string]string)
-					// filter["ServiceID"] = service.ID
-					filter["ServiceName"] = "TestPlugin"
-					update["DesiredState"] = "Stop"
-					log.Printf("Filter servID: %v\n", service.ID)
-					res, _ := r.DB("Controller").Table("Plugins").Filter(filter).Update(update).RunWrite(session)
-					log.Printf("%+v", res)
-				}
+				// services, _ := dockerClient.ServiceList(ctx, types.ServiceListOptions{})
+				// for _, service := range services {
+				//remove service
+				filter := make(map[string]string)
+				update := make(map[string]string)
+				// filter["ServiceID"] = service.ID
+				filter["ServiceName"] = "TestPlugin"
+				update["DesiredState"] = "Stop"
+				// log.Printf("Filter servID: %v\n", service.ID)
+				res, _ := r.DB("Controller").Table("Plugins").Filter(filter).Update(update).RunWrite(session)
+				log.Printf("%+v", res)
+				// }
 				return true
 			},
 			wait: func(t *testing.T, timeout time.Duration) bool {
