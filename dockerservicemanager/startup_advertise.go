@@ -114,6 +114,10 @@ func advertisePlugins(manifest []ManifestPlugin) error {
 		return errors.New("no plugins to advertise")
 	}
 
+	for _, plugin := range manifest {
+		log.Printf("manifest entry: %+v", plugin)
+	}
+
 	session, err := r.Connect(r.ConnectOpts{
 		Address: getRethinkHost(),
 	})
@@ -146,6 +150,10 @@ func advertiseIPs(entries []map[string]interface{}) error {
 
 	if len(entries) < 1 {
 		return errors.New("no nodes to advertise")
+	}
+
+	for _, entry := range entries {
+		log.Printf("port entry: %+v", entry)
 	}
 
 	session, err := r.Connect(r.ConnectOpts{

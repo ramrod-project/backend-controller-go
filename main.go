@@ -22,17 +22,27 @@ func main() {
 		panic(err)
 	}
 
+	log.Printf("Advertisement complete without errors...")
+
 	// Start the event monitor
 	eventData, eventErr := dockerservicemanager.EventMonitor()
+
+	log.Printf("Event monitor started...")
 
 	// Start event handler
 	_, eventDBErr := rethink.EventUpdate(eventData)
 
+	log.Printf("Event handler started...")
+
 	// Start the plugin database change monitor
 	pluginData, pluginErr := rethink.MonitorPlugins()
 
+	log.Printf("Plugin monitor started...")
+
 	// Start the plugin action handler
 	actionErr := dockerservicemanager.HandlePluginChanges(pluginData)
+
+	log.Printf("Plugin handler started...")
 
 	// Monitor all errors in the main loop
 	errChan := errorhandler.ErrorHandler(pluginErr, actionErr, eventErr, eventDBErr)
