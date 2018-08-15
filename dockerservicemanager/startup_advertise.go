@@ -55,7 +55,7 @@ func getNodes() ([]map[string]interface{}, error) {
 		spec := n.Spec
 		if osname, ok := osMap[n.Description.Platform.OS]; ok {
 			entry := map[string]interface{}{
-				"Address":      ip,
+				"Interface":    ip,
 				"NodeHostName": hostname,
 				"OS":           string(osname),
 				"TCPPorts":     []string{},
@@ -132,7 +132,7 @@ func advertisePlugins(manifest []ManifestPlugin) error {
 			"ServiceName":   "",
 			"DesiredState":  "",
 			"State":         "Available",
-			"Address":       "",
+			"Interface":     "",
 			"ExternalPorts": []string{},
 			"InternalPorts": []string{},
 			"OS":            string(plugin.OS),

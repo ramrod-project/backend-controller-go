@@ -83,8 +83,8 @@ func Test_getNodes(t *testing.T) {
 				return
 			}
 			assert.Len(t, got, 1)
-			assert.IsType(t, "string", got[0]["Address"])
-			assert.NotEqual(t, "", got[0]["Address"])
+			assert.IsType(t, "string", got[0]["Interface"])
+			assert.NotEqual(t, "", got[0]["Interface"])
 			assert.IsType(t, "string", got[0]["OS"])
 			assert.NotEqual(t, "", got[0]["OS"])
 			assert.IsType(t, "string", got[0]["NodeHostName"])
@@ -99,7 +99,7 @@ func Test_getNodes(t *testing.T) {
 				return
 			}
 			assert.Equal(t, "posix", res[0].Spec.Annotations.Labels["os"])
-			assert.Equal(t, got[0]["Address"], res[0].Spec.Annotations.Labels["ip"])
+			assert.Equal(t, got[0]["Interface"], res[0].Spec.Annotations.Labels["ip"])
 		})
 	}
 }
@@ -135,7 +135,7 @@ func Test_advertiseIPs(t *testing.T) {
 			args: args{
 				entries: []map[string]interface{}{
 					map[string]interface{}{
-						"Address":      "192.168.1.1",
+						"Interface":      "192.168.1.1",
 						"NodeHostName": "ubuntu",
 						"OS":           "posix",
 						"TCPPorts":     []string{},
@@ -150,14 +150,14 @@ func Test_advertiseIPs(t *testing.T) {
 			args: args{
 				entries: []map[string]interface{}{
 					map[string]interface{}{
-						"Address":      "192.168.1.1",
+						"Interface":      "192.168.1.1",
 						"NodeHostName": "ubuntu",
 						"OS":           "posix",
 						"TCPPorts":     []string{},
 						"UDPPorts":     []string{},
 					},
 					map[string]interface{}{
-						"Address":      "192.168.1.2",
+						"Interface":      "192.168.1.2",
 						"NodeHostName": "WIN1935U21",
 						"OS":           "nt",
 						"TCPPorts":     []string{},
@@ -197,7 +197,7 @@ func Test_advertiseIPs(t *testing.T) {
 				if doc["OS"] == "nt" {
 					index = 1
 				}
-				assert.Equal(t, tt.args.entries[index]["Address"], doc["Address"])
+				assert.Equal(t, tt.args.entries[index]["Interface"], doc["Interface"])
 				assert.Equal(t, tt.args.entries[index]["NodeHostName"], doc["NodeHostName"])
 				assert.Equal(t, tt.args.entries[index]["OS"], doc["OS"])
 				assert.Equal(t, len(tt.args.entries[index]["TCPPorts"].([]string)), len(doc["TCPPorts"].([]interface{})))
@@ -343,7 +343,7 @@ func Test_advertisePlugins(t *testing.T) {
 					"ServiceName":   "",
 					"DesiredState":  "",
 					"State":         "Available",
-					"Address":       "",
+					"Interface":       "",
 					"ExternalPorts": []string{},
 					"InternalPorts": []string{},
 					"OS":            string(rethink.PluginOSAll),
@@ -371,7 +371,7 @@ func Test_advertisePlugins(t *testing.T) {
 					"ServiceName":   "",
 					"DesiredState":  "",
 					"State":         "Available",
-					"Address":       "",
+					"Interface":       "",
 					"ExternalPorts": []string{},
 					"InternalPorts": []string{},
 					"OS":            string(rethink.PluginOSPosix),
@@ -383,7 +383,7 @@ func Test_advertisePlugins(t *testing.T) {
 					"ServiceName":   "",
 					"DesiredState":  "",
 					"State":         "Available",
-					"Address":       "",
+					"Interface":       "",
 					"ExternalPorts": []string{},
 					"InternalPorts": []string{},
 					"OS":            string(rethink.PluginOSWindows),
@@ -438,7 +438,7 @@ func Test_advertisePlugins(t *testing.T) {
 				assert.Equal(t, tt.want[index]["ServiceName"], doc["ServiceName"].(string))
 				assert.Equal(t, tt.want[index]["DesiredState"], doc["DesiredState"].(string))
 				assert.Equal(t, tt.want[index]["State"], doc["State"].(string))
-				assert.Equal(t, tt.want[index]["Address"], doc["Address"].(string))
+				assert.Equal(t, tt.want[index]["Interface"], doc["Interface"].(string))
 				assert.Equal(t, tt.want[index]["OS"], doc["OS"].(string))
 				for j, v := range doc["ExternalPorts"].([]interface{}) {
 					assert.Equal(t, tt.want[index]["ExternalPorts"].([]string)[j], v.(string))
