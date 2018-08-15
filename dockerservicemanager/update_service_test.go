@@ -2,8 +2,6 @@ package dockerservicemanager
 
 import (
 	"context"
-	"fmt"
-	"log"
 	"os"
 	"testing"
 	"time"
@@ -12,48 +10,9 @@ import (
 	container "github.com/docker/docker/api/types/container"
 	swarm "github.com/docker/docker/api/types/swarm"
 	client "github.com/docker/docker/client"
+	"github.com/ramrod-project/backend-controller-go/test"
 	"github.com/stretchr/testify/assert"
 )
-
-func SpecToString(s *swarm.ServiceSpec) string {
-	str := fmt.Sprintf(`
-			Name: %v,
-			TaskTemplate:
-				ContainerSpec:
-					DNSConfig: %v
-					Env: %v
-					Image: %v
-					Labels: %v
-					Mounts: %v
-				RestartPolicy:
-					Condition: %v
-					MaxAttempts: %v
-				Placement:
-					Constraints: %v
-				Networks:
-					Target: %v
-				Mode:
-					Replicas: %v
-				EndpointSpec:
-					Mode: %v
-					Ports: %v
-		`,
-		s.Annotations.Name,
-		s.TaskTemplate.ContainerSpec.DNSConfig,
-		s.TaskTemplate.ContainerSpec.Env,
-		s.TaskTemplate.ContainerSpec.Image,
-		s.TaskTemplate.ContainerSpec.Labels,
-		s.TaskTemplate.ContainerSpec.Mounts,
-		s.TaskTemplate.RestartPolicy.Condition,
-		s.TaskTemplate.RestartPolicy.MaxAttempts,
-		s.TaskTemplate.Placement.Constraints,
-		s.TaskTemplate.Networks,
-		*s.Mode.Replicated.Replicas,
-		s.EndpointSpec.Mode,
-		s.EndpointSpec.Ports,
-	)
-	return str
-}
 
 func TestUpdatePluginService(t *testing.T) {
 	var (
@@ -73,6 +32,19 @@ func TestUpdatePluginService(t *testing.T) {
 
 	ctx := context.Background()
 	dockerClient, err := client.NewEnvClient()
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+
+	netRes, err := dockerClient.NetworkCreate(ctx, "test_update", types.NetworkCreate{
+		Driver:     "overlay",
+		Attachable: true,
+	})
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
 
 	serviceSpec := &swarm.ServiceSpec{
 		Annotations: swarm.Annotations{
@@ -102,7 +74,7 @@ func TestUpdatePluginService(t *testing.T) {
 			Placement: placementConfig,
 			Networks: []swarm.NetworkAttachmentConfig{
 				swarm.NetworkAttachmentConfig{
-					Target: "test",
+					Target: "test_update",
 				},
 			},
 		},
@@ -151,7 +123,7 @@ func TestUpdatePluginService(t *testing.T) {
 						"PLUGIN=Harness",
 						"TEST=TEST",
 					},
-					Network: "test",
+					Network: "test_update",
 					OS:      "posix",
 					Ports: []swarm.PortConfig{swarm.PortConfig{
 						Protocol:      swarm.PortConfigProtocolTCP,
@@ -179,7 +151,7 @@ func TestUpdatePluginService(t *testing.T) {
 						"PLUGIN=Harness",
 						"TEST=TEST",
 					},
-					Network: "test",
+					Network: "test_update",
 					OS:      "posix",
 					Ports: []swarm.PortConfig{swarm.PortConfig{
 						Protocol:      swarm.PortConfigProtocolTCP,
@@ -207,7 +179,7 @@ func TestUpdatePluginService(t *testing.T) {
 						"PLUGIN=Harness",
 						"TEST=TEST",
 					},
-					Network: "test",
+					Network: "test_update",
 					OS:      "posix",
 					Ports: []swarm.PortConfig{swarm.PortConfig{
 						Protocol:      swarm.PortConfigProtocolTCP,
@@ -232,25 +204,23 @@ func TestUpdatePluginService(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Errorf("UpdatePluginService() error = %v, wantErr %v", err, tt.wantErr)
 				return
+			} else if tt.wantErr {
+				return
 			}
-			inspectResults, _, err := dockerClient.ServiceInspectWithRaw(ctx, tt.args.id)
+			_, _, err = dockerClient.ServiceInspectWithRaw(ctx, tt.args.id)
 			if err != nil {
-				log.Printf("%v", err)
+				t.Errorf("%v", err)
+				return
 			} else {
 				time.Sleep(time.Second)
-				if inspectResults.PreviousSpec != nil {
-					log.Printf(SpecToString(inspectResults.PreviousSpec))
-				}
-				log.Printf(SpecToString(&inspectResults.Spec))
 			}
 			assert.Equal(t, tt.want, got)
 		})
 	}
 
-	// Docker cleanup
-	err = dockerClient.ServiceRemove(ctx, id)
-	if err != nil {
-		t.Errorf("%v", err)
+	//Docker cleanup
+	if err := test.DockerCleanUp(ctx, dockerClient, netRes.ID); err != nil {
+		t.Errorf("cleanup error: %v", err)
 	}
 }
 

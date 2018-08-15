@@ -27,28 +27,36 @@ before_install:
   - curl -L -s https://github.com/golang/dep/releases/download/v${DEP_VERSION}/dep-linux-amd64 -o $GOPATH/bin/dep
   - chmod +x $GOPATH/bin/dep
   - docker swarm init
-  - docker network create --driver=overlay --attachable test
   - travis_wait 10 docker pull ramrodpcp/interpreter-plugin:$TAG
 
 install:  
   - dep ensure
   - go vet
   - go build -race
-  - go test github.com/ramrod-project/backend-controller-go/dockerservicemanager github.com/ramrod-project/backend-controller-go/rethink 
-    github.com/ramrod-project/backend-controller-go/errorhandler
+  - go test -v -parallel 1 github.com/ramrod-project/backend-controller-go/dockerservicemanager
+  - go test -v -parallel 1 github.com/ramrod-project/backend-controller-go/rethink
+  - go test -v -parallel 1 github.com/ramrod-project/backend-controller-go/errorhandler
   - make
 
 before_script:
   - travis_wait 10 docker pull ramrodpcp/database-brain:$TAG
+  - docker network prune -f
 
 script:
-  - docker build -t ramrodpcp/backend-contoller:$TAG .
-  - docker run -d --name rethinkdb --network test -p 28015:28015 ramrodpcp/database-brain:$TAG
-  - docker run -d --name controller --network test -v /var/run/docker.sock:/var/run/docker.sock ramrodpcp/backend-contoller:$TAG
-  - docker ps -a
-  - docker logs controller
-  - docker stop controller
-  - docker stop rethinkdb
+  - docker build -t ramrodpcp/backend-controller:$TAG .
+  - docker network create --driver=overlay pcp
+  - docker service create --name rethinkdb --network pcp -p 28015:28015 -e "STAGE=DEV" -e "LOGLEVEL=DEBUG" ramrodpcp/database-brain:$TAG
+  - docker service create --name controller --network pcp -e "STAGE=DEV" -e "LOGLEVEL=DEBUG" -e "TAG=${TAG}" --mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock ramrodpcp/backend-controller:$TAG
+  - sleep 10
+  - docker service ls
+  - docker service ps --no-trunc controller
+  - docker service logs controller
+  - docker service logs rethinkdb
+  - docker service rm controller rethinkdb
+  - sleep 10
+  - docker network prune -f
+  # integration tests
+  - go test -v -parallel 1 github.com/ramrod-project/backend-controller-go/test
 
 notifications:
   slack: ramrod-project:GDF82rRYDg3KSekrT3GA24qO

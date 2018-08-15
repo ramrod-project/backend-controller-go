@@ -3,7 +3,6 @@ package dockerservicemanager
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/docker/docker/api/types"
@@ -84,8 +83,6 @@ func UpdatePluginService(serviceID string, config *PluginServiceConfig) (types.S
 		return types.ServiceUpdateResponse{}, err
 	}
 
-	log.Printf("Updating service %v with new config %v\n", serviceID, config)
-
 	serviceSpec, err := generateServiceSpec(config)
 	if err != nil {
 		return types.ServiceUpdateResponse{}, err
@@ -96,7 +93,6 @@ func UpdatePluginService(serviceID string, config *PluginServiceConfig) (types.S
 		return types.ServiceUpdateResponse{}, err
 	}
 
-	log.Printf("Updating service %v to version %v", serviceID, version)
 	resp, err := dockerClient.ServiceUpdate(ctx, serviceID, swarm.Version{Index: version}, *serviceSpec, types.ServiceUpdateOptions{})
 
 	return resp, err
