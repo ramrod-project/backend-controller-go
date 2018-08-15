@@ -186,7 +186,7 @@ func Test_Integration(t *testing.T) {
 							return false
 						case d := <-changeChan:
 							for _, ip := range ips {
-								if d["Address"].(string) == ip {
+								if d["Interface"].(string) == ip {
 									return true
 								}
 							}
@@ -293,7 +293,7 @@ func Test_Integration(t *testing.T) {
 							if d["State"].(string) != string(rethink.StateAvailable) {
 								break
 							}
-							if d["Address"].(string) != "" {
+							if d["Interface"].(string) != "" {
 								break
 							}
 							if d["OS"].(string) != string(rethink.PluginOSAll) {
@@ -350,7 +350,7 @@ func Test_Integration(t *testing.T) {
 					"ServiceName":   "TestPlugin",
 					"DesiredState":  "Activate",
 					"State":         "Available",
-					"Address":       "",
+					"Interface":       "",
 					"ExternalPorts": []string{"5000/tcp"},
 					"InternalPorts": []string{"5000/tcp"},
 					"OS":            string(rethink.PluginOSAll),
@@ -841,7 +841,7 @@ func Test_Integration(t *testing.T) {
 					"ServiceName":   "TestPlugin2",
 					"DesiredState":  "Activate",
 					"State":         "Available",
-					"Address":       "",
+					"Interface":       "",
 					"ExternalPorts": []string{"6000/tcp"},
 					"InternalPorts": []string{"6000/tcp"},
 					"OS":            string(rethink.PluginOSPosix),

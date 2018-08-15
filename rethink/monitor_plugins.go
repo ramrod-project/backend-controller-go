@@ -164,11 +164,11 @@ func newPlugin(change map[string]interface{}) (*Plugin, error) {
 		return &Plugin{}, NewControllerError(fmt.Sprintf("plugin service name must be string, is %v", t))
 	}
 
-	switch t := change["Address"].(type) {
+	switch t := change["Interface"].(type) {
 	case string:
-		address = change["Address"].(string)
+		address = change["Interface"].(string)
 	default:
-		log.Printf("address %v of type %v passed", change["Address"], t)
+		log.Printf("address %v of type %v passed", change["Interface"], t)
 		address = ""
 	}
 
