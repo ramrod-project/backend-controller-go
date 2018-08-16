@@ -73,7 +73,7 @@ func DockerCleanUp(ctx context.Context, dockerClient *client.Client, net string)
 		_, err := dockerClient.NetworkInspect(ctx, net)
 		if err != nil {
 			_, err := dockerClient.NetworksPrune(ctx, filters.Args{})
-			if err != nil {
+			if err == nil {
 				break
 			}
 		}
