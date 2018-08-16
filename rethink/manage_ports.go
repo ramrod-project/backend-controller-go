@@ -7,14 +7,6 @@ import (
 	r "gopkg.in/gorethink/gorethink.v4"
 )
 
-type Port struct {
-	Interface   string
-	TCPPorts    []string
-	UDPPorts    []string
-	NodHostName string
-	OS          string
-}
-
 func contains(arr []string, element string) bool {
 	for _, i := range arr {
 		if i == element {
@@ -24,7 +16,27 @@ func contains(arr []string, element string) bool {
 	return false
 }
 
-// AddPort adds a list of ports to the Ports table. it returns an error if
+func remove(arr []string, element string) []string {
+	if contains(arr, element) {
+		for i, item := range arr {
+			if item == element {
+				return append(arr[:i], arr[i+1:]...)
+			}
+		}
+	}
+	return arr
+}
+
+func getCurrentEntry(IPaddr string, session *r.Session) map[string]interface{} {
+	filter := make(map[string]interface{})
+	filter["Interface"] = IPaddr
+	entry, _ := r.DB("Controller").Table("Ports").Filter(filter).Run(session)
+	var port map[string]interface{}
+	entry.Next(&port)
+	return port
+}
+
+// AddPort adds a port to the Ports table. it returns an error if
 // there was a duplicate
 func AddPort(IPaddr string, newPort string, protocol string) error {
 	session, err := r.Connect(r.ConnectOpts{
@@ -34,11 +46,8 @@ func AddPort(IPaddr string, newPort string, protocol string) error {
 		panic(err)
 	}
 	//get the current entry
-	filter := make(map[string]interface{})
-	filter["Interface"] = IPaddr
-	entry, _ := r.DB("Controller").Table("Ports").Filter(filter).Run(session)
 	var port map[string]interface{}
-	entry.Next(&port)
+	port = getCurrentEntry(IPaddr, session)
 	//update the ports
 	if protocol == "tcp" {
 		if contains(port["TCPPorts"].([]string), newPort) {
@@ -54,7 +63,7 @@ func AddPort(IPaddr string, newPort string, protocol string) error {
 		return errors.New("only tcp and udp are supported protocols")
 	}
 	//update the entry
-	_, err = r.DB("Controller").Table("Ports").Get(port["id"]).Update(newPort).RunWrite(session)
+	_, err = r.DB("Controller").Table("Ports").Get(port["id"]).Update(port).RunWrite(session)
 	if err != nil {
 		log.Printf("%v", err)
 		return err
@@ -62,21 +71,32 @@ func AddPort(IPaddr string, newPort string, protocol string) error {
 	return nil
 }
 
-func RemovePort(remPort string) error {
-	// session, err := r.Connect(r.ConnectOpts{
-	// 	Address: getRethinkHost(),
-	// })
-	// if err != nil {
-	// 	panic(err)
-	// }
+// RemovePort removes a port to the Ports table. it returns an error if
+// there was a duplicate
+func RemovePort(IPaddr string, remPort string, protocol string) error {
+	session, err := r.Connect(r.ConnectOpts{
+		Address: getRethinkHost(),
+	})
+	if err != nil {
+		panic(err)
+	}
 
-	// filter := make(map[string]interface{})
-	// portData := strings.Split(remPort, "/")
-	// _, err = r.DB("Controller").Table("Ports").Filter().RunWrite(session)
-
-	// if err != nil {
-	// 	log.Printf("Port(s) not found")
-	// 	return err
-	// }
+	// get current entry
+	var port map[string]interface{}
+	port = getCurrentEntry(IPaddr, session)
+	// update ports
+	if protocol == "tcp" {
+		port["TCPPorts"] = remove(port["TCPPorts"].([]string), remPort)
+	} else if protocol == "udp" {
+		port["UDPPorts"] = remove(port["UDPPorts"].([]string), remPort)
+	} else {
+		return errors.New("only tcp and udp are supported protocols")
+	}
+	// update entry
+	_, err = r.DB("Controller").Table("Ports").Get(port["id"]).Update(port).RunWrite(session)
+	if err != nil {
+		log.Printf("%v", err)
+		return err
+	}
 	return nil
 }
