@@ -14,6 +14,7 @@ import (
 var defaultEnvs = map[string]string{
 	"LOGLEVEL": "DEBUG",
 	"STAGE":    "DEV",
+	"TAG":      "latest",
 }
 
 func envString(k string, v string) string {
