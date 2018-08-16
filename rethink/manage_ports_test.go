@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/swarm"
 	"github.com/docker/docker/client"
 	"github.com/ramrod-project/backend-controller-go/test"
 	r "gopkg.in/gorethink/gorethink.v4"
@@ -15,6 +17,23 @@ func TestAddPort(t *testing.T) {
 	if err != nil {
 		t.Errorf("%v", err)
 		return
+	}
+
+	netRes, err := dockerClient.NetworkCreate(ctx, "pcp", types.NetworkCreate{
+		Driver:     "overlay",
+		Attachable: true,
+	})
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+
+	var intBrainSpec = test.BrainSpec
+	intBrainSpec.Networks = []swarm.NetworkAttachmentConfig{
+		swarm.NetworkAttachmentConfig{
+			Target:  "pcp",
+			Aliases: []string{"rethinkdb"},
+		},
 	}
 
 	session, brainID, err := test.StartBrain(ctx, t, dockerClient, test.BrainSpec)
@@ -87,6 +106,10 @@ func TestAddPort(t *testing.T) {
 		t.Errorf("failed to add to empty string")
 	}
 	test.KillService(ctx, dockerClient, brainID)
+	// Docker cleanup
+	if err := test.DockerCleanUp(ctx, dockerClient, netRes.ID); err != nil {
+		t.Errorf("cleanup error: %v", err)
+	}
 }
 
 func TestRemovePort(t *testing.T) {
