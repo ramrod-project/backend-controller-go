@@ -19,9 +19,6 @@ import (
 func getTagFromEnv() string {
 	temp := os.Getenv("TAG")
 	if temp == "" {
-		temp = os.Getenv("TRAVIS_BRANCH")
-	}
-	if temp == "" {
 		temp = "latest"
 	}
 	return temp
@@ -88,9 +85,6 @@ func GetImage(image string) string {
 	var stringBuf bytes.Buffer
 
 	tag := os.Getenv("TAG")
-	if tag == "" {
-		tag = os.Getenv("TRAVIS_BRANCH")
-	}
 	if tag == "" {
 		tag = "latest"
 	}

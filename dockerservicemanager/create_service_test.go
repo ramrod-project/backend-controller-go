@@ -156,9 +156,6 @@ func Test_generateServiceSpec(t *testing.T) {
 
 	tag := os.Getenv("TAG")
 	if tag == "" {
-		tag = os.Getenv("TRAVIS_BRANCH")
-	}
-	if tag == "" {
 		tag = "latest"
 	}
 
@@ -297,7 +294,6 @@ func Test_generateServiceSpec(t *testing.T) {
 
 func Test_getTagFromEnv(t *testing.T) {
 	oldEnvTag := os.Getenv("TAG")
-	oldEnvTravis := os.Getenv("TRAVIS_BRANCH")
 
 	tests := []struct {
 		name   string
@@ -314,21 +310,14 @@ func Test_getTagFromEnv(t *testing.T) {
 			setEnv: []string{"TAG", "dev"},
 			want:   "dev",
 		},
-		{
-			name:   "TRAVIS_BRANCH",
-			setEnv: []string{"TAG", "dev"},
-			want:   "dev",
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			os.Setenv("TAG", "")
-			os.Setenv("TRAVIS_BRANCH", "")
 			os.Setenv(tt.setEnv[0], tt.setEnv[1])
 			got := getTagFromEnv()
 			assert.Equal(t, tt.want, got)
 		})
 	}
 	os.Setenv("TAG", oldEnvTag)
-	os.Setenv("TRAVIS_BRANCH", oldEnvTravis)
 }
