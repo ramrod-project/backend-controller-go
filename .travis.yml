@@ -5,7 +5,9 @@
 sudo: required
 
 env:
-  - DEP_VERSION="0.4.1"
+  global:
+    - DEP_VERSION="0.4.1"
+    - CC_TEST_REPORTER_ID=355a7f4947a6901e67ffd0fe3f09801c3ffb3037decb1c7aa0704bc10e735763
 
 language: go
 go:
