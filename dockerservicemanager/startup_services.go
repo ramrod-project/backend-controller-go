@@ -1,7 +1,6 @@
 package dockerservicemanager
 
 import (
-	"log"
 	"os"
 	"strings"
 
@@ -56,13 +55,11 @@ var auxConfig = PluginServiceConfig{
 // and AUX_START environment variables are set to YES.
 func StartupServices() error {
 
-	log.Printf("debug 0")
 	if os.Getenv("START_HARNESS") == "YES" {
 		res, err := CreatePluginService(&harnessConfig)
 		if err != nil {
 			return err
 		}
-		log.Printf("debug 1")
 		err = advertiseStartupService(map[string]interface{}{
 			"Name":          "Harness",
 			"ServiceID":     res.ID,
@@ -78,7 +75,6 @@ func StartupServices() error {
 		if err != nil {
 			return err
 		}
-		log.Printf("debug 2")
 	}
 
 	if os.Getenv("START_AUX") == "YES" {
@@ -86,7 +82,6 @@ func StartupServices() error {
 		if err != nil {
 			return err
 		}
-		log.Printf("debug 3")
 		err = advertiseStartupService(map[string]interface{}{
 			"Name":          "AuxServices",
 			"ServiceID":     res.ID,
@@ -102,7 +97,6 @@ func StartupServices() error {
 		if err != nil {
 			return err
 		}
-		log.Printf("debug 4")
 	}
 
 	return nil

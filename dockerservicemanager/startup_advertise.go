@@ -180,7 +180,6 @@ func advertiseStartupService(service map[string]interface{}) error {
 	if err != nil {
 		return err
 	}
-	log.Printf("debug 5")
 
 	_, err = r.DB("Controller").Table("Plugins").Insert(service).RunWrite(session)
 	if err != nil {
@@ -229,10 +228,11 @@ func advertiseStartupService(service map[string]interface{}) error {
 			doc["TCPPorts"] = newTCP
 			doc["UDPPorts"] = newUDP
 
-			_, err = r.DB("Controller").Table("Ports").Get(doc["id"]).Update(doc).RunWrite(session)
+			resp, err := r.DB("Controller").Table("Ports").Get(doc["id"]).Update(doc).RunWrite(session)
 			if err != nil {
 				return err
 			}
+			log.Printf("port doc inserted: %+v\nres: %+v", doc, resp)
 		} else {
 			return errors.New("leader port entry not found")
 		}

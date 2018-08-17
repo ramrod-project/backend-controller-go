@@ -87,7 +87,7 @@ func TestStartupServices(t *testing.T) {
 			wantErr: false,
 			wait: func(t *testing.T, timeout time.Duration) bool {
 				var (
-					harnessStarted, auxStarted = false, false
+					harnessStarted, auxStarted, portUpdated = false, false, false
 				)
 
 				// Initialize parent context (with timeout)
@@ -165,6 +165,86 @@ func TestStartupServices(t *testing.T) {
 					}
 				})
 
+				startDB := helper.TimeoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
+					sessionTest, err := r.Connect(r.ConnectOpts{
+						Address: "127.0.0.1",
+					})
+					if err != nil {
+						t.Errorf("%v", err)
+						return false
+					}
+					cntxt := args[0].(context.Context)
+					changeChan, errChan := func(s *r.Session) (<-chan map[string]interface{}, <-chan error) {
+						changes := make(chan map[string]interface{})
+						errs := make(chan error)
+						go func() {
+							for {
+								select {
+								case <-timeoutCtx.Done():
+									return
+								default:
+									break
+								}
+								cursor, err := r.DB("Controller").Table("Ports").Run(s)
+								if err != nil {
+									log.Println(fmt.Errorf("%v", err))
+									errs <- err
+								}
+								var doc map[string]interface{}
+								if cursor.Next(&doc) {
+									changes <- doc
+								}
+								time.Sleep(500 * time.Millisecond)
+							}
+						}()
+						return changes, errs
+					}(sessionTest)
+
+					for {
+					S:
+						select {
+						case <-cntxt.Done():
+							return false
+						case e := <-errChan:
+							log.Println(fmt.Errorf("%v", e))
+							return false
+						case d := <-changeChan:
+							log.Printf("change: %+v", d)
+							if _, ok := d["Interface"]; ok {
+								if d["Interface"].(string) != "" {
+									break
+								}
+							}
+							for _, p := range []string{"20", "21", "80", "5000"} {
+								found := false
+								for _, pd := range d["TCPPorts"].([]interface{}) {
+									if pd.(string) == p {
+										found = true
+									}
+								}
+								if !found {
+									break S
+								}
+							}
+							for _, p := range []string{"53"} {
+								found := true
+								for _, pd := range d["UDPPorts"].([]interface{}) {
+									if pd.(string) == p {
+										found = true
+									}
+								}
+								if !found {
+									break S
+								}
+							}
+							return true
+						default:
+							break
+						}
+						time.Sleep(100 * time.Millisecond)
+					}
+				})
+
 				defer cancel()
 
 				// for loop that iterates until context <-Done()
@@ -187,10 +267,15 @@ func TestStartupServices(t *testing.T) {
 							log.Printf("Setting auxStarted to %v", v)
 							auxStarted = v
 						}
+					case v := <-startDB:
+						if v {
+							log.Printf("Setting auxStarted to %v", v)
+							portUpdated = v
+						}
 					default:
 						break
 					}
-					if harnessStarted && auxStarted {
+					if harnessStarted && auxStarted && portUpdated {
 						break L
 					}
 					time.Sleep(100 * time.Millisecond)
@@ -202,11 +287,14 @@ func TestStartupServices(t *testing.T) {
 				if !auxStarted {
 					t.Errorf("Aux start event not detected")
 				}
+				if !portUpdated {
+					t.Errorf("Port entry not updated")
+				}
 
-				return harnessStarted && auxStarted
+				return harnessStarted && auxStarted && portUpdated
 
 			},
-			timeout: 20 * time.Second,
+			timeout: 30 * time.Second,
 		},
 	}
 	for _, tt := range tests {
