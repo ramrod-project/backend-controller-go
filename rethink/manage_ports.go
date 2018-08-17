@@ -30,6 +30,7 @@ func remove(arr []string, element string) []string {
 func getCurrentEntry(IPaddr string, session *r.Session) map[string]interface{} {
 	filter := make(map[string]interface{})
 	filter["Interface"] = IPaddr
+	log.Printf("\ngetting the data\n")
 	entry, _ := r.DB("Controller").Table("Ports").Filter(filter).Run(session)
 	var port map[string]interface{}
 	entry.Next(&port)
@@ -39,6 +40,7 @@ func getCurrentEntry(IPaddr string, session *r.Session) map[string]interface{} {
 // AddPort adds a port to the Ports table. it returns an error if
 // there was a duplicate
 func AddPort(IPaddr string, newPort string, protocol string) error {
+	log.Printf("\ngetting connection\n")
 	session, err := r.Connect(r.ConnectOpts{
 		Address: getRethinkHost(),
 	})
@@ -47,8 +49,10 @@ func AddPort(IPaddr string, newPort string, protocol string) error {
 	}
 	//get the current entry
 	var port map[string]interface{}
+	log.Printf("\ngetting the entry\n")
 	port = getCurrentEntry(IPaddr, session)
 	//update the ports
+	log.Printf("\nreplacing\n")
 	if protocol == "tcp" {
 		if contains(port["TCPPorts"].([]string), newPort) {
 			return errors.New("port already in use")
@@ -63,6 +67,7 @@ func AddPort(IPaddr string, newPort string, protocol string) error {
 		return errors.New("only tcp and udp are supported protocols")
 	}
 	//update the entry
+	log.Printf("\nupdating\n")
 	_, err = r.DB("Controller").Table("Ports").Get(port["id"]).Update(port).RunWrite(session)
 	if err != nil {
 		log.Printf("%v", err)
