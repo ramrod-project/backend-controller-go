@@ -28,6 +28,8 @@ before_install:
   - chmod +x $GOPATH/bin/dep
   - docker swarm init
   - travis_wait 10 docker pull ramrodpcp/interpreter-plugin:$TAG
+  - travis_wait 10 docker pull ramrodpcp/auxiliary-wrapper:$TAG
+  - travis_wait 10 docker pull ramrodpcp/auxiliary-services:$TAG
   - curl -L https://codeclimate.com/downloads/test-reporter/test-reporter-latest-linux-amd64 > ./cc-test-reporter
   - chmod +x ./cc-test-reporter
 
