@@ -19,7 +19,7 @@ import (
 	r "gopkg.in/gorethink/gorethink.v4"
 )
 
-func Test_getRethinkHost(t *testing.T) {
+func Test_GetRethinkHost(t *testing.T) {
 	oldEnv := os.Getenv("STAGE")
 	tests := []struct {
 		name string
@@ -50,8 +50,8 @@ func Test_getRethinkHost(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			os.Setenv("STAGE", tt.env)
-			if got := getRethinkHost(); got != tt.want {
-				t.Errorf("getRethinkHost() = %v, want %v", got, tt.want)
+			if got := GetRethinkHost(); got != tt.want {
+				t.Errorf("GetRethinkHost() = %v, want %v", got, tt.want)
 			}
 		})
 	}

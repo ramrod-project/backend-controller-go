@@ -27,7 +27,7 @@ var osMap = map[string]rethink.PluginOS{
 	"windows": rethink.PluginOSWindows,
 }
 
-func getRethinkHost() string {
+func GetRethinkHost() string {
 	temp := os.Getenv("STAGE")
 	if temp == "TESTING" {
 		return "127.0.0.1"
@@ -140,7 +140,7 @@ func advertisePlugins(manifest []ManifestPlugin) error {
 	}
 
 	session, err := r.Connect(r.ConnectOpts{
-		Address: getRethinkHost(),
+		Address: GetRethinkHost(),
 	})
 	if err != nil {
 		return err
@@ -175,7 +175,7 @@ func advertiseStartupService(service map[string]interface{}) error {
 	}
 
 	session, err := r.Connect(r.ConnectOpts{
-		Address: getRethinkHost(),
+		Address: GetRethinkHost(),
 	})
 	if err != nil {
 		return err
@@ -252,7 +252,7 @@ func advertiseIPs(entries []map[string]interface{}) error {
 	}
 
 	session, err := r.Connect(r.ConnectOpts{
-		Address: getRethinkHost(),
+		Address: GetRethinkHost(),
 	})
 	if err != nil {
 		return err

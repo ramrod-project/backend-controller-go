@@ -6,11 +6,21 @@ import (
 	"github.com/ramrod-project/backend-controller-go/dockerservicemanager"
 	"github.com/ramrod-project/backend-controller-go/errorhandler"
 	"github.com/ramrod-project/backend-controller-go/rethink"
+	r "gopkg.in/gorethink/gorethink.v4"
 )
 
 func main() {
+
+	// Check db
+	_, err := r.Connect(r.ConnectOpts{
+		Address: rethink.GetRethinkHost(),
+	})
+	if err != nil {
+		panic(err)
+	}
+
 	// Advertise nodes to database
-	err := dockerservicemanager.NodeAdvertise()
+	err = dockerservicemanager.NodeAdvertise()
 	if err != nil {
 		panic(err)
 	}

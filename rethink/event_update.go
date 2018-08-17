@@ -46,7 +46,7 @@ func EventUpdate(in <-chan events.Message) <-chan error {
 	outErr := make(chan error)
 
 	session, err := r.Connect(r.ConnectOpts{
-		Address: getRethinkHost(),
+		Address: GetRethinkHost(),
 	})
 	if err != nil {
 		panic(err)
