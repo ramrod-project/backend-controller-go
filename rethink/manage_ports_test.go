@@ -37,7 +37,7 @@ func TestAddPort(t *testing.T) {
 		},
 	}
 
-	session, brainID, err := test.StartBrain(ctx, t, dockerClient, test.BrainSpec)
+	session, brainID, err := test.StartBrain(ctx, t, dockerClient, test.intBrainSpec)
 	if err != nil {
 		t.Errorf("%v", err)
 		return
