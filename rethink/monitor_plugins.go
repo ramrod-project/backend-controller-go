@@ -78,7 +78,7 @@ func (e *ControllerError) Error() string {
 	return e.s
 }
 
-func getRethinkHost() string {
+func GetRethinkHost() string {
 	temp := os.Getenv("STAGE")
 	if temp == "TESTING" {
 		return "127.0.0.1"
@@ -216,8 +216,9 @@ func watchChanges(res *r.Cursor) (<-chan Plugin, <-chan error) {
 				plugin, err := newPlugin(v.(map[string]interface{}))
 				if err != nil {
 					errChan <- err
+				} else {
+					out <- *plugin
 				}
-				out <- *plugin
 			}
 		}
 	}(res)
@@ -233,7 +234,7 @@ func watchChanges(res *r.Cursor) (<-chan Plugin, <-chan error) {
 // to only the changes that matter.
 func MonitorPlugins() (<-chan Plugin, <-chan error) {
 	session, err := r.Connect(r.ConnectOpts{
-		Address: getRethinkHost(),
+		Address: GetRethinkHost(),
 	})
 	if err != nil {
 		panic(err)

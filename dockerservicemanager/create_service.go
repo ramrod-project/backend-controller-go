@@ -100,6 +100,13 @@ func generateServiceSpec(config *PluginServiceConfig) (*swarm.ServiceSpec, error
 	// Determine container image
 	if config.ServiceName == "AuxiliaryServices" {
 		imageName.Name = "ramrodpcp/auxiliary-wrapper"
+		config.Volumes = []mount.Mount{
+			mount.Mount{
+				Type:   mount.TypeBind,
+				Source: "/var/run/docker.sock",
+				Target: "/var/run/docker.sock",
+			},
+		}
 	} else if config.OS == rethink.PluginOSPosix || config.OS == rethink.PluginOSAll {
 		imageName.Name = "ramrodpcp/interpreter-plugin"
 	} else if config.OS == rethink.PluginOSWindows {

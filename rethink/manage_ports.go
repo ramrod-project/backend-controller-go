@@ -82,7 +82,7 @@ func AddPort(IPaddr string, newPort string, protocol string, session *r.Session)
 // there was a duplicate
 func RemovePort(IPaddr string, remPort string, protocol string, session *r.Session) error {
 	// session, err := r.Connect(r.ConnectOpts{
-	// 	Address: getRethinkHost(),
+	// 	Address: GetRethinkHost(),
 	// })
 	// if err != nil {
 	// 	return err
