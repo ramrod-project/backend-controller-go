@@ -211,7 +211,7 @@ func advertiseStartupService(service map[string]interface{}) error {
 				newTCP = append(newTCP, tcpPort.(string))
 			}
 			for _, udpPort := range doc["UDPPorts"].([]interface{}) {
-				newTCP = append(newUDP, udpPort.(string))
+				newUDP = append(newUDP, udpPort.(string))
 			}
 
 			for _, port := range service["ExternalPorts"].([]string) {

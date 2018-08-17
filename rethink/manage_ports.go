@@ -17,11 +17,9 @@ func contains(arr []string, element string) bool {
 }
 
 func remove(arr []string, element string) []string {
-	if contains(arr, element) {
-		for i, item := range arr {
-			if item == element {
-				return append(arr[:i], arr[i+1:]...)
-			}
+	for i, item := range arr {
+		if item == element {
+			return append(arr[:i], arr[i+1:]...)
 		}
 	}
 	return arr
@@ -40,29 +38,33 @@ func getCurrentEntry(IPaddr string, session *r.Session) map[string]interface{} {
 // AddPort adds a port to the Ports table. it returns an error if
 // there was a duplicate
 func AddPort(IPaddr string, newPort string, protocol string, session *r.Session) error {
-	// log.Printf("\ngetting connection\n")
-	// session, err := r.Connect(r.ConnectOpts{
-	// 	Address: getRethinkHost(),
-	// })
-	// if err != nil {
-	// 	return err
-	// }
-	//get the current entry
-	var port map[string]interface{}
+	var (
+		port   map[string]interface{}
+		newTCP []string
+		newUDP []string
+	)
 	log.Printf("\ngetting the entry\n")
 	port = getCurrentEntry(IPaddr, session)
+
+	for _, tcpPort := range port["TCPPorts"].([]interface{}) {
+		newTCP = append(newTCP, tcpPort.(string))
+	}
+	for _, udpPort := range port["UDPPorts"].([]interface{}) {
+		newUDP = append(newUDP, udpPort.(string))
+	}
+
 	//update the ports
 	log.Printf("\nreplacing\n")
 	if protocol == "tcp" {
-		if contains(port["TCPPorts"].([]string), newPort) {
+		if contains(newTCP, newPort) {
 			return errors.New("port already in use")
 		}
-		port["TCPPorts"] = append(port["TCPPorts"].([]string), newPort)
+		port["TCPPorts"] = append(newTCP, newPort)
 	} else if protocol == "udp" {
-		if contains(port["UDPPorts"].([]string), newPort) {
+		if contains(newUDP, newPort) {
 			return errors.New("port already in use")
 		}
-		port["UDPPorts"] = append(port["UDPPorts"].([]string), newPort)
+		port["UDPPorts"] = append(newUDP, newPort)
 	} else {
 		return errors.New("only tcp and udp are supported protocols")
 	}
@@ -87,21 +89,37 @@ func RemovePort(IPaddr string, remPort string, protocol string, session *r.Sessi
 	// }
 
 	// get current entry
-	var port map[string]interface{}
+	var (
+		port   map[string]interface{}
+		newTCP []string
+		newUDP []string
+	)
 	port = getCurrentEntry(IPaddr, session)
+
+	for _, tcpPort := range port["TCPPorts"].([]interface{}) {
+		newTCP = append(newTCP, tcpPort.(string))
+	}
+	for _, udpPort := range port["UDPPorts"].([]interface{}) {
+		newUDP = append(newUDP, udpPort.(string))
+	}
+
 	// update ports
 	if protocol == "tcp" {
-		port["TCPPorts"] = remove(port["TCPPorts"].([]string), remPort)
+		port["TCPPorts"] = remove(newTCP, remPort)
 	} else if protocol == "udp" {
-		port["UDPPorts"] = remove(port["UDPPorts"].([]string), remPort)
+		port["UDPPorts"] = remove(newUDP, remPort)
 	} else {
 		return errors.New("only tcp and udp are supported protocols")
 	}
 	// update entry
-	_, err := r.DB("Controller").Table("Ports").Get(port["id"]).Update(port).RunWrite(session)
+	resp, err := r.DB("Controller").Table("Ports").Get(port["id"]).Update(port).RunWrite(session)
+	log.Printf("removed: %+v", resp)
 	if err != nil {
 		log.Printf("%v", err)
 		return err
+	}
+	if resp.Unchanged == 1 {
+		return errors.New("port doesn't exits")
 	}
 	return nil
 }

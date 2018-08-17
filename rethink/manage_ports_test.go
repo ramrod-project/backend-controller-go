@@ -2,6 +2,7 @@ package rethink
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -102,10 +103,23 @@ func TestAddPort(t *testing.T) {
 	}
 	testRes := make(map[string]interface{})
 	testRes = getCurrentEntry("192.168.1.1", session)
-	if !contains(testRes["TCPPorts"].([]string), "9990") {
+
+	var (
+		newTCP []string
+		newUDP []string
+	)
+
+	for _, tcpPort := range testRes["TCPPorts"].([]interface{}) {
+		newTCP = append(newTCP, tcpPort.(string))
+	}
+	for _, udpPort := range testRes["UDPPorts"].([]interface{}) {
+		newUDP = append(newUDP, udpPort.(string))
+	}
+
+	if !contains(newTCP, "9990") {
 		t.Errorf("9990 was not added")
 	}
-	if !contains(testRes["UPDPorts"].([]string), "5178") {
+	if !contains(newUDP, "5178") {
 		t.Errorf("failed to add to empty string")
 	}
 	test.KillService(ctx, dockerClient, brainID)
@@ -149,6 +163,7 @@ func TestRemovePort(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
+		err     error
 		wantErr bool
 	}{
 		{
@@ -159,15 +174,18 @@ func TestRemovePort(t *testing.T) {
 				protocol: "tcp",
 			},
 			wantErr: false,
-		}, {
+		},
+		{
 			name: "delete a port that does not exist",
 			args: args{
 				IPaddr:   "192.168.1.1",
 				remPort:  "6003",
 				protocol: "tcp",
 			},
+			err:     errors.New("port doesn't exits"),
 			wantErr: true,
-		}, {
+		},
+		{
 			name: "delete the last port",
 			args: args{
 				IPaddr:   "192.168.1.1",
@@ -175,13 +193,15 @@ func TestRemovePort(t *testing.T) {
 				protocol: "udp",
 			},
 			wantErr: false,
-		}, {
+		},
+		{
 			name: "delete a port in empty list",
 			args: args{
 				IPaddr:   "192.168.1.1",
 				remPort:  "9000",
 				protocol: "udp",
 			},
+			err:     errors.New("port doesn't exits"),
 			wantErr: true,
 		},
 	}
@@ -194,7 +214,16 @@ func TestRemovePort(t *testing.T) {
 	}
 	testRes := make(map[string]interface{})
 	testRes = getCurrentEntry("192.168.1.1", session)
-	if contains(testRes["TCPPorts"].([]string), "6003") {
+
+	var (
+		newTCP []string
+	)
+
+	for _, tcpPort := range testRes["TCPPorts"].([]interface{}) {
+		newTCP = append(newTCP, tcpPort.(string))
+	}
+
+	if contains(newTCP, "6003") {
 		t.Errorf("port 6003 was not deleted")
 	}
 	test.KillService(ctx, dockerClient, brainID)
