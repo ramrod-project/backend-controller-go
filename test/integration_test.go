@@ -12,6 +12,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/docker/docker/client"
+	"github.com/ramrod-project/backend-controller-go/helper"
 	"github.com/ramrod-project/backend-controller-go/rethink"
 	"github.com/stretchr/testify/assert"
 	r "gopkg.in/gorethink/gorethink.v4"
@@ -38,35 +39,6 @@ func dumpEverything(ctx context.Context, t *testing.T, dockerClient *client.Clie
 	for cursor.Next(&doc) {
 		t.Errorf("Plugin entry: %+v", doc)
 	}
-}
-
-func timoutTester(ctx context.Context, args []interface{}, f func(args ...interface{}) bool) <-chan bool {
-	done := make(chan bool)
-
-	go func() {
-		for {
-			recv := make(chan bool)
-
-			go func() {
-				recv <- f(args...)
-				close(recv)
-				return
-			}()
-
-			select {
-			case <-ctx.Done():
-				done <- false
-				close(done)
-				return
-			case b := <-recv:
-				done <- b
-				close(done)
-				return
-			}
-		}
-	}()
-
-	return done
 }
 
 func Test_Integration(t *testing.T) {
@@ -151,7 +123,7 @@ func Test_Integration(t *testing.T) {
 				// Initialize parent context (with timeout)
 				timeoutCtx, cancel := context.WithTimeout(context.Background(), timeout)
 
-				portsDB := timoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
+				portsDB := helper.TimeoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
 					sessionTest, err := r.Connect(r.ConnectOpts{
 						Address: "127.0.0.1",
 					})
@@ -244,7 +216,7 @@ func Test_Integration(t *testing.T) {
 				// Initialize parent context (with timeout)
 				timeoutCtx, cancel := context.WithTimeout(context.Background(), timeout)
 
-				pluginsDB := timoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
+				pluginsDB := helper.TimeoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
 					sessionTest, err := r.Connect(r.ConnectOpts{
 						Address: "127.0.0.1",
 					})
@@ -350,7 +322,7 @@ func Test_Integration(t *testing.T) {
 					"ServiceName":   "TestPlugin",
 					"DesiredState":  "Activate",
 					"State":         "Available",
-					"Interface":       "",
+					"Interface":     "",
 					"ExternalPorts": []string{"5000/tcp"},
 					"InternalPorts": []string{"5000/tcp"},
 					"OS":            string(rethink.PluginOSAll),
@@ -372,7 +344,7 @@ func Test_Integration(t *testing.T) {
 				// Initialize parent context (with timeout)
 				timeoutCtx, cancel := context.WithTimeout(context.Background(), timeout)
 
-				startDocker := timoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
+				startDocker := helper.TimeoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
 					dc, err := client.NewEnvClient()
 					if err != nil {
 						t.Errorf("%v", err)
@@ -411,7 +383,7 @@ func Test_Integration(t *testing.T) {
 
 				var startDockerVerify <-chan bool
 
-				startDB := timoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
+				startDB := helper.TimeoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
 					sessionTest, err := r.Connect(r.ConnectOpts{
 						Address: "127.0.0.1",
 					})
@@ -478,7 +450,7 @@ func Test_Integration(t *testing.T) {
 					case v := <-startDocker:
 						if v {
 							log.Printf("Setting foundService to %v", v)
-							startDockerVerify = timoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
+							startDockerVerify = helper.TimeoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
 								dc, err := client.NewEnvClient()
 								if err != nil {
 									t.Errorf("%v", err)
@@ -587,7 +559,7 @@ func Test_Integration(t *testing.T) {
 				// Create goroutine for each condition we want to satisfy
 				// and pass same parent context
 				// goroutines return <-chan bool
-				restartDocker := timoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
+				restartDocker := helper.TimeoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
 					dc, err := client.NewEnvClient()
 					if err != nil {
 						t.Errorf("%v", err)
@@ -629,7 +601,7 @@ func Test_Integration(t *testing.T) {
 						time.Sleep(100 * time.Millisecond)
 					}
 				})
-				restartDB := timoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
+				restartDB := helper.TimeoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
 					sessionTest, err := r.Connect(r.ConnectOpts{
 						Address: "127.0.0.1",
 					})
@@ -679,7 +651,7 @@ func Test_Integration(t *testing.T) {
 						time.Sleep(100 * time.Millisecond)
 					}
 				})
-				restartedDockerUpdated := timoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
+				restartedDockerUpdated := helper.TimeoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
 					dc, err := client.NewEnvClient()
 					if err != nil {
 						t.Errorf("%v", err)
@@ -744,7 +716,7 @@ func Test_Integration(t *testing.T) {
 					case v := <-restartDB:
 						if v {
 							log.Printf("Setting rDB to %v", v)
-							restartedDBUpdated = timoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
+							restartedDBUpdated = helper.TimeoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
 								sessionTest, err := r.Connect(r.ConnectOpts{
 									Address: "127.0.0.1",
 								})
@@ -841,7 +813,7 @@ func Test_Integration(t *testing.T) {
 					"ServiceName":   "TestPlugin2",
 					"DesiredState":  "Activate",
 					"State":         "Available",
-					"Interface":       "",
+					"Interface":     "",
 					"ExternalPorts": []string{"6000/tcp"},
 					"InternalPorts": []string{"6000/tcp"},
 					"OS":            string(rethink.PluginOSPosix),
@@ -863,7 +835,7 @@ func Test_Integration(t *testing.T) {
 				// Initialize parent context (with timeout)
 				timeoutCtx, cancel := context.WithTimeout(context.Background(), timeout)
 
-				startDocker := timoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
+				startDocker := helper.TimeoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
 					dc, err := client.NewEnvClient()
 					if err != nil {
 						t.Errorf("%v", err)
@@ -902,7 +874,7 @@ func Test_Integration(t *testing.T) {
 
 				var startDockerVerify <-chan bool
 
-				startDB := timoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
+				startDB := helper.TimeoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
 					sessionTest, err := r.Connect(r.ConnectOpts{
 						Address: "127.0.0.1",
 					})
@@ -936,7 +908,7 @@ func Test_Integration(t *testing.T) {
 							log.Println(fmt.Errorf("%v", e))
 							return false
 						case d := <-changeChan:
-							if v, ok := d["new_val"]; !ok {
+							if _, ok := d["new_val"]; !ok {
 								break
 							}
 							if d["new_val"].(map[string]interface{})["ServiceName"].(string) != "TestPlugin2" {
@@ -969,7 +941,7 @@ func Test_Integration(t *testing.T) {
 					case v := <-startDocker:
 						if v {
 							log.Printf("Setting foundService to %v", v)
-							startDockerVerify = timoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
+							startDockerVerify = helper.TimeoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
 								dc, err := client.NewEnvClient()
 								if err != nil {
 									t.Errorf("%v", err)
@@ -1080,7 +1052,7 @@ func Test_Integration(t *testing.T) {
 				// Initialize parent context (with timeout)
 				timeoutCtx, cancel := context.WithTimeout(context.Background(), timeout)
 
-				stopDocker := timoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
+				stopDocker := helper.TimeoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
 					dc, err := client.NewEnvClient()
 					if err != nil {
 						t.Errorf("%v", err)
@@ -1116,7 +1088,7 @@ func Test_Integration(t *testing.T) {
 					}
 				})
 
-				stopDB := timoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
+				stopDB := helper.TimeoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
 					sessionTest, err := r.Connect(r.ConnectOpts{
 						Address: "127.0.0.1",
 					})
@@ -1150,7 +1122,7 @@ func Test_Integration(t *testing.T) {
 							log.Println(fmt.Errorf("%v", e))
 							return false
 						case d := <-changeChan:
-							if v, ok := d["new_val"]; !ok {
+							if _, ok := d["new_val"]; !ok {
 								break
 							}
 							if d["new_val"].(map[string]interface{})["ServiceName"].(string) != "TestPlugin" {

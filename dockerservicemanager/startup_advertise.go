@@ -180,6 +180,7 @@ func advertiseStartupService(service map[string]interface{}) error {
 	if err != nil {
 		return err
 	}
+	log.Printf("debug 5")
 
 	_, err = r.DB("Controller").Table("Plugins").Insert(service).RunWrite(session)
 	if err != nil {

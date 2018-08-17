@@ -483,7 +483,7 @@ func Test_advertiseStartupService(t *testing.T) {
 	oldEnv := os.Getenv("STAGE")
 	os.Setenv("STAGE", "TESTING")
 
-	ctx := context.TODO()
+	ctx := context.Background()
 	dockerClient, err := client.NewEnvClient()
 	if err != nil {
 		t.Errorf("%v", err)

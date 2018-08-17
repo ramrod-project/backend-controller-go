@@ -1,7 +1,9 @@
 package dockerservicemanager
 
 import (
+	"log"
 	"os"
+	"strings"
 
 	mount "github.com/docker/docker/api/types/mount"
 	swarm "github.com/docker/docker/api/types/swarm"
@@ -11,7 +13,7 @@ import (
 
 var harnessConfig = PluginServiceConfig{
 	Environment: []string{
-		getEnvByKey("STAGE"),
+		strings.Replace(getEnvByKey("STAGE"), "TESTING", "DEV", 1),
 		getEnvByKey("LOGLEVEL"),
 		envString("PORT", "5000"),
 		envString("PLUGIN", "Harness"),
@@ -32,7 +34,7 @@ var harnessConfig = PluginServiceConfig{
 
 var auxConfig = PluginServiceConfig{
 	Environment: []string{
-		getEnvByKey("STAGE"),
+		strings.Replace(getEnvByKey("STAGE"), "TESTING", "DEV", 1),
 		getEnvByKey("LOGLEVEL"),
 		getEnvByKey("TAG"),
 	},
@@ -53,23 +55,14 @@ var auxConfig = PluginServiceConfig{
 // and a Harness plugin service if the HARNESS_START
 // and AUX_START environment variables are set to YES.
 func StartupServices() error {
-	var (
-		startHarness bool = false
-		startAux     bool = false
-	)
 
+	log.Printf("debug 0")
 	if os.Getenv("START_HARNESS") == "YES" {
-		startHarness = true
-	}
-	if os.Getenv("START_HARNESS") == "YES" {
-		startAux = true
-	}
-
-	if startHarness {
 		res, err := CreatePluginService(&harnessConfig)
 		if err != nil {
 			return err
 		}
+		log.Printf("debug 1")
 		err = advertiseStartupService(map[string]interface{}{
 			"Name":          "Harness",
 			"ServiceID":     res.ID,
@@ -85,13 +78,15 @@ func StartupServices() error {
 		if err != nil {
 			return err
 		}
+		log.Printf("debug 2")
 	}
 
-	if startAux {
+	if os.Getenv("START_AUX") == "YES" {
 		res, err := CreatePluginService(&auxConfig)
 		if err != nil {
 			return err
 		}
+		log.Printf("debug 3")
 		err = advertiseStartupService(map[string]interface{}{
 			"Name":          "AuxServices",
 			"ServiceID":     res.ID,
@@ -107,6 +102,7 @@ func StartupServices() error {
 		if err != nil {
 			return err
 		}
+		log.Printf("debug 4")
 	}
 
 	return nil

@@ -98,12 +98,15 @@ func generateServiceSpec(config *PluginServiceConfig) (*swarm.ServiceSpec, error
 	// log.Printf("Creating service %v with config %v\n", config.ServiceName, config)
 
 	// Determine container image
-	if config.OS == rethink.PluginOSPosix || config.OS == rethink.PluginOSAll {
+	if config.ServiceName == "AuxiliaryServices" {
+		imageName.Name = "ramrodpcp/auxiliary-wrapper"
+	} else if config.OS == rethink.PluginOSPosix || config.OS == rethink.PluginOSAll {
 		imageName.Name = "ramrodpcp/interpreter-plugin"
 	} else if config.OS == rethink.PluginOSWindows {
 		imageName.Name = "ramrodpcp/interpreter-plugin-windows"
 		placementConfig.Constraints = []string{"node.labels.os==nt"}
 		hosts = append(hosts, hostString("rethinkdb", getManagerIP()))
+		config.Environment = append(config.Environment, "RETHINK_HOST="+getManagerIP())
 	} else {
 		return &swarm.ServiceSpec{}, fmt.Errorf("invalid OS setting: %v", config.OS)
 	}
