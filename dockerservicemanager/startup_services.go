@@ -49,6 +49,9 @@ var auxConfig = PluginServiceConfig{
 	},
 }
 
+// StartupServices will start the Aux Services Service
+// and a Harness plugin service if the HARNESS_START
+// and AUX_START environment variables are set to YES.
 func StartupServices() error {
 	var (
 		startHarness bool = false
@@ -63,19 +66,48 @@ func StartupServices() error {
 	}
 
 	if startHarness {
-		_, err := CreatePluginService(&harnessConfig)
+		res, err := CreatePluginService(&harnessConfig)
+		if err != nil {
+			return err
+		}
+		err = advertiseStartupService(map[string]interface{}{
+			"Name":          "Harness",
+			"ServiceID":     res.ID,
+			"ServiceName":   harnessConfig.ServiceName,
+			"DesiredState":  "",
+			"State":         "Active",
+			"Interface":     "",
+			"ExternalPorts": []string{"5000/tcp"},
+			"InternalPorts": []string{"5000/tcp"},
+			"OS":            string(rethink.PluginOSAll),
+			"Environment":   []string{},
+		})
 		if err != nil {
 			return err
 		}
 	}
 
 	if startAux {
-		_, err := CreatePluginService(&auxConfig)
+		res, err := CreatePluginService(&auxConfig)
+		if err != nil {
+			return err
+		}
+		err = advertiseStartupService(map[string]interface{}{
+			"Name":          "AuxServices",
+			"ServiceID":     res.ID,
+			"ServiceName":   auxConfig.ServiceName,
+			"DesiredState":  "",
+			"State":         "Active",
+			"Interface":     "",
+			"ExternalPorts": []string{"20/tcp", "21/tcp", "80/tcp", "53/udp"},
+			"InternalPorts": []string{"20/tcp", "21/tcp", "80/tcp", "53/udp"},
+			"OS":            string(rethink.PluginOSPosix),
+			"Environment":   []string{},
+		})
 		if err != nil {
 			return err
 		}
 	}
 
 	return nil
-
 }

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/docker/docker/api/types"
@@ -34,9 +35,29 @@ func getRethinkHost() string {
 	return "rethinkdb"
 }
 
+func getLeaderHostname() (string, error) {
+	ctx := context.Background()
+	dockerClient, err := client.NewEnvClient()
+	if err != nil {
+		return "", err
+	}
+
+	nodes, err := dockerClient.NodeList(ctx, types.NodeListOptions{})
+	if err != nil {
+		return "", err
+	}
+
+	for _, n := range nodes {
+		if n.ManagerStatus.Leader {
+			return n.Description.Hostname, nil
+		}
+	}
+	return "", errors.New("no leader found")
+}
+
 func getNodes() ([]map[string]interface{}, error) {
 
-	ctx := context.TODO()
+	ctx := context.Background()
 	dockerClient, err := client.NewEnvClient()
 	if err != nil {
 		return nil, err
@@ -140,10 +161,83 @@ func advertisePlugins(manifest []ManifestPlugin) error {
 		})
 	}
 
-	_, err = r.DB("Controller").Table("Plugins").Insert(plugins).Run(session)
+	_, err = r.DB("Controller").Table("Plugins").Insert(plugins).RunWrite(session)
 
 	return err
 
+}
+
+func advertiseStartupService(service map[string]interface{}) error {
+	if service["ServiceName"] == "" {
+		return errors.New("service must have ServiceName")
+	} else if service["Name"] == "" {
+		return errors.New("service must have (plugin) Name")
+	}
+
+	session, err := r.Connect(r.ConnectOpts{
+		Address: getRethinkHost(),
+	})
+	if err != nil {
+		return err
+	}
+
+	_, err = r.DB("Controller").Table("Plugins").Insert(service).RunWrite(session)
+	if err != nil {
+		return err
+	}
+
+	leader, err := getLeaderHostname()
+	if err != nil {
+		return err
+	}
+
+	if len(service["ExternalPorts"].([]string)) > 0 {
+		var (
+			doc    = make(map[string]interface{})
+			filter = map[string]string{
+				"NodeHostName": leader,
+			}
+			newTCP []string
+			newUDP []string
+		)
+
+		res, err := r.DB("Controller").Table("Ports").Filter(filter).Run(session)
+		if err != nil {
+			return err
+		}
+
+		if res.Next(&doc) {
+			for _, tcpPort := range doc["TCPPorts"].([]interface{}) {
+				newTCP = append(newTCP, tcpPort.(string))
+			}
+			for _, udpPort := range doc["UDPPorts"].([]interface{}) {
+				newTCP = append(newUDP, udpPort.(string))
+			}
+
+			for _, port := range service["ExternalPorts"].([]string) {
+				split := strings.Split(port, "/")
+				if split[1] == "tcp" {
+					newTCP = append(newTCP, split[0])
+				} else if split[1] == "udp" {
+					newUDP = append(newUDP, split[0])
+				} else {
+					return fmt.Errorf("port %v not set to tcp or udp", port)
+				}
+			}
+
+			doc["TCPPorts"] = newTCP
+			doc["UDPPorts"] = newUDP
+
+			_, err = r.DB("Controller").Table("Ports").Get(doc["id"]).Update(doc).RunWrite(session)
+			if err != nil {
+				return err
+			}
+		} else {
+			return errors.New("leader port entry not found")
+		}
+
+	}
+	return nil
 }
 
 func advertiseIPs(entries []map[string]interface{}) error {
@@ -163,7 +257,7 @@ func advertiseIPs(entries []map[string]interface{}) error {
 		return err
 	}
 
-	_, err = r.DB("Controller").Table("Ports").Insert(entries).Run(session)
+	_, err = r.DB("Controller").Table("Ports").Insert(entries).RunWrite(session)
 
 	return err
 }
