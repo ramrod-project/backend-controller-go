@@ -45,7 +45,7 @@ func AddPort(IPaddr string, newPort string, protocol string) error {
 		Address: getRethinkHost(),
 	})
 	if err != nil {
-		panic(err)
+		return err
 	}
 	//get the current entry
 	var port map[string]interface{}
@@ -83,7 +83,7 @@ func RemovePort(IPaddr string, remPort string, protocol string) error {
 		Address: getRethinkHost(),
 	})
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	// get current entry
