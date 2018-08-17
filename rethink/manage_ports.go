@@ -39,14 +39,14 @@ func getCurrentEntry(IPaddr string, session *r.Session) map[string]interface{} {
 
 // AddPort adds a port to the Ports table. it returns an error if
 // there was a duplicate
-func AddPort(IPaddr string, newPort string, protocol string) error {
-	log.Printf("\ngetting connection\n")
-	session, err := r.Connect(r.ConnectOpts{
-		Address: getRethinkHost(),
-	})
-	if err != nil {
-		return err
-	}
+func AddPort(IPaddr string, newPort string, protocol string, session *r.Session) error {
+	// log.Printf("\ngetting connection\n")
+	// session, err := r.Connect(r.ConnectOpts{
+	// 	Address: getRethinkHost(),
+	// })
+	// if err != nil {
+	// 	return err
+	// }
 	//get the current entry
 	var port map[string]interface{}
 	log.Printf("\ngetting the entry\n")
@@ -68,7 +68,7 @@ func AddPort(IPaddr string, newPort string, protocol string) error {
 	}
 	//update the entry
 	log.Printf("\nupdating\n")
-	_, err = r.DB("Controller").Table("Ports").Get(port["id"]).Update(port).RunWrite(session)
+	_, err := r.DB("Controller").Table("Ports").Get(port["id"]).Update(port).RunWrite(session)
 	if err != nil {
 		log.Printf("%v", err)
 		return err
@@ -78,13 +78,13 @@ func AddPort(IPaddr string, newPort string, protocol string) error {
 
 // RemovePort removes a port to the Ports table. it returns an error if
 // there was a duplicate
-func RemovePort(IPaddr string, remPort string, protocol string) error {
-	session, err := r.Connect(r.ConnectOpts{
-		Address: getRethinkHost(),
-	})
-	if err != nil {
-		return err
-	}
+func RemovePort(IPaddr string, remPort string, protocol string, session *r.Session) error {
+	// session, err := r.Connect(r.ConnectOpts{
+	// 	Address: getRethinkHost(),
+	// })
+	// if err != nil {
+	// 	return err
+	// }
 
 	// get current entry
 	var port map[string]interface{}
@@ -98,7 +98,7 @@ func RemovePort(IPaddr string, remPort string, protocol string) error {
 		return errors.New("only tcp and udp are supported protocols")
 	}
 	// update entry
-	_, err = r.DB("Controller").Table("Ports").Get(port["id"]).Update(port).RunWrite(session)
+	_, err := r.DB("Controller").Table("Ports").Get(port["id"]).Update(port).RunWrite(session)
 	if err != nil {
 		log.Printf("%v", err)
 		return err

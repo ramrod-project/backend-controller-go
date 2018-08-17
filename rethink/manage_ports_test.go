@@ -95,7 +95,7 @@ func TestAddPort(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := AddPort(tt.args.IPaddr, tt.args.newPort, tt.args.protocol); (err != nil) != tt.wantErr {
+			if err := AddPort(tt.args.IPaddr, tt.args.newPort, tt.args.protocol, session); (err != nil) != tt.wantErr {
 				t.Errorf("AddPort() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -187,7 +187,7 @@ func TestRemovePort(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := RemovePort(tt.args.IPaddr, tt.args.remPort, tt.args.protocol); (err != nil) != tt.wantErr {
+			if err := RemovePort(tt.args.IPaddr, tt.args.remPort, tt.args.protocol, session); (err != nil) != tt.wantErr {
 				t.Errorf("RemovePort() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
