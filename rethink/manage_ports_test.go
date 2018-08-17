@@ -3,6 +3,7 @@ package rethink
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/swarm"
@@ -41,6 +42,8 @@ func TestAddPort(t *testing.T) {
 		t.Errorf("%v", err)
 		return
 	}
+
+	time.Sleep(10 * time.Second)
 
 	testPort := map[string]interface{}{
 		"Interface":    "192.168.1.1",
