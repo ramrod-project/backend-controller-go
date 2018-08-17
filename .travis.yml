@@ -43,7 +43,7 @@ install:
   - go test -coverprofile=dockerservicemanager.cover -v -parallel 1 github.com/ramrod-project/backend-controller-go/dockerservicemanager
   - go test -coverprofile=rethink.cover -v -parallel 1 github.com/ramrod-project/backend-controller-go/rethink
   - go test -coverprofile=errorhandler.cover -v -parallel 1 github.com/ramrod-project/backend-controller-go/errorhandler
-  - ./cc-test-reporter after-build --exit-code 0
+  - ./cc-test-reporter after-build -t gocov --exit-code 0
   - make
 
 before_script:
