@@ -216,8 +216,9 @@ func watchChanges(res *r.Cursor) (<-chan Plugin, <-chan error) {
 				plugin, err := newPlugin(v.(map[string]interface{}))
 				if err != nil {
 					errChan <- err
+				} else {
+					out <- *plugin
 				}
-				out <- *plugin
 			}
 		}
 	}(res)

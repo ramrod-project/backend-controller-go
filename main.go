@@ -1,7 +1,9 @@
 package main
 
 import (
+	"errors"
 	"log"
+	"time"
 
 	"github.com/ramrod-project/backend-controller-go/dockerservicemanager"
 	"github.com/ramrod-project/backend-controller-go/errorhandler"
@@ -12,15 +14,31 @@ import (
 func main() {
 
 	// Check db
-	_, err := r.Connect(r.ConnectOpts{
-		Address: rethink.GetRethinkHost(),
-	})
-	if err != nil {
-		panic(err)
+	start := time.Now()
+	ready := false
+	for {
+		session, err := r.Connect(r.ConnectOpts{
+			Address: rethink.GetRethinkHost(),
+		})
+		if err == nil {
+			_, err := r.DB("Controller").Table("Plugins").Run(session)
+			if err == nil {
+				ready = true
+				break
+			}
+		}
+		if time.Since(start) >= 20*time.Second {
+			panic(err)
+		}
+		time.Sleep(time.Second)
 	}
+	if !ready {
+		panic(errors.New("Brain not ready"))
+	}
+	log.Printf("Brain ready...")
 
 	// Advertise nodes to database
-	err = dockerservicemanager.NodeAdvertise()
+	err := dockerservicemanager.NodeAdvertise()
 	if err != nil {
 		panic(err)
 	}
@@ -65,7 +83,7 @@ func main() {
 
 	for err := range errChan {
 		if err != nil {
-			log.Fatalf("Error: %v\n", err)
+			log.Printf("Error: %v\n", err)
 		}
 	}
 }
