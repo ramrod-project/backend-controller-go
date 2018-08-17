@@ -28,14 +28,18 @@ before_install:
   - chmod +x $GOPATH/bin/dep
   - docker swarm init
   - travis_wait 10 docker pull ramrodpcp/interpreter-plugin:$TAG
+  - curl -L https://codeclimate.com/downloads/test-reporter/test-reporter-latest-linux-amd64 > ./cc-test-reporter
+  - chmod +x ./cc-test-reporter
 
 install:  
   - dep ensure
   - go vet
   - go build -race
-  - go test -v -parallel 1 github.com/ramrod-project/backend-controller-go/dockerservicemanager
-  - go test -v -parallel 1 github.com/ramrod-project/backend-controller-go/rethink
-  - go test -v -parallel 1 github.com/ramrod-project/backend-controller-go/errorhandler
+  - ./cc-test-reporter before-build
+  - go test -coverprofile=dockerservicemanager.cover -v -parallel 1 github.com/ramrod-project/backend-controller-go/dockerservicemanager
+  - go test -coverprofile=rethink.cover -v -parallel 1 github.com/ramrod-project/backend-controller-go/rethink
+  - go test -coverprofile=errorhandler.cover -v -parallel 1 github.com/ramrod-project/backend-controller-go/errorhandler
+  - ./cc-test-reporter after-build --exit-code 0
   - make
 
 before_script:
