@@ -40,13 +40,11 @@ install:
   - go vet
   - go build -race
   - ./cc-test-reporter before-build
-  - go test -coverprofile=dockerservicemanager.cover -v -parallel 1 github.com/ramrod-project/backend-controller-go/dockerservicemanager
-  - go test -coverprofile=rethink.cover -v -parallel 1 github.com/ramrod-project/backend-controller-go/rethink
-  - go test -coverprofile=errorhandler.cover -v -parallel 1 github.com/ramrod-project/backend-controller-go/errorhandler
-  - echo "mode: set" > c.out
-  - grep -h -v "^mode:" ./*.cover >> c.out
-  - rm -f *.cover
-  - ./cc-test-reporter after-build -t gocov --exit-code 0
+  - go test -coverprofile=dockerservicemanager.out -v -parallel 1 github.com/ramrod-project/backend-controller-go/dockerservicemanager
+  - go test -coverprofile=rethink.out -v -parallel 1 github.com/ramrod-project/backend-controller-go/rethink
+  - go test -coverprofile=errorhandler.out -v -parallel 1 github.com/ramrod-project/backend-controller-go/errorhandler
+  - ./cc-test-reporter format-coverage --input-type gocov out
+  - ./cc-test-reporter upload-coverage
   - make
 
 before_script:
