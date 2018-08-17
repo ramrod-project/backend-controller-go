@@ -25,9 +25,6 @@ func TestRemovePluginService(t *testing.T) {
 
 	tag := os.Getenv("TAG")
 	if tag == "" {
-		tag = os.Getenv("TRAVIS_BRANCH")
-	}
-	if tag == "" {
 		tag = "latest"
 	}
 

@@ -19,9 +19,6 @@ import (
 func getTagFromEnv() string {
 	temp := os.Getenv("TAG")
 	if temp == "" {
-		temp = os.Getenv("TRAVIS_BRANCH")
-	}
-	if temp == "" {
 		temp = "latest"
 	}
 	return temp
@@ -76,7 +73,7 @@ func DockerCleanUp(ctx context.Context, dockerClient *client.Client, net string)
 		_, err := dockerClient.NetworkInspect(ctx, net)
 		if err != nil {
 			_, err := dockerClient.NetworksPrune(ctx, filters.Args{})
-			if err != nil {
+			if err == nil {
 				break
 			}
 		}
@@ -88,9 +85,6 @@ func GetImage(image string) string {
 	var stringBuf bytes.Buffer
 
 	tag := os.Getenv("TAG")
-	if tag == "" {
-		tag = os.Getenv("TRAVIS_BRANCH")
-	}
 	if tag == "" {
 		tag = "latest"
 	}

@@ -58,5 +58,11 @@ script:
   # integration tests
   - go test -v -parallel 1 github.com/ramrod-project/backend-controller-go/test
 
+after_success:
+  - if [[ "$TRAVIS_PULL_REQUEST" == "false" ]]; 
+    then echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin; fi
+  - if [[ "$TRAVIS_PULL_REQUEST" == "false"  ]]; 
+    then docker push ramrodpcp/backend-controller:$TAG; fi
+
 notifications:
   slack: ramrod-project:GDF82rRYDg3KSekrT3GA24qO

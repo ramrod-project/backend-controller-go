@@ -22,6 +22,12 @@ func main() {
 		panic(err)
 	}
 
+	// Start up Harness and Aux if needed
+	err = dockerservicemanager.StartupServices()
+	if err != nil {
+		panic(err)
+	}
+
 	log.Printf("Advertisement complete without errors...")
 
 	// Start the event monitor
