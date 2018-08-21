@@ -16,3 +16,4 @@ controller
 backend-controller-go
 docker_event_log
 *.cover
+cc-test-reporter
