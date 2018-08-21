@@ -50,7 +50,7 @@ script:
   - docker build -t ramrodpcp/backend-controller:test .
   - docker network create --driver=overlay pcp
   - docker service create --name rethinkdb --network pcp -p 28015:28015 -e "STAGE=DEV" -e "LOGLEVEL=DEBUG" ramrodpcp/database-brain:$TAG
-  - docker service create --name controller --network pcp -e "STAGE=DEV" -e "LOGLEVEL=DEBUG" -e "TAG=${TAG}" --mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock ramrodpcp/backend-controller:$TAG
+  - docker service create --name controller --network pcp -e "STAGE=DEV" -e "LOGLEVEL=DEBUG" -e "TAG=${TAG}" --mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock ramrodpcp/backend-controller:test
   - sleep 10
   - docker service ls
   - docker service ps --no-trunc controller
