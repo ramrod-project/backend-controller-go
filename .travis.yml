@@ -32,14 +32,14 @@ before_install:
   - travis_wait 10 docker pull ramrodpcp/interpreter-plugin:$TAG
   - travis_wait 10 docker pull ramrodpcp/auxiliary-wrapper:$TAG
   - travis_wait 10 docker pull ramrodpcp/auxiliary-services:$TAG
+  - curl -L https://codeclimate.com/downloads/test-reporter/test-reporter-latest-linux-amd64 > ./cc-test-reporter
+  - chmod +x ./cc-test-reporter
 
 install:  
-  - dep ensure
+  - dep ensure -v
   - go vet
   - go build -race
-  - go test -v -parallel 1 github.com/ramrod-project/backend-controller-go/dockerservicemanager
-  - go test -v -parallel 1 github.com/ramrod-project/backend-controller-go/rethink
-  - go test -v -parallel 1 github.com/ramrod-project/backend-controller-go/errorhandler
+  - ./codecoverage.sh # Runs all of the tests and uploads coverage results
   - make
 
 before_script:
