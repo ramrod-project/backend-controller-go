@@ -36,7 +36,7 @@ before_install:
   - chmod +x ./cc-test-reporter
 
 install:  
-  - dep ensure
+  - dep ensure -v
   - go vet
   - go build -race
   - ./codecoverage.sh # Runs all of the tests and uploads coverage results
