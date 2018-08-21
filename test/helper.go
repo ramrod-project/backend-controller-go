@@ -198,7 +198,7 @@ var controllerSpec = swarm.ServiceSpec{
 		ContainerSpec: swarm.ContainerSpec{
 			DNSConfig: &swarm.DNSConfig{},
 			Env:       []string{"TAG=" + getTagFromEnv()},
-			Image:     GetImage("ramrodpcp/backend-controller"),
+			Image:     "ramrodpcp/backend-controller:test",
 			Mounts: []mount.Mount{
 				mount.Mount{
 					Type:   mount.TypeBind,

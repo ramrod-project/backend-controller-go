@@ -15,11 +15,11 @@ import (
 func checkDB(timeout time.Duration) bool {
 	// Verify db connection
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
 
 	done := func() <-chan struct{} {
 		con := make(chan struct{})
 		go func() {
-			defer cancel()
 			for {
 				select {
 				case <-ctx.Done():
@@ -30,6 +30,7 @@ func checkDB(timeout time.Duration) bool {
 				}
 				session, err := r.Connect(r.ConnectOpts{
 					Address: rethink.GetRethinkHost(),
+					Timeout: 3 * time.Second,
 				})
 				if err == nil {
 					_, err := r.DB("Controller").Table("Plugins").Run(session)
@@ -39,14 +40,13 @@ func checkDB(timeout time.Duration) bool {
 						return
 					}
 				}
-				time.Sleep(1000 * time.Millisecond)
+				time.Sleep(100 * time.Millisecond)
 			}
 		}()
 		return con
 	}()
 	select {
 	case <-ctx.Done():
-		<-done
 		return false
 	case <-done:
 		log.Printf("success: brain connection verified")
