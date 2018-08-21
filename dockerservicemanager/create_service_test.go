@@ -16,9 +16,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// TODO:
+// get leader node IP to use to verify tests
+
 func Test_CreatePluginService(t *testing.T) {
 
-	ctx := context.TODO()
+	ctx := context.Background()
 	dockerClient, err := client.NewEnvClient()
 	if err != nil {
 		t.Errorf("%v", err)
@@ -154,6 +157,16 @@ func Test_generateServiceSpec(t *testing.T) {
 		second          = time.Second
 	)
 
+	ctx := context.Background()
+	dockerClient, err := client.NewEnvClient()
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+
+	nodeInspect, err := dockerClient.NodeList(ctx, types.NodeListOptions{})
+	nodeIP := nodeInspect[0].Status.Addr
+
 	tag := os.Getenv("TAG")
 	if tag == "" {
 		tag = "latest"
@@ -233,6 +246,80 @@ func Test_generateServiceSpec(t *testing.T) {
 						Protocol:      swarm.PortConfigProtocolTCP,
 						TargetPort:    666,
 						PublishedPort: 666,
+						PublishMode:   swarm.PortConfigPublishModeIngress,
+					}},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Good config (win)",
+			args: args{
+				config: &PluginServiceConfig{
+					Environment: []string{
+						"STAGE=PROD",
+						"LOGLEVEL=DEBUG",
+						"PORT=777",
+						"PLUGIN=GoodPluginWin",
+					},
+					Network: "goodnet",
+					OS:      "nt",
+					Ports: []swarm.PortConfig{swarm.PortConfig{
+						Protocol:      swarm.PortConfigProtocolUDP,
+						TargetPort:    777,
+						PublishedPort: 777,
+						PublishMode:   swarm.PortConfigPublishModeIngress,
+					}},
+					ServiceName: "GoodServiceWin",
+				},
+			},
+			want: &swarm.ServiceSpec{
+				Annotations: swarm.Annotations{
+					Name: "GoodServiceWin",
+				},
+				TaskTemplate: swarm.TaskSpec{
+					ContainerSpec: swarm.ContainerSpec{
+						DNSConfig: &swarm.DNSConfig{},
+						Env: []string{
+							"STAGE=PROD",
+							"LOGLEVEL=DEBUG",
+							"PORT=777",
+							"PLUGIN=GoodPluginWin",
+							"RETHINK_HOST=" + nodeIP,
+						},
+						Healthcheck: &container.HealthConfig{
+							Interval: time.Second,
+							Timeout:  time.Second * 3,
+							Retries:  3,
+						},
+						Image:           "ramrodpcp/interpreter-plugin-windows:" + tag,
+						StopGracePeriod: &second,
+						Hosts:           []string{hostString("rethinkdb", nodeIP)},
+					},
+					RestartPolicy: &swarm.RestartPolicy{
+						Condition:   "on-failure",
+						MaxAttempts: &maxAttempts,
+					},
+					Placement: &swarm.Placement{
+						Constraints: []string{"node.labels.os==nt"},
+					},
+					Networks: []swarm.NetworkAttachmentConfig{
+						swarm.NetworkAttachmentConfig{
+							Target: "goodnet",
+						},
+					},
+				},
+				Mode: swarm.ServiceMode{
+					Replicated: &swarm.ReplicatedService{
+						Replicas: &replicas,
+					},
+				},
+				EndpointSpec: &swarm.EndpointSpec{
+					Mode: swarm.ResolutionModeVIP,
+					Ports: []swarm.PortConfig{swarm.PortConfig{
+						Protocol:      swarm.PortConfigProtocolUDP,
+						TargetPort:    777,
+						PublishedPort: 777,
 						PublishMode:   swarm.PortConfigPublishModeIngress,
 					}},
 				},
@@ -320,4 +407,62 @@ func Test_getTagFromEnv(t *testing.T) {
 		})
 	}
 	os.Setenv("TAG", oldEnvTag)
+}
+
+func Test_getManagerIP(t *testing.T) {
+
+	ctx := context.TODO()
+	dockerClient, err := client.NewEnvClient()
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+
+	nodeInspect, err := dockerClient.NodeList(ctx, types.NodeListOptions{})
+	nodeIP := nodeInspect[0].Status.Addr
+
+	tests := []struct {
+		name string
+		want string
+	}{
+		{
+			name: "get ip",
+			want: nodeIP,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := getManagerIP(); got != tt.want {
+				t.Errorf("getManagerIP() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_hostString(t *testing.T) {
+	type args struct {
+		h string
+		i string
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			name: "test 1",
+			args: args{
+				h: "rethinkdb",
+				i: "127.0.0.1",
+			},
+			want: "rethinkdb:127.0.0.1",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := hostString(tt.args.h, tt.args.i); got != tt.want {
+				t.Errorf("hostString() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }
