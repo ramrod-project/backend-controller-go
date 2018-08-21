@@ -2,7 +2,7 @@
 
 ./cc-test-reporter before-build 
 for pkg in $(go list ./... | grep -v main); do
-    if [[ $pkg == "test" ]]; then
+    if [[ $pkg == "github.com/ramrod-project/backend-controller-go/test" ]]; then
         continue
     fi
     go test -v -parallel 1 -coverprofile=$(echo $pkg | tr / -).cover $pkg
