@@ -1,38 +1,52 @@
 package rethink
 
 import (
-	"log"
+	"fmt"
 
 	events "github.com/docker/docker/api/types/events"
 	r "gopkg.in/gorethink/gorethink.v4"
 )
 
-func handleEvent(event events.Message, session *r.Session) (r.WriteResponse, error) {
-	log.Printf("Event received: %v", event)
+func handleEvent(event events.Message, session *r.Session) error {
+	filter := make(map[string]string)
+	update := make(map[string]string)
+	if v, ok := event.Actor.Attributes["name"]; ok {
+		filter["ServiceName"] = v
+	} else {
+		return fmt.Errorf("no Name Attribute")
+	}
 	if val, ok := event.Actor.Attributes["updatestate.new"]; ok {
-		filter := make(map[string]string)
-		update := make(map[string]string)
-		filter["ServiceName"] = event.Actor.Attributes["name"]
+		update["DesiredState"] = ""
 		if val == "updating" {
 			update["State"] = "Restarting"
 		} else if val == "completed" {
 			update["State"] = "Active"
 		}
-		res, err := r.DB("Controller").Table("Plugins").Filter(filter).Update(update).RunWrite(session)
-		return res, err
+		_, err := r.DB("Controller").Table("Plugins").Filter(filter).Update(update).RunWrite(session)
+		return err
+	} else if event.Action == "create" {
+		update["State"] = "Active"
+		update["ServiceID"] = event.Actor.ID
+		update["DesiredState"] = ""
+		_, err := r.DB("Controller").Table("Plugins").Filter(filter).Update(update).RunWrite(session)
+		return err
+	} else if event.Action == "remove" {
+		update["State"] = "Stopped"
+		update["DesiredState"] = ""
+		_, err := r.DB("Controller").Table("Plugins").Filter(filter).Update(update).RunWrite(session)
+		return err
 	}
-	return r.WriteResponse{}, nil
+	return nil
 }
 
 // EventUpdate consumes the event channel from the docker
 // client event monitor. If handles events (one by one at
 // the moment) and updates the database as they are recieved.
-func EventUpdate(in <-chan events.Message) (<-chan r.WriteResponse, <-chan error) {
+func EventUpdate(in <-chan events.Message) <-chan error {
 	outErr := make(chan error)
-	outDB := make(chan r.WriteResponse)
 
 	session, err := r.Connect(r.ConnectOpts{
-		Address: "127.0.0.1",
+		Address: GetRethinkHost(),
 	})
 	if err != nil {
 		panic(err)
@@ -40,11 +54,12 @@ func EventUpdate(in <-chan events.Message) (<-chan r.WriteResponse, <-chan error
 
 	go func(in <-chan events.Message) {
 		for event := range in {
-			response, err := handleEvent(event, session)
-			outDB <- response
-			outErr <- err
+			err := handleEvent(event, session)
+			if err != nil {
+				outErr <- err
+			}
 		}
 	}(in)
 
-	return outDB, outErr
+	return outErr
 }
