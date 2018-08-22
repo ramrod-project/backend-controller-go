@@ -28,7 +28,6 @@ func remove(arr []string, element string) []string {
 func getCurrentEntry(IPaddr string, session *r.Session) map[string]interface{} {
 	filter := make(map[string]interface{})
 	filter["Interface"] = IPaddr
-	log.Printf("\ngetting the data\n")
 	entry, _ := r.DB("Controller").Table("Ports").Filter(filter).Run(session)
 	var port map[string]interface{}
 	entry.Next(&port)
@@ -43,7 +42,6 @@ func AddPort(IPaddr string, newPort string, protocol string, session *r.Session)
 		newTCP []string
 		newUDP []string
 	)
-	log.Printf("\ngetting the entry\n")
 	port = getCurrentEntry(IPaddr, session)
 
 	for _, tcpPort := range port["TCPPorts"].([]interface{}) {
@@ -113,7 +111,6 @@ func RemovePort(IPaddr string, remPort string, protocol string, session *r.Sessi
 	}
 	// update entry
 	resp, err := r.DB("Controller").Table("Ports").Get(port["id"]).Update(port).RunWrite(session)
-	log.Printf("removed: %+v", resp)
 	if err != nil {
 		log.Printf("%v", err)
 		return err
