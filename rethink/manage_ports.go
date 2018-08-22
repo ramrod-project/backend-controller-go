@@ -39,7 +39,7 @@ func getCurrentEntry(IPaddr string, session *r.Session) map[string]interface{} {
 // there was a duplicate
 func AddPort(IPaddr string, newPort string, protocol string) error {
 	session, err := r.Connect(r.ConnectOpts{
-		Address: GetRethinkHost(),
+		Address: "127.0.0.1",
 	})
 	if err != nil {
 		return err
@@ -89,7 +89,7 @@ func AddPort(IPaddr string, newPort string, protocol string) error {
 // there was a duplicate
 func RemovePort(IPaddr string, remPort string, protocol string) error {
 	session, err := r.Connect(r.ConnectOpts{
-		Address: GetRethinkHost(),
+		Address: "127.0.0.1",
 	})
 	if err != nil {
 		return err
