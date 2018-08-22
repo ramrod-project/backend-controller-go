@@ -137,7 +137,7 @@ func DockerCleanUp(ctx context.Context, dockerClient *client.Client, net string)
 						continue L
 					}
 					for _, n := range netList {
-						if n.Name == net {
+						if n.ID == net {
 							continue L
 						}
 					}
