@@ -472,6 +472,7 @@ func Test_Integration(t *testing.T) {
 							if _, ok := d["new_val"]; !ok {
 								break
 							}
+							log.Printf("%+v", d["new_val"])
 							if d["new_val"].(map[string]interface{})["Interface"].(string) != dockerservicemanager.GetManagerIP() {
 								break
 							}
