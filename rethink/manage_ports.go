@@ -37,7 +37,14 @@ func getCurrentEntry(IPaddr string, session *r.Session) map[string]interface{} {
 
 // AddPort adds a port to the Ports table. it returns an error if
 // there was a duplicate
-func AddPort(IPaddr string, newPort string, protocol string, session *r.Session) error {
+func AddPort(IPaddr string, newPort string, protocol string) error {
+	session, err := r.Connect(r.ConnectOpts{
+		Address: GetRethinkHost(),
+	})
+	if err != nil {
+		return err
+	}
+
 	var (
 		port   map[string]interface{}
 		newTCP []string
@@ -70,7 +77,7 @@ func AddPort(IPaddr string, newPort string, protocol string, session *r.Session)
 	}
 	//update the entry
 	log.Printf("\nupdating\n")
-	_, err := r.DB("Controller").Table("Ports").Get(port["id"]).Update(port).RunWrite(session)
+	_, err = r.DB("Controller").Table("Ports").Get(port["id"]).Update(port).RunWrite(session)
 	if err != nil {
 		log.Printf("%v", err)
 		return err
@@ -80,13 +87,13 @@ func AddPort(IPaddr string, newPort string, protocol string, session *r.Session)
 
 // RemovePort removes a port to the Ports table. it returns an error if
 // there was a duplicate
-func RemovePort(IPaddr string, remPort string, protocol string, session *r.Session) error {
-	// session, err := r.Connect(r.ConnectOpts{
-	// 	Address: getRethinkHost(),
-	// })
-	// if err != nil {
-	// 	return err
-	// }
+func RemovePort(IPaddr string, remPort string, protocol string) error {
+	session, err := r.Connect(r.ConnectOpts{
+		Address: GetRethinkHost(),
+	})
+	if err != nil {
+		return err
+	}
 
 	// get current entry
 	var (
@@ -118,8 +125,8 @@ func RemovePort(IPaddr string, remPort string, protocol string, session *r.Sessi
 		log.Printf("%v", err)
 		return err
 	}
-	if resp.Unchanged == 1 {
-		return errors.New("port doesn't exits")
-	}
+	// if resp.Unchanged == 1 {
+	// 	return errors.New("port doesn't exits")
+	// }
 	return nil
 }

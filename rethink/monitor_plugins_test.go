@@ -33,7 +33,7 @@ func Test_newPlugin(t *testing.T) {
 					"ServiceName":   "TestPlugin-5000",
 					"DesiredState":  "",
 					"State":         "Available",
-					"Interface":       "192.168.1.1",
+					"Interface":     "192.168.1.1",
 					"ExternalPorts": []interface{}{"5000/tcp"},
 					"InternalPorts": []interface{}{"5000/tcp"},
 					"OS":            "all",
@@ -63,7 +63,7 @@ func Test_newPlugin(t *testing.T) {
 					"ServiceName":   "",
 					"DesiredState":  "",
 					"State":         "Available",
-					"Interface":       "192.168.1.1",
+					"Interface":     "192.168.1.1",
 					"ExternalPorts": []interface{}{"5000/tcp"},
 					"InternalPorts": []interface{}{"5000/tcp"},
 					"OS":            "all",
@@ -83,7 +83,7 @@ func Test_newPlugin(t *testing.T) {
 					"ServiceName":   "TestPlugin-5000",
 					"DesiredState":  "blah",
 					"State":         "Available",
-					"Interface":       "192.168.1.1",
+					"Interface":     "192.168.1.1",
 					"ExternalPorts": []interface{}{"5000/tcp"},
 					"InternalPorts": []interface{}{"5000/tcp"},
 					"OS":            "all",
@@ -103,7 +103,7 @@ func Test_newPlugin(t *testing.T) {
 					"ServiceName":   "TestPlugin-5000",
 					"DesiredState":  "",
 					"State":         "",
-					"Interface":       "192.168.1.1",
+					"Interface":     "192.168.1.1",
 					"ExternalPorts": []interface{}{"5000/tcp"},
 					"InternalPorts": []interface{}{"5000/tcp"},
 					"OS":            "all",
@@ -123,7 +123,7 @@ func Test_newPlugin(t *testing.T) {
 					"ServiceName":   "TestPlugin-5005",
 					"DesiredState":  "Restart",
 					"State":         "Active",
-					"Interface":       "192.168.1.1",
+					"Interface":     "192.168.1.1",
 					"ExternalPorts": []interface{}{"5005/tcp", "5006/tcp", "5007/tcp", "5008/tcp"},
 					"InternalPorts": []interface{}{"5005/tcp", "5006/tcp", "5007/tcp", "5008/tcp"},
 					"OS":            "nt",
@@ -182,7 +182,7 @@ func Test_watchChanges(t *testing.T) {
 		"ServiceName":   "",
 		"DesiredState":  string(DesiredStateNull),
 		"State":         string(StateAvailable),
-		"Interface":       "192.168.1.1",
+		"Interface":     "192.168.1.1",
 		"ExternalPorts": []string{"1080/tcp"},
 		"InternalPorts": []string{"1080/tcp"},
 		"OS":            string(PluginOSAll),
@@ -412,7 +412,7 @@ func TestMonitorPlugins(t *testing.T) {
 				"ServiceName":   "TestPlugin1Service",
 				"DesiredState":  "",
 				"State":         "Available",
-				"Interface":       "192.168.1.1",
+				"Interface":     "192.168.1.1",
 				"ExternalPorts": []interface{}{"999/tcp"},
 				"InternalPorts": []interface{}{"999/tcp"},
 				"OS":            "nt",
@@ -439,7 +439,7 @@ func TestMonitorPlugins(t *testing.T) {
 				"ServiceName":   "TestPlugin2Service",
 				"DesiredState":  "",
 				"State":         "Available",
-				"Interface":       "192.168.1.2",
+				"Interface":     "192.168.1.2",
 				"ExternalPorts": []interface{}{"444/tcp", "444/udp"},
 				"InternalPorts": []interface{}{"444/tcp", "444/udp"},
 				"OS":            "all",
@@ -585,7 +585,7 @@ func Test_getRethinkHost(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			os.Setenv("STAGE", tt.env)
-			if got := getRethinkHost(); got != tt.want {
+			if got := GetRethinkHost(); got != tt.want {
 				t.Errorf("getRethinkHost() = %v, want %v", got, tt.want)
 			}
 		})
