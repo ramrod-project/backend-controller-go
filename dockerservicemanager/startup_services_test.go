@@ -48,10 +48,12 @@ func TestStartupServices(t *testing.T) {
 		return
 	}
 
-	netRes, err := dockerClient.NetworkCreate(ctx, "pcp", types.NetworkCreate{
-		Driver:     "overlay",
-		Attachable: true,
-	})
+	// Set up clean environment
+	if err := test.DockerCleanUp(ctx, dockerClient, ""); err != nil {
+		t.Errorf("setup error: %v", err)
+	}
+
+	netID, err := test.CheckCreateNet("pcp")
 	if err != nil {
 		t.Errorf("%v", err)
 		return
@@ -225,7 +227,6 @@ func TestStartupServices(t *testing.T) {
 							log.Println(fmt.Errorf("%v", e))
 							return false
 						case d := <-changeChan:
-							log.Printf("change: %+v", d)
 							if _, ok := d["Interface"]; ok {
 								if d["Interface"].(string) != "" {
 									break
@@ -345,7 +346,7 @@ func TestStartupServices(t *testing.T) {
 	}
 
 	test.KillService(ctx, dockerClient, brainID)
-	test.DockerCleanUp(ctx, dockerClient, netRes.ID)
+	test.DockerCleanUp(ctx, dockerClient, netID)
 	os.Setenv("START_HARNESS", oldHarness)
 	os.Setenv("START_AUX", oldAux)
 	os.Setenv("STAGE", oldStage)

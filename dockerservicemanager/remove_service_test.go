@@ -35,10 +35,12 @@ func TestRemovePluginService(t *testing.T) {
 		return
 	}
 
-	netRes, err := dockerClient.NetworkCreate(ctx, "test_remove", types.NetworkCreate{
-		Driver:     "overlay",
-		Attachable: true,
-	})
+	// Set up clean environment
+	if err := test.DockerCleanUp(ctx, dockerClient, ""); err != nil {
+		t.Errorf("setup error: %v", err)
+	}
+
+	netID, err := test.CheckCreateNet("test_remove")
 	if err != nil {
 		t.Errorf("%v", err)
 		return
@@ -134,7 +136,7 @@ func TestRemovePluginService(t *testing.T) {
 	}
 
 	//Docker cleanup
-	if err := test.DockerCleanUp(ctx, dockerClient, netRes.ID); err != nil {
+	if err := test.DockerCleanUp(ctx, dockerClient, netID); err != nil {
 		t.Errorf("cleanup error: %v", err)
 	}
 }

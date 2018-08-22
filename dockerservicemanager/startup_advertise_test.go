@@ -116,6 +116,11 @@ func Test_advertiseIPs(t *testing.T) {
 		return
 	}
 
+	// Set up clean environment
+	if err := test.DockerCleanUp(ctx, dockerClient, ""); err != nil {
+		t.Errorf("setup error: %v", err)
+	}
+
 	session, brainID, err := test.StartBrain(ctx, t, dockerClient, test.BrainSpec)
 	if err != nil {
 		t.Errorf("%v", err)
@@ -316,6 +321,11 @@ func Test_advertisePlugins(t *testing.T) {
 		return
 	}
 
+	// Set up clean environment
+	if err := test.DockerCleanUp(ctx, dockerClient, ""); err != nil {
+		t.Errorf("setup error: %v", err)
+	}
+
 	session, brainID, err := test.StartBrain(ctx, t, dockerClient, test.BrainSpec)
 	if err != nil {
 		t.Errorf("%v", err)
@@ -462,22 +472,6 @@ func Test_advertisePlugins(t *testing.T) {
 
 	test.DockerCleanUp(ctx, dockerClient, "")
 }
-
-/*func TestPluginAdvertise(t *testing.T) {
-	tests := []struct {
-		name    string
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-	}
-	for tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if err := PluginAdvertise(); (err != nil) != tt.wantErr {
-				t.Errorf("PluginAdvertise() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}*/
 
 func Test_advertiseStartupService(t *testing.T) {
 	oldEnv := os.Getenv("STAGE")
@@ -628,7 +622,10 @@ func Test_advertiseStartupService(t *testing.T) {
 	test.KillService(ctx, dockerClient, brainID)
 	os.Setenv("STAGE", oldEnv)
 
-	test.DockerCleanUp(ctx, dockerClient, "")
+	//Docker cleanup
+	if err := test.DockerCleanUp(ctx, dockerClient, ""); err != nil {
+		t.Errorf("cleanup error: %v", err)
+	}
 }
 
 func Test_getLeaderHostname(t *testing.T) {

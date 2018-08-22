@@ -186,13 +186,15 @@ func Test_selectChange(t *testing.T) {
 		return
 	}
 
+	// Set up clean environment
+	if err := test.DockerCleanUp(ctx, dockerClient, ""); err != nil {
+		t.Errorf("setup error: %v", err)
+	}
+
 	nodeInspect, err := dockerClient.NodeList(ctx, types.NodeListOptions{})
 	nodeIP := nodeInspect[0].Status.Addr
 
-	netRes, err := dockerClient.NetworkCreate(ctx, "pcp", types.NetworkCreate{
-		Driver:     "overlay",
-		Attachable: true,
-	})
+	netID, err := test.CheckCreateNet("pcp")
 	if err != nil {
 		t.Errorf("%v", err)
 		return
@@ -326,7 +328,7 @@ func Test_selectChange(t *testing.T) {
 				if service.Spec.Annotations.Name == tt.args.plugin.ServiceName {
 					found = true
 					err = nil
-					err = validateService(tt.args.plugin, service, netRes.ID)
+					err = validateService(tt.args.plugin, service, netID)
 					if err != nil {
 						t.Errorf("%v", err)
 						return
@@ -338,7 +340,7 @@ func Test_selectChange(t *testing.T) {
 	}
 
 	//Docker cleanup
-	if err := test.DockerCleanUp(ctx, dockerClient, netRes.ID); err != nil {
+	if err := test.DockerCleanUp(ctx, dockerClient, netID); err != nil {
 		t.Errorf("cleanup error: %v", err)
 	}
 }

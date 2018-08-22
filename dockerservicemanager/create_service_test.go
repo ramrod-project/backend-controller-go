@@ -3,7 +3,6 @@ package dockerservicemanager
 import (
 	"context"
 	"errors"
-	"log"
 	"os"
 	"testing"
 	"time"
@@ -28,10 +27,12 @@ func Test_CreatePluginService(t *testing.T) {
 		return
 	}
 
-	netRes, err := dockerClient.NetworkCreate(ctx, "test_create", types.NetworkCreate{
-		Driver:     "overlay",
-		Attachable: true,
-	})
+	// Set up clean environment
+	if err := test.DockerCleanUp(ctx, dockerClient, ""); err != nil {
+		t.Errorf("setup error: %v", err)
+	}
+
+	netID, err := test.CheckCreateNet("test_create")
 	if err != nil {
 		t.Errorf("%v", err)
 		return
@@ -138,13 +139,11 @@ func Test_CreatePluginService(t *testing.T) {
 				assert.Equal(t, tt.err, err)
 			}
 			assert.Equal(t, tt.want.Warnings, got.Warnings)
-			log.Printf("Warnings: %v\n", got.Warnings)
-			log.Printf("ID created: %v\n\n", got.ID)
 			generatedIDs[i] = got.ID
 		})
 	}
 	//Docker cleanup
-	if err := test.DockerCleanUp(ctx, dockerClient, netRes.ID); err != nil {
+	if err := test.DockerCleanUp(ctx, dockerClient, netID); err != nil {
 		t.Errorf("cleanup error: %v", err)
 	}
 }
