@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log"
 
+	"github.com/docker/docker/api/types/swarm"
 	r "gopkg.in/gorethink/gorethink.v4"
 )
 
@@ -28,7 +29,6 @@ func remove(arr []string, element string) []string {
 func getCurrentEntry(IPaddr string, session *r.Session) map[string]interface{} {
 	filter := make(map[string]interface{})
 	filter["Interface"] = IPaddr
-	log.Printf("\ngetting the data\n")
 	entry, _ := r.DB("Controller").Table("Ports").Filter(filter).Run(session)
 	var port map[string]interface{}
 	entry.Next(&port)
@@ -37,7 +37,7 @@ func getCurrentEntry(IPaddr string, session *r.Session) map[string]interface{} {
 
 // AddPort adds a port to the Ports table. it returns an error if
 // there was a duplicate
-func AddPort(IPaddr string, newPort string, protocol string) error {
+func AddPort(IPaddr string, newPort string, protocol swarm.PortConfigProtocol) error {
 	session, err := r.Connect(r.ConnectOpts{
 		Address: "127.0.0.1",
 	})
@@ -50,7 +50,6 @@ func AddPort(IPaddr string, newPort string, protocol string) error {
 		newTCP []string
 		newUDP []string
 	)
-	log.Printf("\ngetting the entry\n")
 	port = getCurrentEntry(IPaddr, session)
 
 	for _, tcpPort := range port["TCPPorts"].([]interface{}) {
@@ -61,13 +60,12 @@ func AddPort(IPaddr string, newPort string, protocol string) error {
 	}
 
 	//update the ports
-	log.Printf("\nreplacing\n")
-	if protocol == "tcp" {
+	if protocol == swarm.PortConfigProtocolTCP {
 		if contains(newTCP, newPort) {
 			return errors.New("port already in use")
 		}
 		port["TCPPorts"] = append(newTCP, newPort)
-	} else if protocol == "udp" {
+	} else if protocol == swarm.PortConfigProtocolUDP {
 		if contains(newUDP, newPort) {
 			return errors.New("port already in use")
 		}
@@ -76,7 +74,6 @@ func AddPort(IPaddr string, newPort string, protocol string) error {
 		return errors.New("only tcp and udp are supported protocols")
 	}
 	//update the entry
-	log.Printf("\nupdating\n")
 	_, err = r.DB("Controller").Table("Ports").Get(port["id"]).Update(port).RunWrite(session)
 	if err != nil {
 		log.Printf("%v", err)
@@ -87,7 +84,7 @@ func AddPort(IPaddr string, newPort string, protocol string) error {
 
 // RemovePort removes a port to the Ports table. it returns an error if
 // there was a duplicate
-func RemovePort(IPaddr string, remPort string, protocol string) error {
+func RemovePort(remPort string, protocol swarm.PortConfigProtocol) error {
 	session, err := r.Connect(r.ConnectOpts{
 		Address: "127.0.0.1",
 	})
@@ -101,7 +98,11 @@ func RemovePort(IPaddr string, remPort string, protocol string) error {
 		newTCP []string
 		newUDP []string
 	)
-	port = getCurrentEntry(IPaddr, session)
+	entry, _ := r.DB("Controller").Table("Ports").Filter(func(row r.Term) interface{} {
+		return r.Expr([]string{}).Contains(row.Field(remPort))
+	}).Run(session)
+	entry.Next(&port)
+	// port = getCurrentEntry(IPaddr, session)
 
 	for _, tcpPort := range port["TCPPorts"].([]interface{}) {
 		newTCP = append(newTCP, tcpPort.(string))
@@ -111,16 +112,15 @@ func RemovePort(IPaddr string, remPort string, protocol string) error {
 	}
 
 	// update ports
-	if protocol == "tcp" {
+	if protocol == swarm.PortConfigProtocolTCP {
 		port["TCPPorts"] = remove(newTCP, remPort)
-	} else if protocol == "udp" {
+	} else if protocol == swarm.PortConfigProtocolUDP {
 		port["UDPPorts"] = remove(newUDP, remPort)
 	} else {
 		return errors.New("only tcp and udp are supported protocols")
 	}
 	// update entry
-	resp, err := r.DB("Controller").Table("Ports").Get(port["id"]).Update(port).RunWrite(session)
-	log.Printf("removed: %+v", resp)
+	_, err = r.DB("Controller").Table("Ports").Get(port["id"]).Update(port).RunWrite(session)
 	if err != nil {
 		log.Printf("%v", err)
 		return err

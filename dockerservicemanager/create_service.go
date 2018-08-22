@@ -193,6 +193,11 @@ func CreatePluginService(config *PluginServiceConfig) (types.ServiceCreateRespon
 	resp, err := dockerClient.ServiceCreate(ctx, *serviceSpec, types.ServiceCreateOptions{})
 	log.Printf("Started service %+v", resp)
 
+	//update ports
+	for _, port := range config.Ports {
+		rethink.AddPort(config.Address, string(port.PublishedPort), string(port.Protocol))
+	}
+
 	return resp, err
 
 }
