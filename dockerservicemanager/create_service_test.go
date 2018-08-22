@@ -411,7 +411,7 @@ func Test_getTagFromEnv(t *testing.T) {
 
 func Test_getManagerIP(t *testing.T) {
 
-	ctx := context.TODO()
+	ctx := context.Background()
 	dockerClient, err := client.NewEnvClient()
 	if err != nil {
 		t.Errorf("%v", err)

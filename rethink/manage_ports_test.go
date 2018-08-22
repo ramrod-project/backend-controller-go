@@ -14,7 +14,7 @@ import (
 )
 
 func TestAddPort(t *testing.T) {
-	ctx := context.TODO()
+	ctx := context.Background()
 	dockerClient, err := client.NewEnvClient()
 	if err != nil {
 		t.Errorf("%v", err)
@@ -130,7 +130,7 @@ func TestAddPort(t *testing.T) {
 }
 
 func TestRemovePort(t *testing.T) {
-	ctx := context.TODO()
+	ctx := context.Background()
 	dockerClient, err := client.NewEnvClient()
 	if err != nil {
 		t.Errorf("%v", err)

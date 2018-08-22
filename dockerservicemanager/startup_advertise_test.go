@@ -60,7 +60,7 @@ func Test_getRethinkHost(t *testing.T) {
 
 func Test_getNodes(t *testing.T) {
 
-	ctx := context.TODO()
+	ctx := context.Background()
 	dockerClient, err := client.NewEnvClient()
 	if err != nil {
 		t.Errorf("%v", err)
@@ -109,7 +109,7 @@ func Test_advertiseIPs(t *testing.T) {
 	oldEnv := os.Getenv("STAGE")
 	os.Setenv("STAGE", "TESTING")
 
-	ctx := context.TODO()
+	ctx := context.Background()
 	dockerClient, err := client.NewEnvClient()
 	if err != nil {
 		t.Errorf("%v", err)
@@ -309,7 +309,7 @@ func Test_advertisePlugins(t *testing.T) {
 	oldEnv := os.Getenv("STAGE")
 	os.Setenv("STAGE", "TESTING")
 
-	ctx := context.TODO()
+	ctx := context.Background()
 	dockerClient, err := client.NewEnvClient()
 	if err != nil {
 		t.Errorf("%v", err)

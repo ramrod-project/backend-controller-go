@@ -44,7 +44,7 @@ func dumpEverything(ctx context.Context, t *testing.T, dockerClient *client.Clie
 // Test starting when database is not up
 func Test_IntegrationNoDB(t *testing.T) {
 
-	ctx := context.TODO()
+	ctx := context.Background()
 	dockerClient, err := client.NewEnvClient()
 	if err != nil {
 		t.Errorf("%v", err)
@@ -187,7 +187,7 @@ func Test_IntegrationNoDB(t *testing.T) {
 
 func Test_Integration(t *testing.T) {
 
-	ctx := context.TODO()
+	ctx := context.Background()
 	dockerClient, err := client.NewEnvClient()
 	if err != nil {
 		t.Errorf("%v", err)

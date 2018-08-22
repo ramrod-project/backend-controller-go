@@ -63,7 +63,7 @@ func hostString(h string, i string) string {
 }
 
 func getManagerIP() string {
-	ctx := context.TODO()
+	ctx := context.Background()
 	dockerClient, err := client.NewEnvClient()
 	if err != nil {
 		panic(err)
@@ -173,7 +173,7 @@ func generateServiceSpec(config *PluginServiceConfig) (*swarm.ServiceSpec, error
 func CreatePluginService(config *PluginServiceConfig) (types.ServiceCreateResponse, error) {
 
 	// log.Printf("Entering CreatePluginService")
-	ctx := context.TODO()
+	ctx := context.Background()
 	dockerClient, err := client.NewEnvClient()
 
 	if err != nil {

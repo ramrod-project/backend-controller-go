@@ -17,6 +17,22 @@ import (
 	r "gopkg.in/gorethink/gorethink.v4"
 )
 
+var testServiceSpec = swarm.ServiceSpec{
+	Annotations: swarm.Annotations{
+		Name: "TestService",
+	},
+	TaskTemplate: swarm.TaskSpec{
+		ContainerSpec: swarm.ContainerSpec{
+			DNSConfig: &swarm.DNSConfig{},
+			Image:     "alpine:3.7",
+			Command:   []string{"sleep", "30"},
+		},
+		RestartPolicy: &swarm.RestartPolicy{
+			Condition: "on-failure",
+		},
+	},
+}
+
 func TestStartupServices(t *testing.T) {
 	oldStage := os.Getenv("STAGE")
 	os.Setenv("STAGE", "TESTING")
@@ -333,4 +349,95 @@ func TestStartupServices(t *testing.T) {
 	os.Setenv("START_HARNESS", oldHarness)
 	os.Setenv("START_AUX", oldAux)
 	os.Setenv("STAGE", oldStage)
+}
+
+func Test_checkService(t *testing.T) {
+
+	ctx := context.Background()
+	dockerClient, err := client.NewEnvClient()
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+
+	timeoutCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	up := func(tctx context.Context) <-chan struct{} {
+		res := make(chan struct{})
+		go func() {
+			mes, err := dockerClient.Events(tctx, types.EventsOptions{})
+		L:
+			for {
+				select {
+				case <-tctx.Done():
+					close(res)
+					break L
+				case m := <-mes:
+					if m.Type != "container" {
+						break
+					}
+					if m.Action != "start" {
+						break
+					}
+					if v, ok := m.Actor.Attributes["com.docker.swarm.service.name"]; ok {
+						if v != "TestService" {
+							break
+						}
+					} else {
+						break
+					}
+					res <- struct{}{}
+					return
+				case e := <-err:
+					t.Errorf("%v", e)
+					close(res)
+					break L
+				}
+			}
+			return
+		}()
+		return res
+	}(timeoutCtx)
+
+	testSvc, err := dockerClient.ServiceCreate(ctx, testServiceSpec, types.ServiceCreateOptions{})
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+
+	select {
+	case <-timeoutCtx.Done():
+		t.Errorf("context timed out")
+		test.KillService(ctx, dockerClient, testSvc.ID)
+		return
+	case <-up:
+		break
+	}
+
+	tests := []struct {
+		name    string
+		service string
+		want    bool
+	}{
+		{
+			name:    "find test service",
+			service: "TestService",
+			want:    true,
+		},
+		{
+			name:    "don't find service",
+			service: "FakeService",
+			want:    false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := checkService(tt.service); got != tt.want {
+				t.Errorf("checkService() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+
+	test.KillService(ctx, dockerClient, testSvc.ID)
 }

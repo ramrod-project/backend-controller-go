@@ -179,7 +179,7 @@ func Test_pluginToConfig(t *testing.T) {
 
 func Test_selectChange(t *testing.T) {
 
-	ctx := context.TODO()
+	ctx := context.Background()
 	dockerClient, err := client.NewEnvClient()
 	if err != nil {
 		t.Errorf("%v", err)

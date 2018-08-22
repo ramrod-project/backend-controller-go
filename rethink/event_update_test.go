@@ -16,7 +16,7 @@ import (
 )
 
 func Test_handleEvent(t *testing.T) {
-	ctx := context.TODO()
+	ctx := context.Background()
 	dockerClient, err := client.NewEnvClient()
 	if err != nil {
 		t.Errorf("%v", err)

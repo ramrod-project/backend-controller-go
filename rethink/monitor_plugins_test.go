@@ -163,7 +163,7 @@ func Test_newPlugin(t *testing.T) {
 
 func Test_watchChanges(t *testing.T) {
 
-	ctx := context.TODO()
+	ctx := context.Background()
 	dockerClient, err := client.NewEnvClient()
 	if err != nil {
 		t.Errorf("%v", err)
@@ -382,7 +382,7 @@ func TestMonitorPlugins(t *testing.T) {
 	oldEnv := os.Getenv("STAGE")
 	os.Setenv("STAGE", "TESTING")
 
-	ctx := context.TODO()
+	ctx := context.Background()
 	dockerClient, err := client.NewEnvClient()
 	if err != nil {
 		t.Errorf("%v", err)
