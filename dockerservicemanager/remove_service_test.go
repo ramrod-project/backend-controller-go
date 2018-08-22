@@ -129,6 +129,9 @@ func TestRemovePluginService(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := RemovePluginService(tt.args.serviceID); (err != nil) != tt.wantErr {
 				t.Errorf("RemovePluginService() error = %v, wantErr %v", err, tt.wantErr)
+				if err := test.DockerCleanUp(ctx, dockerClient, netID); err != nil {
+					t.Errorf("cleanup error: %v", err)
+				}
 			} else if tt.wantErr {
 				assert.Equal(t, tt.err, err)
 			}
@@ -137,7 +140,4 @@ func TestRemovePluginService(t *testing.T) {
 
 	//Docker cleanup
 	dockerClient.NetworkRemove(ctx, netID)
-	if err := test.DockerCleanUp(ctx, dockerClient, netID); err != nil {
-		t.Errorf("cleanup error: %v", err)
-	}
 }
