@@ -28,7 +28,7 @@ func TestAddPort(t *testing.T) {
 		t.Errorf("%v", err)
 		return
 	}
-
+	time.Sleep(30 * time.Second)
 	var intBrainSpec = test.BrainSpec
 	intBrainSpec.Networks = []swarm.NetworkAttachmentConfig{
 		swarm.NetworkAttachmentConfig{
@@ -135,7 +135,7 @@ func TestRemovePort(t *testing.T) {
 		t.Errorf("%v", err)
 		return
 	}
-
+	time.Sleep(30 * time.Second)
 	session, brainID, err := test.StartBrain(ctx, t, dockerClient, test.BrainSpec)
 	if err != nil {
 		t.Errorf("%v", err)
