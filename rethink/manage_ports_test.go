@@ -43,7 +43,7 @@ func TestAddPort(t *testing.T) {
 		return
 	}
 
-	time.Sleep(10 * time.Second)
+	time.Sleep(30 * time.Second)
 
 	testPort := map[string]interface{}{
 		"Interface":    "192.168.1.1",
@@ -154,6 +154,9 @@ func TestRemovePort(t *testing.T) {
 		t.Errorf("%v", err)
 		return
 	}
+
+	time.Sleep(30 * time.Second)
+
 	type args struct {
 		IPaddr   string
 		remPort  string
