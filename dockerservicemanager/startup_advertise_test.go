@@ -364,6 +364,7 @@ func Test_advertisePlugins(t *testing.T) {
 
 	tests := []struct {
 		name     string
+		existing map[string]interface{}
 		manifest []ManifestPlugin
 		want     []map[string]interface{}
 		wantErr  bool
@@ -434,6 +435,42 @@ func Test_advertisePlugins(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "Existing plugin",
+			existing: map[string]interface{}{
+				"Name":          "ExistingPlugin",
+				"ServiceID":     "",
+				"ServiceName":   "",
+				"DesiredState":  "",
+				"State":         "Available",
+				"Interface":     "",
+				"ExternalPorts": []string{},
+				"InternalPorts": []string{},
+				"OS":            string(rethink.PluginOSAll),
+				"Environment":   []string{},
+			},
+			manifest: []ManifestPlugin{
+				ManifestPlugin{
+					Name: "ExistingPlugin",
+					OS:   rethink.PluginOSPosix,
+				},
+			},
+			want: []map[string]interface{}{
+				map[string]interface{}{
+					"Name":          "ExistingPlugin",
+					"ServiceID":     "",
+					"ServiceName":   "",
+					"DesiredState":  "",
+					"State":         "Available",
+					"Interface":     "",
+					"ExternalPorts": []string{},
+					"InternalPorts": []string{},
+					"OS":            string(rethink.PluginOSAll),
+					"Environment":   []string{},
+				},
+			},
+			wantErr: false,
+		},
+		{
 			name:     "No plugin",
 			manifest: []ManifestPlugin{},
 			wantErr:  true,
@@ -442,6 +479,13 @@ func Test_advertisePlugins(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.existing != nil {
+				_, err := r.DB("Controller").Table("Plugins").Insert(tt.existing).RunWrite(session)
+				if err != nil {
+					t.Errorf("%v", err)
+					return
+				}
+			}
 			err := advertisePlugins(tt.manifest)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("%v", err)

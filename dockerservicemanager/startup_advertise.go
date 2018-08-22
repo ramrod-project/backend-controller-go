@@ -129,7 +129,9 @@ func getPlugins() ([]ManifestPlugin, error) {
 }
 
 func advertisePlugins(manifest []ManifestPlugin) error {
-	var plugins []map[string]interface{}
+	var (
+		doc map[string]interface{}
+	)
 
 	if len(manifest) < 1 {
 		return errors.New("no plugins to advertise")
@@ -142,8 +144,9 @@ func advertisePlugins(manifest []ManifestPlugin) error {
 		return err
 	}
 
+L:
 	for _, plugin := range manifest {
-		plugins = append(plugins, map[string]interface{}{
+		pluginEntry := map[string]interface{}{
 			"Name":          plugin.Name,
 			"ServiceID":     "",
 			"ServiceName":   "",
@@ -154,10 +157,18 @@ func advertisePlugins(manifest []ManifestPlugin) error {
 			"InternalPorts": []string{},
 			"OS":            string(plugin.OS),
 			"Environment":   []string{},
-		})
+		}
+		cursor, err := r.DB("Controller").Table("Plugins").Run(session)
+		if err != nil {
+			return err
+		}
+		for cursor.Next(&doc) {
+			if doc["Name"].(string) == plugin.Name && doc["ServiceName"] == "" {
+				continue L
+			}
+		}
+		_, err = r.DB("Controller").Table("Plugins").Insert(pluginEntry).RunWrite(session)
 	}
-
-	_, err = r.DB("Controller").Table("Plugins").Insert(plugins).RunWrite(session)
 
 	return err
 
