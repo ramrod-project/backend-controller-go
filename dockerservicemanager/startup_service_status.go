@@ -53,11 +53,15 @@ func serviceToEntry(svc swarm.Service) (map[string]interface{}, error) {
 		res["InternalPorts"].([]string)[i] = concatPort(p.TargetPort, p.Protocol)
 	}
 	res["OS"] = string(rethink.PluginOSPosix)
-	for _, c := range svc.Spec.TaskTemplate.Placement.Constraints {
-		split := strings.Split(c, "==")
-		if split[0] == "node.labels.os" {
-			res["OS"] = split[1]
-			break
+	var null *swarm.Placement
+	if svc.Spec.TaskTemplate.Placement != null {
+		placement := *svc.Spec.TaskTemplate.Placement
+		for _, c := range placement.Constraints {
+			split := strings.Split(c, "==")
+			if split[0] == "node.labels.os" {
+				res["OS"] = split[1]
+				break
+			}
 		}
 	}
 	res["Environment"] = []string{}
