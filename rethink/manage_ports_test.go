@@ -2,7 +2,6 @@ package rethink
 
 import (
 	"context"
-	"errors"
 	"testing"
 	"time"
 
@@ -182,8 +181,7 @@ func TestRemovePort(t *testing.T) {
 				remPort:  "6003",
 				protocol: "tcp",
 			},
-			err:     errors.New("port doesn't exits"),
-			wantErr: true,
+			wantErr: false,
 		},
 		{
 			name: "delete the last port",
@@ -201,8 +199,7 @@ func TestRemovePort(t *testing.T) {
 				remPort:  "9000",
 				protocol: "udp",
 			},
-			err:     errors.New("port doesn't exits"),
-			wantErr: true,
+			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
