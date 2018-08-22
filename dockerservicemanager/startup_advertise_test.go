@@ -131,10 +131,11 @@ func Test_advertiseIPs(t *testing.T) {
 		entries []map[string]interface{}
 	}
 	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
-		err     error
+		name     string
+		existing map[string]interface{}
+		args     args
+		wantErr  bool
+		err      error
 	}{
 		{
 			name: "One node",
@@ -171,6 +172,27 @@ func Test_advertiseIPs(t *testing.T) {
 					},
 				},
 			},
+		},
+		{
+			name: "Existing node",
+			existing: map[string]interface{}{
+				"Interface":    "10.0.0.1",
+				"NodeHostName": "ubuntu",
+				"OS":           "posix",
+				"TCPPorts":     []string{},
+				"UDPPorts":     []string{},
+			},
+			args: args{
+				entries: []map[string]interface{}{
+					map[string]interface{}{
+						"Interface":    "10.0.0.3",
+						"NodeHostName": "ubuntu",
+						"OS":           "posix",
+						"TCPPorts":     []string{},
+						"UDPPorts":     []string{},
+					},
+				},
+			},
 			wantErr: false,
 		},
 		{
@@ -184,6 +206,14 @@ func Test_advertiseIPs(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.existing != nil {
+				_, err := r.DB("Controller").Table("Ports").Insert(tt.existing).RunWrite(session)
+				if err != nil {
+					t.Errorf("Rethink error: %v", err)
+					return
+				}
+				time.Sleep(time.Second)
+			}
 			if err := advertiseIPs(tt.args.entries); (err != nil) != tt.wantErr {
 				t.Errorf("advertiseIPs() error = %v, wantErr %v", err, tt.wantErr)
 				return

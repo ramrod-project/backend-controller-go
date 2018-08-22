@@ -236,6 +236,25 @@ func advertiseStartupService(service map[string]interface{}) error {
 	return nil
 }
 
+func checkForNode(name string) string {
+	var doc map[string]interface{}
+
+	session, err := r.Connect(r.ConnectOpts{
+		Address: getRethinkHost(),
+	})
+	if err != nil {
+		return ""
+	}
+
+	cursor, err := r.DB("Controller").Table("Ports").Run(session)
+	for cursor.Next(&doc) {
+		if doc["NodeHostName"].(string) == name {
+			return doc["id"].(string)
+		}
+	}
+	return ""
+}
+
 func advertiseIPs(entries []map[string]interface{}) error {
 
 	if len(entries) < 1 {
@@ -249,7 +268,13 @@ func advertiseIPs(entries []map[string]interface{}) error {
 		return err
 	}
 
-	_, err = r.DB("Controller").Table("Ports").Insert(entries).RunWrite(session)
+	for _, e := range entries {
+		if resID := checkForNode(e["NodeHostName"].(string)); resID == "" {
+			_, err = r.DB("Controller").Table("Ports").Insert(e).RunWrite(session)
+		} else {
+			_, err = r.DB("Controller").Table("Ports").Get(resID).Update(e).RunWrite(session)
+		}
+	}
 
 	return err
 }
