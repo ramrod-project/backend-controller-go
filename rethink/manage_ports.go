@@ -24,7 +24,7 @@ func GetIPFromID(servID string) string {
 	return addr
 }
 
-func contains(arr []string, element string) bool {
+func Contains(arr []string, element string) bool {
 	for _, i := range arr {
 		if i == element {
 			return true
@@ -77,12 +77,12 @@ func AddPort(IPaddr string, newPort string, protocol swarm.PortConfigProtocol) e
 
 	//update the ports
 	if protocol == swarm.PortConfigProtocolTCP {
-		if contains(newTCP, newPort) {
+		if Contains(newTCP, newPort) {
 			return errors.New("port already in use")
 		}
 		port["TCPPorts"] = append(newTCP, newPort)
 	} else if protocol == swarm.PortConfigProtocolUDP {
-		if contains(newUDP, newPort) {
+		if Contains(newUDP, newPort) {
 			return errors.New("port already in use")
 		}
 		port["UDPPorts"] = append(newUDP, newPort)

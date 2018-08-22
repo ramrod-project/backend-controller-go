@@ -115,10 +115,10 @@ func TestAddPort(t *testing.T) {
 		newUDP = append(newUDP, udpPort.(string))
 	}
 
-	if !contains(newTCP, "9990") {
+	if !Contains(newTCP, "9990") {
 		t.Errorf("9990 was not added")
 	}
-	if !contains(newUDP, "5178") {
+	if !Contains(newUDP, "5178") {
 		t.Errorf("failed to add to empty string")
 	}
 	test.KillService(ctx, dockerClient, brainID)
@@ -223,7 +223,7 @@ func TestRemovePort(t *testing.T) {
 		newTCP = append(newTCP, tcpPort.(string))
 	}
 
-	if contains(newTCP, "6003") {
+	if Contains(newTCP, "6003") {
 		t.Errorf("port 6003 was not deleted")
 	}
 	test.KillService(ctx, dockerClient, brainID)

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ramrod-project/backend-controller-go/rethink"
+
 	"github.com/docker/docker/api/types"
 	swarm "github.com/docker/docker/api/types/swarm"
 	client "github.com/docker/docker/client"
@@ -94,6 +96,10 @@ func UpdatePluginService(serviceID string, config *PluginServiceConfig) (types.S
 	}
 
 	resp, err := dockerClient.ServiceUpdate(ctx, serviceID, swarm.Version{Index: version}, *serviceSpec, types.ServiceUpdateOptions{})
+	for _, port := range config.Ports {
+		rethink.RemovePort(config.Address, string(port.PublishedPort), port.Protocol)
+		rethink.AddPort(config.Address, string(port.PublishedPort), port.Protocol)
+	}
 
 	return resp, err
 }

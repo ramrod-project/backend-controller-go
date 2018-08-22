@@ -12,6 +12,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/docker/docker/client"
+	"github.com/ramrod-project/backend-controller-go/dockerservicemanager"
 	"github.com/ramrod-project/backend-controller-go/helper"
 	"github.com/ramrod-project/backend-controller-go/rethink"
 	"github.com/stretchr/testify/assert"
@@ -337,8 +338,8 @@ func Test_Integration(t *testing.T) {
 			},
 			wait: func(t *testing.T, timeout time.Duration) bool {
 				var (
-					foundService, dbUpdated, serviceVerify bool = false, false, false
-					targetService                          string
+					foundService, dbUpdated, serviceVerify, portChecked bool = false, false, false, false
+					targetService                                       string
 				)
 
 				// Initialize parent context (with timeout)
@@ -434,6 +435,57 @@ func Test_Integration(t *testing.T) {
 					}
 				})
 
+				portCheck := helper.TimeoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
+					sessionTest, err := r.Connect(r.ConnectOpts{
+						Address: "127.0.0.1",
+					})
+					if err != nil {
+						t.Errorf("%v", err)
+						return false
+					}
+					cntxt := args[0].(context.Context)
+					changeChan, errChan := func(s *r.Session) (<-chan map[string]interface{}, <-chan error) {
+						changes := make(chan map[string]interface{})
+						errs := make(chan error)
+						go func() {
+							cursor, err := r.DB("Controller").Table("Ports").Changes().Run(s)
+							if err != nil {
+								log.Println(fmt.Errorf("%v", err))
+								errs <- err
+							}
+							var doc map[string]interface{}
+							for cursor.Next(&doc) {
+								changes <- doc
+							}
+						}()
+						return changes, errs
+					}(sessionTest)
+
+					for {
+						select {
+						case <-cntxt.Done():
+							return false
+						case e := <-errChan:
+							log.Println(fmt.Errorf("%v", e))
+							return false
+						case d := <-changeChan:
+							if _, ok := d["new_val"]; !ok {
+								break
+							}
+							if d["new_val"].(map[string]interface{})["Interface"].(string) != dockerservicemanager.GetManagerIP() {
+								break
+							}
+							if d["new_val"].(map[string]interface{})["TCPPorts"].([]interface{})[0].(string) != "5000" {
+								break
+							}
+							return true
+						default:
+							break
+						}
+						time.Sleep(100 * time.Millisecond)
+					}
+				})
+
 				defer cancel()
 
 				// for loop that iterates until context <-Done()
@@ -445,6 +497,7 @@ func Test_Integration(t *testing.T) {
 						<-startDocker
 						<-startDockerVerify
 						<-startDB
+						<-portCheck
 						log.Printf("Done (main)")
 						break L
 					case v := <-startDocker:
@@ -511,10 +564,15 @@ func Test_Integration(t *testing.T) {
 							log.Printf("Setting dbUpdated to %v", v)
 							dbUpdated = v
 						}
+					case v := <-portCheck:
+						if v {
+							log.Printf("Setting PortChecked to %v", v)
+							portChecked = v
+						}
 					default:
 						break
 					}
-					if foundService && serviceVerify && dbUpdated {
+					if foundService && serviceVerify && dbUpdated && portChecked {
 						break L
 					}
 					time.Sleep(100 * time.Millisecond)
@@ -529,8 +587,11 @@ func Test_Integration(t *testing.T) {
 				if !dbUpdated {
 					t.Errorf("Docker start db not updated")
 				}
+				if !portChecked {
+					t.Errorf("Ports not found in database")
+				}
 
-				return foundService && serviceVerify && dbUpdated
+				return foundService && serviceVerify && dbUpdated && portChecked
 
 			},
 			timeout: 60 * time.Second,

@@ -62,7 +62,7 @@ func hostString(h string, i string) string {
 	return stringBuf.String()
 }
 
-func getManagerIP() string {
+func GetManagerIP() string {
 	ctx := context.TODO()
 	dockerClient, err := client.NewEnvClient()
 	if err != nil {
@@ -105,8 +105,8 @@ func generateServiceSpec(config *PluginServiceConfig) (*swarm.ServiceSpec, error
 	} else if config.OS == rethink.PluginOSWindows {
 		imageName.Name = "ramrodpcp/interpreter-plugin-windows"
 		placementConfig.Constraints = []string{"node.labels.os==nt"}
-		hosts = append(hosts, hostString("rethinkdb", getManagerIP()))
-		config.Environment = append(config.Environment, "RETHINK_HOST="+getManagerIP())
+		hosts = append(hosts, hostString("rethinkdb", GetManagerIP()))
+		config.Environment = append(config.Environment, "RETHINK_HOST="+GetManagerIP())
 	} else {
 		return &swarm.ServiceSpec{}, fmt.Errorf("invalid OS setting: %v", config.OS)
 	}
