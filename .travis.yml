@@ -47,10 +47,10 @@ before_script:
   - docker network prune -f
 
 script:
-  - docker build -t ramrodpcp/backend-controller:$TAG .
+  - docker build -t ramrodpcp/backend-controller:test .
   - docker network create --driver=overlay pcp
   - docker service create --name rethinkdb --network pcp -p 28015:28015 -e "STAGE=DEV" -e "LOGLEVEL=DEBUG" ramrodpcp/database-brain:$TAG
-  - docker service create --name controller --network pcp -e "STAGE=DEV" -e "LOGLEVEL=DEBUG" -e "TAG=${TAG}" --mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock ramrodpcp/backend-controller:$TAG
+  - docker service create --name controller --network pcp -e "STAGE=DEV" -e "LOGLEVEL=DEBUG" -e "TAG=${TAG}" --mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock ramrodpcp/backend-controller:test
   - sleep 10
   - docker service ls
   - docker service ps --no-trunc controller
@@ -63,6 +63,7 @@ script:
   - go test -v -parallel 1 github.com/ramrod-project/backend-controller-go/test
 
 after_success:
+  - docker tag ramrodpcp/backend-controller:test ramrodpcp/backend-controller:$TAG
   - if [[ "$TRAVIS_PULL_REQUEST" == "false" ]]; 
     then echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin; fi
   - if [[ "$TRAVIS_PULL_REQUEST" == "false"  ]]; 
