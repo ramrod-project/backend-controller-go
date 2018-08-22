@@ -21,7 +21,7 @@ func RemovePluginService(serviceID string) error {
 	serv, _, _ := dockerClient.ServiceInspectWithRaw(ctx, serviceID)
 	//update ports
 	for _, port := range serv.Spec.EndpointSpec.Ports {
-		rethink.RemovePort(string(port.PublishedPort), string(port.Protocol))
+		rethink.RemovePort(rethink.GetIPFromID(serviceID), string(port.PublishedPort), port.Protocol)
 	}
 
 	log.Printf("Removing service %v\n", serviceID)

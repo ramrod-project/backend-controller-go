@@ -195,7 +195,7 @@ func CreatePluginService(config *PluginServiceConfig) (types.ServiceCreateRespon
 
 	//update ports
 	for _, port := range config.Ports {
-		rethink.AddPort(config.Address, string(port.PublishedPort), string(port.Protocol))
+		rethink.AddPort(config.Address, string(port.PublishedPort), port.Protocol)
 	}
 
 	return resp, err

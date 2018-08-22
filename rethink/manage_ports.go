@@ -8,6 +8,22 @@ import (
 	r "gopkg.in/gorethink/gorethink.v4"
 )
 
+func GetIPFromID(servID string) string {
+	session, err := r.Connect(r.ConnectOpts{
+		Address: "127.0.0.1",
+	})
+	if err != nil {
+		return ""
+	}
+	filter := make(map[string]interface{})
+	filter["ServiceID"] = servID
+	entry, _ := r.DB("Controller").Table("Plugins").Filter(filter).Run(session)
+	var res map[string]interface{}
+	entry.Next(&res)
+	addr := res["Interface"].(string)
+	return addr
+}
+
 func contains(arr []string, element string) bool {
 	for _, i := range arr {
 		if i == element {
@@ -84,7 +100,7 @@ func AddPort(IPaddr string, newPort string, protocol swarm.PortConfigProtocol) e
 
 // RemovePort removes a port to the Ports table. it returns an error if
 // there was a duplicate
-func RemovePort(remPort string, protocol swarm.PortConfigProtocol) error {
+func RemovePort(IPaddr string, remPort string, protocol swarm.PortConfigProtocol) error {
 	session, err := r.Connect(r.ConnectOpts{
 		Address: "127.0.0.1",
 	})
@@ -98,11 +114,7 @@ func RemovePort(remPort string, protocol swarm.PortConfigProtocol) error {
 		newTCP []string
 		newUDP []string
 	)
-	entry, _ := r.DB("Controller").Table("Ports").Filter(func(row r.Term) interface{} {
-		return r.Expr([]string{}).Contains(row.Field(remPort))
-	}).Run(session)
-	entry.Next(&port)
-	// port = getCurrentEntry(IPaddr, session)
+	port = getCurrentEntry(IPaddr, session)
 
 	for _, tcpPort := range port["TCPPorts"].([]interface{}) {
 		newTCP = append(newTCP, tcpPort.(string))
