@@ -41,6 +41,150 @@ func dumpEverything(ctx context.Context, t *testing.T, dockerClient *client.Clie
 	}
 }
 
+// Test starting when database is not up
+func Test_IntegrationNoDB(t *testing.T) {
+
+	ctx := context.TODO()
+	dockerClient, err := client.NewEnvClient()
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+
+	netRes, err := dockerClient.NetworkCreate(ctx, "pcp", types.NetworkCreate{
+		Driver:     "overlay",
+		Attachable: true,
+	})
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+	var serviceID string
+
+	tests := []struct {
+		name string
+		run  func(t *testing.T) bool
+		// Used if need to wait for a result to propogate
+		wait func(t *testing.T, timeout time.Duration) bool
+		// Set timeout for wait
+		timeout time.Duration
+	}{
+		{
+			name: "no database",
+			run: func(t *testing.T) bool {
+				serviceID, err = StartIntegrationTestService(ctx, dockerClient, controllerSpec)
+				if err != nil {
+					t.Errorf("%v", err)
+					return false
+				}
+				return true
+			},
+			wait: func(t *testing.T, timeout time.Duration) bool {
+				var (
+					containerDead = false
+				)
+
+				// Initialize parent context (with timeout)
+				timeoutCtx, cancel := context.WithTimeout(context.Background(), timeout)
+
+				// Create goroutine for each condition we want to satisfy
+				// and pass same parent context
+				// goroutines return <-chan bool
+				deadDocker := helper.TimeoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
+					dc, err := client.NewEnvClient()
+					if err != nil {
+						t.Errorf("%v", err)
+						return false
+					}
+					cntxt := args[0].(context.Context)
+					eventChan, errChan := dc.Events(cntxt, types.EventsOptions{})
+
+					for {
+						select {
+						case <-cntxt.Done():
+							return false
+						case e := <-errChan:
+							log.Println(fmt.Errorf("%v", e))
+							return false
+						case e := <-eventChan:
+							if e.Type != "container" {
+								break
+							}
+							if e.Status != "die" {
+								break
+							}
+							if v, ok := e.Actor.Attributes["com.docker.swarm.service.name"]; ok {
+								if v != "controller" {
+									break
+								}
+							} else {
+								break
+							}
+							return true
+						}
+						time.Sleep(100 * time.Millisecond)
+					}
+				})
+
+				defer cancel()
+
+				// for loop that iterates until context <-Done()
+				// once <-Done() then get return from all goroutines
+			L:
+				for {
+					select {
+					case <-timeoutCtx.Done():
+						<-deadDocker
+						log.Printf("Done (main)")
+						break L
+					case v := <-deadDocker:
+						if v {
+							log.Printf("Setting containerDead to %v", v)
+							containerDead = v
+						}
+					default:
+						break
+					}
+					if containerDead {
+						break L
+					}
+					time.Sleep(100 * time.Millisecond)
+				}
+
+				if !containerDead {
+					t.Errorf("container dead event not detected")
+				}
+
+				return containerDead
+			},
+			timeout: 40 * time.Second,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res := make(chan bool)
+			go func() {
+				res <- tt.wait(t, tt.timeout)
+				close(res)
+				return
+			}()
+			time.Sleep(3 * time.Second)
+			assert.True(t, tt.run(t))
+			assert.True(t, <-res)
+			time.Sleep(3 * time.Second)
+		})
+	}
+
+	// Service cleanup
+	KillService(ctx, dockerClient, serviceID)
+
+	// Docker cleanup
+	if err := DockerCleanUp(ctx, dockerClient, netRes.ID); err != nil {
+		t.Errorf("cleanup error: %v", err)
+	}
+}
+
 func Test_Integration(t *testing.T) {
 
 	ctx := context.TODO()
