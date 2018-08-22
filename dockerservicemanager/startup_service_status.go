@@ -3,6 +3,8 @@ package dockerservicemanager
 import (
 	"bytes"
 	"context"
+	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/docker/docker/api/types"
@@ -15,17 +17,16 @@ import (
 func concatPort(port uint32, proto swarm.PortConfigProtocol) string {
 	var stringBuf bytes.Buffer
 
-	stringBuf.WriteString(string(port))
+	stringBuf.WriteString(strconv.FormatUint(uint64(port), 10))
 	stringBuf.WriteString("/")
 	stringBuf.WriteString(string(proto))
 
 	return stringBuf.String()
 }
 
-func serviceToEntry(s *r.Session, svc swarm.Service) (map[string]interface{}, error) {
+func serviceToEntry(svc swarm.Service) (map[string]interface{}, error) {
 	var (
 		res = make(map[string]interface{})
-		doc map[string]interface{}
 	)
 
 	res["ServiceName"] = svc.Spec.Annotations.Name
@@ -40,8 +41,8 @@ func serviceToEntry(s *r.Session, svc swarm.Service) (map[string]interface{}, er
 		}
 	}
 	res["ServiceID"] = svc.ID
-	res["DesiredState"] = rethink.DesiredStateNull
-	res["State"] = rethink.StateActive
+	res["DesiredState"] = string(rethink.DesiredStateNull)
+	res["State"] = string(rethink.StateActive)
 	res["Interface"] = ""
 	res["ExternalPorts"] = make([]string, len(svc.Endpoint.Ports))
 	for i, p := range svc.Endpoint.Ports {
@@ -51,18 +52,22 @@ func serviceToEntry(s *r.Session, svc swarm.Service) (map[string]interface{}, er
 	for i, p := range svc.Endpoint.Ports {
 		res["InternalPorts"].([]string)[i] = concatPort(p.TargetPort, p.Protocol)
 	}
-
-	cursor, err := r.DB("Controller").Table("Plugins").Filter(map[string]interface{}{"Name": res["Name"], "ServiceName": ""}).Run(s)
-	if err != nil {
-		return res, err
+	res["OS"] = string(rethink.PluginOSPosix)
+	for _, c := range svc.Spec.TaskTemplate.Placement.Constraints {
+		split := strings.Split(c, "==")
+		if split[0] == "node.labels.os" {
+			res["OS"] = split[1]
+			break
+		}
 	}
-
-	if cursor.Next(&doc) {
-		res["OS"] = doc["OS"]
-	} else {
-		res["OS"] = rethink.PluginOSPosix
+	res["Environment"] = []string{}
+	for _, e := range svc.Spec.TaskTemplate.ContainerSpec.Env {
+		split := strings.Split(e, "=")
+		pattern := regexp.MustCompile(`PORT|PLUGIN|LOGLEVEL|RETHINK_HOST|STAGE`)
+		if !pattern.MatchString(split[0]) {
+			res["Environment"] = append(res["Environment"].([]string), e)
+		}
 	}
-
 	return res, nil
 }
 
@@ -105,7 +110,7 @@ func StartupServiceStatus() error {
 		if cursor.Next(&doc) {
 			// Update entry
 			id = doc["id"].(string)
-			doc, err = serviceToEntry(session, s)
+			doc, err = serviceToEntry(s)
 			if err != nil {
 				return err
 			}
@@ -113,7 +118,7 @@ func StartupServiceStatus() error {
 			operation = r.DB("Controller").Table("Plugins").Get(id).Update(doc)
 		} else {
 			// Create entry
-			doc, err = serviceToEntry(session, s)
+			doc, err = serviceToEntry(s)
 			if err != nil {
 				return err
 			}

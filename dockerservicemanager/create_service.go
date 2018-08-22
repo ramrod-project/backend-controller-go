@@ -102,6 +102,7 @@ func generateServiceSpec(config *PluginServiceConfig) (*swarm.ServiceSpec, error
 		imageName.Name = "ramrodpcp/auxiliary-wrapper"
 	} else if config.OS == rethink.PluginOSPosix || config.OS == rethink.PluginOSAll {
 		imageName.Name = "ramrodpcp/interpreter-plugin"
+		placementConfig.Constraints = []string{"node.labels.os==posix"}
 	} else if config.OS == rethink.PluginOSWindows {
 		imageName.Name = "ramrodpcp/interpreter-plugin-windows"
 		placementConfig.Constraints = []string{"node.labels.os==nt"}

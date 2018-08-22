@@ -150,10 +150,9 @@ func Test_CreatePluginService(t *testing.T) {
 
 func Test_generateServiceSpec(t *testing.T) {
 	var (
-		maxAttempts     = uint64(3)
-		placementConfig = &swarm.Placement{}
-		replicas        = uint64(1)
-		second          = time.Second
+		maxAttempts = uint64(3)
+		replicas    = uint64(1)
+		second      = time.Second
 	)
 
 	ctx := context.Background()
@@ -227,7 +226,9 @@ func Test_generateServiceSpec(t *testing.T) {
 						Condition:   "on-failure",
 						MaxAttempts: &maxAttempts,
 					},
-					Placement: placementConfig,
+					Placement: &swarm.Placement{
+						Constraints: []string{"node.labels.os==posix"},
+					},
 					Networks: []swarm.NetworkAttachmentConfig{
 						swarm.NetworkAttachmentConfig{
 							Target: "goodnet",
