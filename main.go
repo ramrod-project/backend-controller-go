@@ -74,6 +74,12 @@ func main() { // pragma: no cover
 		log.Fatalf("fatal: %v", err)
 	}
 
+	// Advertise current plugin service status
+	err = dockerservicemanager.StartupServiceStatus()
+	if err != nil {
+		log.Fatalf("fatal: %v", err)
+	}
+
 	// Start up Harness and Aux if needed
 	err = dockerservicemanager.StartupServices()
 	if err != nil {
