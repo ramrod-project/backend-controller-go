@@ -3,7 +3,11 @@ package dockerservicemanager
 import (
 	"context"
 	"fmt"
+	"log"
+	"strconv"
 	"time"
+
+	"github.com/ramrod-project/backend-controller-go/rethink"
 
 	"github.com/docker/docker/api/types"
 	swarm "github.com/docker/docker/api/types/swarm"
@@ -94,6 +98,19 @@ func UpdatePluginService(serviceID string, config *PluginServiceConfig) (types.S
 	}
 
 	resp, err := dockerClient.ServiceUpdate(ctx, serviceID, swarm.Version{Index: version}, *serviceSpec, types.ServiceUpdateOptions{})
+	if err != nil {
+		return resp, err
+	}
+	for _, port := range config.Ports {
+		err = rethink.RemovePort(config.Address, strconv.FormatUint(uint64(port.PublishedPort), 10), port.Protocol)
+		if err != nil {
+			log.Printf("%v", err)
+		}
+		err = rethink.AddPort(config.Address, strconv.FormatUint(uint64(port.PublishedPort), 10), port.Protocol)
+		if err != nil {
+			log.Printf("%v", err)
+		}
+	}
 
 	return resp, err
 }

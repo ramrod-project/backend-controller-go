@@ -19,6 +19,8 @@ import (
 // get leader node IP to use to verify tests
 
 func Test_CreatePluginService(t *testing.T) {
+	env := os.Getenv("STAGE")
+	os.Setenv("STAGE", "TESTING")
 
 	ctx := context.Background()
 	dockerClient, err := client.NewEnvClient()
@@ -30,6 +32,12 @@ func Test_CreatePluginService(t *testing.T) {
 	// Set up clean environment
 	if err := test.DockerCleanUp(ctx, dockerClient, ""); err != nil {
 		t.Errorf("setup error: %v", err)
+	}
+	
+	_, brainID, err := test.StartBrain(ctx, t, dockerClient, test.BrainSpec)
+	if err != nil {
+		t.Errorf("%v", err)
+		return
 	}
 
 	netID, err := test.CheckCreateNet("test_create")
@@ -142,10 +150,14 @@ func Test_CreatePluginService(t *testing.T) {
 			generatedIDs[i] = got.ID
 		})
 	}
+
+	test.KillService(ctx, dockerClient, brainID)
+
 	//Docker cleanup
 	if err := test.DockerCleanUp(ctx, dockerClient, netID); err != nil {
 		t.Errorf("cleanup error: %v", err)
 	}
+	os.Setenv("STAGE", env)
 }
 
 func Test_generateServiceSpec(t *testing.T) {
@@ -409,7 +421,7 @@ func Test_getTagFromEnv(t *testing.T) {
 	os.Setenv("TAG", oldEnvTag)
 }
 
-func Test_getManagerIP(t *testing.T) {
+func Test_GetManagerIP(t *testing.T) {
 
 	ctx := context.Background()
 	dockerClient, err := client.NewEnvClient()
@@ -432,8 +444,8 @@ func Test_getManagerIP(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := getManagerIP(); got != tt.want {
-				t.Errorf("getManagerIP() = %v, want %v", got, tt.want)
+			if got := GetManagerIP(); got != tt.want {
+				t.Errorf("GetManagerIP() = %v, want %v", got, tt.want)
 			}
 		})
 	}

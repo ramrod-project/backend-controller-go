@@ -2,9 +2,8 @@ package rethink
 
 import (
 	"context"
-	"errors"
+	"os"
 	"testing"
-	"time"
 
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/docker/docker/client"
@@ -13,6 +12,8 @@ import (
 )
 
 func TestAddPort(t *testing.T) {
+	env := os.Getenv("STAGE")
+	os.Setenv("STAGE", "TESTING")
 	ctx := context.Background()
 	dockerClient, err := client.NewEnvClient()
 	if err != nil {
@@ -30,7 +31,6 @@ func TestAddPort(t *testing.T) {
 		t.Errorf("%v", err)
 		return
 	}
-
 	var intBrainSpec = test.BrainSpec
 	intBrainSpec.Networks = []swarm.NetworkAttachmentConfig{
 		swarm.NetworkAttachmentConfig{
@@ -44,8 +44,6 @@ func TestAddPort(t *testing.T) {
 		t.Errorf("%v", err)
 		return
 	}
-
-	time.Sleep(10 * time.Second)
 
 	testPort := map[string]interface{}{
 		"Interface":    "192.168.1.1",
@@ -62,7 +60,7 @@ func TestAddPort(t *testing.T) {
 	type args struct {
 		IPaddr   string
 		newPort  string
-		protocol string
+		protocol swarm.PortConfigProtocol
 	}
 	tests := []struct {
 		name    string
@@ -74,7 +72,7 @@ func TestAddPort(t *testing.T) {
 			args: args{
 				IPaddr:   "192.168.1.1",
 				newPort:  "9990",
-				protocol: "tcp",
+				protocol: swarm.PortConfigProtocolTCP,
 			},
 			wantErr: false,
 		}, {
@@ -82,7 +80,7 @@ func TestAddPort(t *testing.T) {
 			args: args{
 				IPaddr:   "192.168.1.1",
 				newPort:  "5178",
-				protocol: "udp",
+				protocol: swarm.PortConfigProtocolUDP,
 			},
 			wantErr: false,
 		}, {
@@ -90,20 +88,24 @@ func TestAddPort(t *testing.T) {
 			args: args{
 				IPaddr:   "192.168.1.1",
 				newPort:  "9990",
-				protocol: "tcp",
+				protocol: swarm.PortConfigProtocolTCP,
 			},
 			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := AddPort(tt.args.IPaddr, tt.args.newPort, tt.args.protocol, session); (err != nil) != tt.wantErr {
+			if err := AddPort(tt.args.IPaddr, tt.args.newPort, tt.args.protocol); (err != nil) != tt.wantErr {
 				t.Errorf("AddPort() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
 	testRes := make(map[string]interface{})
-	testRes = getCurrentEntry("192.168.1.1", session)
+	testRes, err = getCurrentEntry("192.168.1.1", session)
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
 
 	var (
 		newTCP []string
@@ -117,10 +119,10 @@ func TestAddPort(t *testing.T) {
 		newUDP = append(newUDP, udpPort.(string))
 	}
 
-	if !contains(newTCP, "9990") {
+	if !Contains(newTCP, "9990") {
 		t.Errorf("9990 was not added")
 	}
-	if !contains(newUDP, "5178") {
+	if !Contains(newUDP, "5178") {
 		t.Errorf("failed to add to empty string")
 	}
 	test.KillService(ctx, dockerClient, brainID)
@@ -128,16 +130,18 @@ func TestAddPort(t *testing.T) {
 	if err := test.DockerCleanUp(ctx, dockerClient, netID); err != nil {
 		t.Errorf("cleanup error: %v", err)
 	}
+	os.Setenv("STAGE", env)
 }
 
 func TestRemovePort(t *testing.T) {
+	env := os.Getenv("STAGE")
+	os.Setenv("STAGE", "TESTING")
 	ctx := context.Background()
 	dockerClient, err := client.NewEnvClient()
 	if err != nil {
 		t.Errorf("%v", err)
 		return
 	}
-
 	session, brainID, err := test.StartBrain(ctx, t, dockerClient, test.BrainSpec)
 	if err != nil {
 		t.Errorf("%v", err)
@@ -156,10 +160,11 @@ func TestRemovePort(t *testing.T) {
 		t.Errorf("%v", err)
 		return
 	}
+
 	type args struct {
 		IPaddr   string
 		remPort  string
-		protocol string
+		protocol swarm.PortConfigProtocol
 	}
 	tests := []struct {
 		name    string
@@ -172,7 +177,7 @@ func TestRemovePort(t *testing.T) {
 			args: args{
 				IPaddr:   "192.168.1.1",
 				remPort:  "6003",
-				protocol: "tcp",
+				protocol: swarm.PortConfigProtocolTCP,
 			},
 			wantErr: false,
 		},
@@ -181,17 +186,16 @@ func TestRemovePort(t *testing.T) {
 			args: args{
 				IPaddr:   "192.168.1.1",
 				remPort:  "6003",
-				protocol: "tcp",
+				protocol: swarm.PortConfigProtocolTCP,
 			},
-			err:     errors.New("port doesn't exits"),
-			wantErr: true,
+			wantErr: false,
 		},
 		{
 			name: "delete the last port",
 			args: args{
 				IPaddr:   "192.168.1.1",
 				remPort:  "8000",
-				protocol: "udp",
+				protocol: swarm.PortConfigProtocolUDP,
 			},
 			wantErr: false,
 		},
@@ -200,21 +204,24 @@ func TestRemovePort(t *testing.T) {
 			args: args{
 				IPaddr:   "192.168.1.1",
 				remPort:  "9000",
-				protocol: "udp",
+				protocol: swarm.PortConfigProtocolUDP,
 			},
-			err:     errors.New("port doesn't exits"),
-			wantErr: true,
+			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := RemovePort(tt.args.IPaddr, tt.args.remPort, tt.args.protocol, session); (err != nil) != tt.wantErr {
+			if err := RemovePort(tt.args.IPaddr, tt.args.remPort, tt.args.protocol); (err != nil) != tt.wantErr {
 				t.Errorf("RemovePort() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
 	testRes := make(map[string]interface{})
-	testRes = getCurrentEntry("192.168.1.1", session)
+	testRes, err = getCurrentEntry("192.168.1.1", session)
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
 
 	var (
 		newTCP []string
@@ -224,8 +231,10 @@ func TestRemovePort(t *testing.T) {
 		newTCP = append(newTCP, tcpPort.(string))
 	}
 
-	if contains(newTCP, "6003") {
+	if Contains(newTCP, "6003") {
 		t.Errorf("port 6003 was not deleted")
 	}
 	test.KillService(ctx, dockerClient, brainID)
+
+	os.Setenv("STAGE", env)
 }

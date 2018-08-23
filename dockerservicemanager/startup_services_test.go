@@ -82,7 +82,7 @@ func TestStartupServices(t *testing.T) {
 
 	_, err = r.DB("Controller").Table("Ports").Insert(
 		map[string]interface{}{
-			"Interface":    "",
+			"Interface":    GetManagerIP(),
 			"NodeHostName": leader,
 			"OS":           "posix",
 			"TCPPorts":     []string{},
@@ -228,7 +228,7 @@ func TestStartupServices(t *testing.T) {
 							return false
 						case d := <-changeChan:
 							if _, ok := d["Interface"]; ok {
-								if d["Interface"].(string) != "" {
+								if d["Interface"].(string) != GetManagerIP() {
 									break
 								}
 							}
@@ -272,7 +272,6 @@ func TestStartupServices(t *testing.T) {
 					case <-timeoutCtx.Done():
 						<-startHarness
 						<-startAux
-						log.Printf("Done (main)")
 						break L
 					case v := <-startHarness:
 						if v {

@@ -2,7 +2,6 @@ package dockerservicemanager
 
 import (
 	"context"
-	"errors"
 	"os"
 	"testing"
 	"time"
@@ -12,10 +11,11 @@ import (
 	swarm "github.com/docker/docker/api/types/swarm"
 	client "github.com/docker/docker/client"
 	"github.com/ramrod-project/backend-controller-go/test"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestRemovePluginService(t *testing.T) {
+	env := os.Getenv("STAGE")
+	os.Setenv("STAGE", "TESTING")
 	var (
 		maxAttempts     = uint64(3)
 		placementConfig = &swarm.Placement{}
@@ -38,6 +38,12 @@ func TestRemovePluginService(t *testing.T) {
 	// Set up clean environment
 	if err := test.DockerCleanUp(ctx, dockerClient, ""); err != nil {
 		t.Errorf("setup error: %v", err)
+	}
+
+	_, brainID, err := test.StartBrain(ctx, t, dockerClient, test.BrainSpec)
+	if err != nil {
+		t.Errorf("%v", err)
+		return
 	}
 
 	netID, err := test.CheckCreateNet("testremove")
@@ -107,7 +113,6 @@ func TestRemovePluginService(t *testing.T) {
 		name    string
 		args    args
 		wantErr bool
-		err     error
 	}{
 		{
 			name: "Shutdown existing service",
@@ -122,7 +127,6 @@ func TestRemovePluginService(t *testing.T) {
 				serviceID: "whatisthis",
 			},
 			wantErr: true,
-			err:     errors.New("Error response from daemon: service whatisthis not found"),
 		},
 	}
 	for _, tt := range tests {
@@ -132,12 +136,13 @@ func TestRemovePluginService(t *testing.T) {
 				if err := test.DockerCleanUp(ctx, dockerClient, netID); err != nil {
 					t.Errorf("cleanup error: %v", err)
 				}
-			} else if tt.wantErr {
-				assert.Equal(t, tt.err, err)
 			}
 		})
 	}
 
+	test.KillService(ctx, dockerClient, brainID)
+
 	//Docker cleanup
 	dockerClient.NetworkRemove(ctx, netID)
+	os.Setenv("STAGE", env)
 }
