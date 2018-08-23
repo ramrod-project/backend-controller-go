@@ -4,7 +4,6 @@ import (
 	"context"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/docker/docker/client"
@@ -32,7 +31,6 @@ func TestAddPort(t *testing.T) {
 		t.Errorf("%v", err)
 		return
 	}
-	time.Sleep(30 * time.Second)
 	var intBrainSpec = test.BrainSpec
 	intBrainSpec.Networks = []swarm.NetworkAttachmentConfig{
 		swarm.NetworkAttachmentConfig{
@@ -46,8 +44,6 @@ func TestAddPort(t *testing.T) {
 		t.Errorf("%v", err)
 		return
 	}
-
-	time.Sleep(30 * time.Second)
 
 	testPort := map[string]interface{}{
 		"Interface":    "192.168.1.1",
@@ -146,7 +142,6 @@ func TestRemovePort(t *testing.T) {
 		t.Errorf("%v", err)
 		return
 	}
-	time.Sleep(30 * time.Second)
 	session, brainID, err := test.StartBrain(ctx, t, dockerClient, test.BrainSpec)
 	if err != nil {
 		t.Errorf("%v", err)
@@ -165,8 +160,6 @@ func TestRemovePort(t *testing.T) {
 		t.Errorf("%v", err)
 		return
 	}
-
-	time.Sleep(30 * time.Second)
 
 	type args struct {
 		IPaddr   string

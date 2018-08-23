@@ -620,6 +620,9 @@ func Test_Integration(t *testing.T) {
 							if d["new_val"].(map[string]interface{})["Interface"].(string) != dockerservicemanager.GetManagerIP() {
 								break
 							}
+							if len(d["new_val"].(map[string]interface{})["TCPPorts"].([]interface{})) != 1 {
+								break
+							}
 							if d["new_val"].(map[string]interface{})["TCPPorts"].([]interface{})[0].(string) != "5000" {
 								break
 							}
@@ -892,6 +895,9 @@ func Test_Integration(t *testing.T) {
 							return false
 						case d := <-changeChan:
 							if _, ok := d["new_val"]; !ok {
+								break
+							}
+							if len(d["new_val"].(map[string]interface{})["TCPPorts"].([]interface{}) != 1) {
 								break
 							}
 							if d["new_val"].(map[string]interface{})["TCPPorts"].([]interface{})[0].(string) != "5005" {
