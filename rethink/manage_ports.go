@@ -55,7 +55,7 @@ func getCurrentEntry(IPaddr string, session *r.Session) map[string]interface{} {
 // there was a duplicate
 func AddPort(IPaddr string, newPort string, protocol swarm.PortConfigProtocol) error {
 	session, err := r.Connect(r.ConnectOpts{
-		Address: "127.0.0.1",
+		Address: GetRethinkHost(),
 	})
 	if err != nil {
 		return err
@@ -105,7 +105,7 @@ func AddPort(IPaddr string, newPort string, protocol swarm.PortConfigProtocol) e
 // there was a duplicate
 func RemovePort(IPaddr string, remPort string, protocol swarm.PortConfigProtocol) error {
 	session, err := r.Connect(r.ConnectOpts{
-		Address: "127.0.0.1",
+		Address: GetRethinkHost(),
 	})
 	if err != nil {
 		return err

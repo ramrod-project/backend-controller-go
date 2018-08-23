@@ -2,6 +2,7 @@ package rethink
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 
@@ -12,6 +13,8 @@ import (
 )
 
 func TestAddPort(t *testing.T) {
+	env := os.Getenv("STAGE")
+	os.Setenv("STAGE", "TESTING")
 	ctx := context.Background()
 	dockerClient, err := client.NewEnvClient()
 	if err != nil {
@@ -127,9 +130,12 @@ func TestAddPort(t *testing.T) {
 	if err := test.DockerCleanUp(ctx, dockerClient, netID); err != nil {
 		t.Errorf("cleanup error: %v", err)
 	}
+	os.Setenv("STAGE", env)
 }
 
 func TestRemovePort(t *testing.T) {
+	env := os.Getenv("STAGE")
+	os.Setenv("STAGE", "TESTING")
 	ctx := context.Background()
 	dockerClient, err := client.NewEnvClient()
 	if err != nil {
@@ -228,4 +234,6 @@ func TestRemovePort(t *testing.T) {
 		t.Errorf("port 6003 was not deleted")
 	}
 	test.KillService(ctx, dockerClient, brainID)
+
+	os.Setenv("STAGE", env)
 }
