@@ -1026,7 +1026,7 @@ func Test_Integration(t *testing.T) {
 					"ServiceName":   "TestPlugin2",
 					"DesiredState":  "Activate",
 					"State":         "Available",
-					"Interface":     "",
+					"Interface":     dockerservicemanager.GetManagerIP(),
 					"ExternalPorts": []string{"6000/tcp"},
 					"InternalPorts": []string{"6000/tcp"},
 					"OS":            string(rethink.PluginOSPosix),

@@ -2,6 +2,7 @@ package rethink
 
 import (
 	"errors"
+	"fmt"
 	"log"
 
 	"github.com/docker/docker/api/types/swarm"
@@ -42,13 +43,15 @@ func remove(arr []string, element string) []string {
 	return arr
 }
 
-func getCurrentEntry(IPaddr string, session *r.Session) map[string]interface{} {
+func getCurrentEntry(IPaddr string, session *r.Session) (map[string]interface{}, error) {
 	filter := make(map[string]interface{})
 	filter["Interface"] = IPaddr
 	entry, _ := r.DB("Controller").Table("Ports").Filter(filter).Run(session)
 	var port map[string]interface{}
-	entry.Next(&port)
-	return port
+	if !entry.Next(&port) {
+		return port, fmt.Errorf("Interface not found: %v", IPaddr)
+	}
+	return port, nil
 }
 
 // AddPort adds a port to the Ports table. it returns an error if
@@ -66,7 +69,11 @@ func AddPort(IPaddr string, newPort string, protocol swarm.PortConfigProtocol) e
 		newTCP []string
 		newUDP []string
 	)
-	port = getCurrentEntry(IPaddr, session)
+	port, err = getCurrentEntry(IPaddr, session)
+	if err != nil {
+		log.Printf("%v", err)
+		return err
+	}
 
 	for _, tcpPort := range port["TCPPorts"].([]interface{}) {
 		newTCP = append(newTCP, tcpPort.(string))
@@ -117,7 +124,11 @@ func RemovePort(IPaddr string, remPort string, protocol swarm.PortConfigProtocol
 		newTCP []string
 		newUDP []string
 	)
-	port = getCurrentEntry(IPaddr, session)
+	port, err = getCurrentEntry(IPaddr, session)
+	if err != nil {
+		log.Printf("%v", err)
+		return err
+	}
 
 	for _, tcpPort := range port["TCPPorts"].([]interface{}) {
 		newTCP = append(newTCP, tcpPort.(string))
