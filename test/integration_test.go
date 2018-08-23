@@ -752,7 +752,7 @@ func Test_Integration(t *testing.T) {
 			name: "Update service",
 			run: func(t *testing.T) bool {
 				_, err := r.DB("Controller").Table("Plugins").Filter(map[string]string{"ServiceName": "TestPlugin"}).Update(map[string]interface{}{
-					"DesiredState": "Restart", "Environment": []string{"TEST=TEST"},
+					"DesiredState": "Restart", "Environment": []string{"TEST=TEST"}, "ExternalPorts": []string{"5005/tcp"},
 				}).Run(session)
 				if err != nil {
 					t.Errorf("%v", err)
@@ -763,7 +763,7 @@ func Test_Integration(t *testing.T) {
 			},
 			wait: func(t *testing.T, timeout time.Duration) bool {
 				var (
-					rD, rDB, rDu, rDBu bool = false, false, false, false
+					rD, rDB, rDu, rDBu, portChecked bool = false, false, false, false, false
 				)
 
 				// Initialize parent context (with timeout)
@@ -864,6 +864,55 @@ func Test_Integration(t *testing.T) {
 						time.Sleep(100 * time.Millisecond)
 					}
 				})
+
+				PortCheck := helper.TimeoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
+					sessionTest, err := r.Connect(r.ConnectOpts{
+						Address: "127.0.0.1",
+					})
+					if err != nil {
+						t.Errorf("%v", err)
+						return false
+					}
+					cntxt := args[0].(context.Context)
+					changeChan, errChan := func(s *r.Session) (<-chan map[string]interface{}, <-chan error) {
+						changes := make(chan map[string]interface{})
+						errs := make(chan error)
+						go func() {
+							cursor, err := r.DB("Controller").Table("Ports").Changes().Run(s)
+							if err != nil {
+								log.Println(fmt.Errorf("%v", err))
+								errs <- err
+							}
+							var doc map[string]interface{}
+							for cursor.Next(&doc) {
+								changes <- doc
+							}
+						}()
+						return changes, errs
+					}(sessionTest)
+
+					for {
+						select {
+						case <-cntxt.Done():
+							return false
+						case e := <-errChan:
+							log.Println(fmt.Errorf("%v", e))
+							return false
+						case d := <-changeChan:
+							if _, ok := d["new_val"]; !ok {
+								break
+							}
+							if d["new_val"].(map[string]interface{})["TCPPorts"].([]interface{})[0].(string) != "5005" {
+								break
+							}
+							return true
+						default:
+							break
+						}
+						time.Sleep(100 * time.Millisecond)
+					}
+				})
+
 				restartedDockerUpdated := helper.TimeoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
 					dc, err := client.NewEnvClient()
 					if err != nil {
@@ -919,6 +968,7 @@ func Test_Integration(t *testing.T) {
 						<-restartDB
 						<-restartedDockerUpdated
 						<-restartedDBUpdated
+						<-PortCheck
 						log.Printf("Done (main)")
 						break L
 					case v := <-restartDocker:
@@ -991,10 +1041,14 @@ func Test_Integration(t *testing.T) {
 							log.Printf("Setting rDBu to %v", v)
 							rDBu = v
 						}
+						if v {
+							log.Printf("Setting PortChecked to %v", v)
+							portChecked = v
+						}
 					default:
 						break
 					}
-					if rD && rDB && rDu && rDBu {
+					if rD && rDB && rDu && rDBu && portChecked {
 						break L
 					}
 					time.Sleep(100 * time.Millisecond)
@@ -1012,8 +1066,11 @@ func Test_Integration(t *testing.T) {
 				if !rDBu {
 					t.Errorf("Database restart complete event not detected")
 				}
+				if !portChecked {
+					t.Errorf("Ports not found in database")
+				}
 
-				return rD && rDB && rDu && rDBu
+				return rD && rDB && rDu && rDBu && portChecked
 			},
 			timeout: 60 * time.Second,
 		},
