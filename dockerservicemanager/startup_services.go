@@ -1,11 +1,14 @@
 package dockerservicemanager
 
 import (
+	"context"
 	"os"
 	"strings"
 
+	"github.com/docker/docker/api/types"
 	mount "github.com/docker/docker/api/types/mount"
 	swarm "github.com/docker/docker/api/types/swarm"
+	client "github.com/docker/docker/client"
 
 	"github.com/ramrod-project/backend-controller-go/rethink"
 )
@@ -50,12 +53,30 @@ var auxConfig = PluginServiceConfig{
 	},
 }
 
+func checkService(service string) bool {
+	ctx := context.Background()
+	dockerClient, err := client.NewEnvClient()
+
+	if err != nil {
+		return false
+	}
+
+	services, err := dockerClient.ServiceList(ctx, types.ServiceListOptions{})
+	// Check current services to see if already running
+	for _, s := range services {
+		if s.Spec.Annotations.Name == service {
+			return true
+		}
+	}
+	return false
+}
+
 // StartupServices will start the Aux Services Service
 // and a Harness plugin service if the HARNESS_START
 // and AUX_START environment variables are set to YES.
 func StartupServices() error {
 
-	if os.Getenv("START_HARNESS") == "YES" {
+	if os.Getenv("START_HARNESS") == "YES" && !checkService("Harness-5000") {
 		res, err := CreatePluginService(&harnessConfig)
 		if err != nil {
 			return err
@@ -77,7 +98,7 @@ func StartupServices() error {
 		}
 	}
 
-	if os.Getenv("START_AUX") == "YES" {
+	if os.Getenv("START_AUX") == "YES" && !checkService("AuxiliaryServices") {
 		res, err := CreatePluginService(&auxConfig)
 		if err != nil {
 			return err

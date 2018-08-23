@@ -44,17 +44,19 @@ func dumpEverything(ctx context.Context, t *testing.T, dockerClient *client.Clie
 // Test starting when database is not up
 func Test_IntegrationNoDB(t *testing.T) {
 
-	ctx := context.TODO()
+	ctx := context.Background()
 	dockerClient, err := client.NewEnvClient()
 	if err != nil {
 		t.Errorf("%v", err)
 		return
 	}
 
-	netRes, err := dockerClient.NetworkCreate(ctx, "pcp", types.NetworkCreate{
-		Driver:     "overlay",
-		Attachable: true,
-	})
+	// Set up clean environment
+	if err := DockerCleanUp(ctx, dockerClient, ""); err != nil {
+		t.Errorf("setup error: %v", err)
+	}
+
+	netID, err := CheckCreateNet("pcp")
 	if err != nil {
 		t.Errorf("%v", err)
 		return
@@ -180,24 +182,26 @@ func Test_IntegrationNoDB(t *testing.T) {
 	KillService(ctx, dockerClient, serviceID)
 
 	// Docker cleanup
-	if err := DockerCleanUp(ctx, dockerClient, netRes.ID); err != nil {
+	if err := DockerCleanUp(ctx, dockerClient, netID); err != nil {
 		t.Errorf("cleanup error: %v", err)
 	}
 }
 
 func Test_Integration(t *testing.T) {
 
-	ctx := context.TODO()
+	ctx := context.Background()
 	dockerClient, err := client.NewEnvClient()
 	if err != nil {
 		t.Errorf("%v", err)
 		return
 	}
 
-	netRes, err := dockerClient.NetworkCreate(ctx, "pcp", types.NetworkCreate{
-		Driver:     "overlay",
-		Attachable: true,
-	})
+	// Set up clean environment
+	if err := DockerCleanUp(ctx, dockerClient, ""); err != nil {
+		t.Errorf("setup error: %v", err)
+	}
+
+	netID, err := CheckCreateNet("pcp")
 	if err != nil {
 		t.Errorf("%v", err)
 		return
@@ -637,7 +641,7 @@ func Test_Integration(t *testing.T) {
 									if len(inspect.Spec.TaskTemplate.Networks) < 1 {
 										continue
 									}
-									if inspect.Spec.TaskTemplate.Networks[0].Target != netRes.ID {
+									if inspect.Spec.TaskTemplate.Networks[0].Target != netID {
 										continue
 									}
 									return true
@@ -1128,7 +1132,7 @@ func Test_Integration(t *testing.T) {
 									if len(inspect.Spec.TaskTemplate.Networks) < 1 {
 										continue
 									}
-									if inspect.Spec.TaskTemplate.Networks[0].Target != netRes.ID {
+									if inspect.Spec.TaskTemplate.Networks[0].Target != netID {
 										continue
 									}
 									for _, env := range inspect.Spec.TaskTemplate.ContainerSpec.Env {
@@ -1347,7 +1351,7 @@ func Test_Integration(t *testing.T) {
 	}
 
 	// Docker cleanup
-	if err := DockerCleanUp(ctx, dockerClient, netRes.ID); err != nil {
+	if err := DockerCleanUp(ctx, dockerClient, netID); err != nil {
 		t.Errorf("cleanup error: %v", err)
 	}
 }
