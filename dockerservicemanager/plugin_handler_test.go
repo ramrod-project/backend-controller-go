@@ -201,7 +201,7 @@ func Test_selectChange(t *testing.T) {
 	}
 
 	e := map[string]interface{}{
-		"Interface":    "192.168.1.1",
+		"Interface":    GetManagerIP(),
 		"NodeHostName": "ubuntu",
 		"OS":           "posix",
 		"TCPPorts":     []string{},
