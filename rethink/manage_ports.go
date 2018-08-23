@@ -9,20 +9,22 @@ import (
 	r "gopkg.in/gorethink/gorethink.v4"
 )
 
-func GetIPFromID(servID string) string {
+func GetIPFromID(servID string) (string, error) {
 	session, err := r.Connect(r.ConnectOpts{
 		Address: "127.0.0.1",
 	})
 	if err != nil {
-		return ""
+		return "", err
 	}
 	filter := make(map[string]interface{})
 	filter["ServiceID"] = servID
 	entry, _ := r.DB("Controller").Table("Plugins").Filter(filter).Run(session)
 	var res map[string]interface{}
-	entry.Next(&res)
+	if !entry.Next(&res) {
+		return "", err
+	}
 	addr := res["Interface"].(string)
-	return addr
+	return addr, nil
 }
 
 func Contains(arr []string, element string) bool {

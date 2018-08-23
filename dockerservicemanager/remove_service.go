@@ -24,7 +24,10 @@ func RemovePluginService(serviceID string) error {
 		return err
 	}
 	//update ports
-	servIP := rethink.GetIPFromID(serviceID)
+	servIP, err := rethink.GetIPFromID(serviceID)
+	if err != nil {
+		log.Printf("%v", err)
+	}
 
 	log.Printf("Removing service %v\n", serviceID)
 
