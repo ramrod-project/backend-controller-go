@@ -2,6 +2,7 @@ package dockerservicemanager
 
 import (
 	"context"
+	"log"
 	"os"
 	"testing"
 	"time"
@@ -12,6 +13,7 @@ import (
 	client "github.com/docker/docker/client"
 	"github.com/ramrod-project/backend-controller-go/test"
 	"github.com/stretchr/testify/assert"
+	r "gopkg.in/gorethink/gorethink.v4"
 )
 
 func TestUpdatePluginService(t *testing.T) {
@@ -41,10 +43,23 @@ func TestUpdatePluginService(t *testing.T) {
 		t.Errorf("setup error: %v", err)
 	}
 
-	_, brainID, err := test.StartBrain(ctx, t, dockerClient, test.BrainSpec)
+	session, brainID, err := test.StartBrain(ctx, t, dockerClient, test.BrainSpec)
 	if err != nil {
 		t.Errorf("%v", err)
 		return
+	}
+
+	e := map[string]interface{}{
+		"Interface":    GetManagerIP(),
+		"NodeHostName": "ubuntu",
+		"OS":           "posix",
+		"TCPPorts":     []string{},
+		"UDPPorts":     []string{},
+	}
+
+	_, err = r.DB("Controller").Table("Ports").Insert(e).RunWrite(session)
+	if err != nil {
+		log.Printf("%v", err)
 	}
 
 	netID, err := test.CheckCreateNet("test_update")
@@ -139,6 +154,7 @@ func TestUpdatePluginService(t *testing.T) {
 						PublishMode:   swarm.PortConfigPublishModeIngress,
 					}},
 					ServiceName: "GoodService",
+					Address:     GetManagerIP(),
 				},
 				id: id,
 			},
@@ -167,6 +183,7 @@ func TestUpdatePluginService(t *testing.T) {
 						PublishMode:   swarm.PortConfigPublishModeIngress,
 					}},
 					ServiceName: "GoodService",
+					Address:     GetManagerIP(),
 				},
 				id: "",
 			},
@@ -195,6 +212,7 @@ func TestUpdatePluginService(t *testing.T) {
 						PublishMode:   swarm.PortConfigPublishModeIngress,
 					}},
 					ServiceName: "BadServiceUpdate",
+					Address:     GetManagerIP(),
 				},
 				id: id,
 			},
