@@ -29,6 +29,9 @@ func RemovePluginService(serviceID string) error {
 	log.Printf("Removing service %v\n", serviceID)
 
 	err = dockerClient.ServiceRemove(ctx, serviceID)
+	if err != nil {
+		return err
+	}
 
 	for _, port := range serv.Spec.EndpointSpec.Ports {
 		err := rethink.RemovePort(servIP, strconv.FormatUint(uint64(port.PublishedPort), 10), port.Protocol)
