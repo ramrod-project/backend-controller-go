@@ -90,12 +90,14 @@ func AddPort(IPaddr string, newPort string, protocol swarm.PortConfigProtocol) e
 		return errors.New("only tcp and udp are supported protocols")
 	}
 	//update the entry
-	_, err = r.DB("Controller").Table("Ports").Get(port["id"]).Update(port).RunWrite(session)
+	log.Printf("updating database with %+v\n", port)
+	res, err := r.DB("Controller").Table("Ports").Get(port["id"]).Update(port).RunWrite(session)
 	if err != nil {
 		log.Printf("%v", err)
 		return err
 	}
-	log.Printf("port added: %v\n", port)
+	log.Printf("%+v", res)
+	log.Printf("port added: %+v\n", port)
 	return nil
 }
 

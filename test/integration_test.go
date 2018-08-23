@@ -615,6 +615,7 @@ func Test_Integration(t *testing.T) {
 							log.Println(fmt.Errorf("%v", e))
 							return false
 						case d := <-changeChan:
+							log.Printf("%+v", d)
 							if _, ok := d["new_val"]; !ok {
 								break
 							}
@@ -627,7 +628,6 @@ func Test_Integration(t *testing.T) {
 							}
 							return true
 						default:
-							log.Printf("default\n")
 							break
 						}
 						time.Sleep(100 * time.Millisecond)
