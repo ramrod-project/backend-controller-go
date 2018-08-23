@@ -192,6 +192,12 @@ func Test_selectChange(t *testing.T) {
 		t.Errorf("setup error: %v", err)
 	}
 
+	_, brainID, err := test.StartBrain(ctx, t, dockerClient, test.BrainSpec)
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+
 	nodeInspect, err := dockerClient.NodeList(ctx, types.NodeListOptions{})
 	nodeIP := nodeInspect[0].Status.Addr
 
@@ -339,6 +345,8 @@ func Test_selectChange(t *testing.T) {
 			assert.True(t, found)
 		})
 	}
+
+	test.KillService(ctx, dockerClient, brainID)
 
 	//Docker cleanup
 	if err := test.DockerCleanUp(ctx, dockerClient, netID); err != nil {

@@ -37,6 +37,12 @@ func TestRemovePluginService(t *testing.T) {
 		return
 	}
 
+	_, brainID, err := test.StartBrain(ctx, t, dockerClient, test.BrainSpec)
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+
 	// Set up clean environment
 	if err := test.DockerCleanUp(ctx, dockerClient, ""); err != nil {
 		t.Errorf("setup error: %v", err)
@@ -139,6 +145,8 @@ func TestRemovePluginService(t *testing.T) {
 			}
 		})
 	}
+
+	test.KillService(ctx, dockerClient, brainID)
 
 	//Docker cleanup
 	dockerClient.NetworkRemove(ctx, netID)
