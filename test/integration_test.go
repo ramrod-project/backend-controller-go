@@ -627,7 +627,7 @@ func Test_Integration(t *testing.T) {
 							}
 							return true
 						default:
-							log.Printf("%+v", d)
+							log.Printf("default\n")
 							break
 						}
 						time.Sleep(100 * time.Millisecond)
