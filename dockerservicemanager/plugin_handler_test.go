@@ -3,7 +3,6 @@ package dockerservicemanager
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"strings"
 	"testing"
@@ -210,7 +209,8 @@ func Test_selectChange(t *testing.T) {
 
 	_, err = r.DB("Controller").Table("Ports").Insert(e).RunWrite(session)
 	if err != nil {
-		log.Printf("%v", err)
+		t.Errorf("%v", err)
+		return
 	}
 
 	nodeInspect, err := dockerClient.NodeList(ctx, types.NodeListOptions{})

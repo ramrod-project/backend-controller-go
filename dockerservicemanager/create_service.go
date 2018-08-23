@@ -76,7 +76,7 @@ func GetManagerIP() string {
 	}
 
 	for _, node := range list {
-		if node.Spec.Role == "manager" {
+		if node.ManagerStatus.Leader {
 			return node.Status.Addr
 		}
 	}
@@ -95,8 +95,6 @@ func generateServiceSpec(config *PluginServiceConfig) (*swarm.ServiceSpec, error
 		replicas        = uint64(1)
 		stopGrace       = time.Second
 	)
-
-	// log.Printf("Creating service %v with config %v\n", config.ServiceName, config)
 
 	// Determine container image
 	if config.ServiceName == "AuxiliaryServices" {
@@ -117,8 +115,6 @@ func generateServiceSpec(config *PluginServiceConfig) (*swarm.ServiceSpec, error
 	if config.Address != "" {
 		placementConfig.Constraints = append(placementConfig.Constraints, "node.labels.ip=="+config.Address)
 	}
-
-	// log.Printf("Creating service spec\n")
 
 	serviceSpec := &swarm.ServiceSpec{
 		Annotations: swarm.Annotations{
@@ -174,7 +170,6 @@ func generateServiceSpec(config *PluginServiceConfig) (*swarm.ServiceSpec, error
 // given a PluginServiceConfig.
 func CreatePluginService(config *PluginServiceConfig) (types.ServiceCreateResponse, error) {
 
-	// log.Printf("Entering CreatePluginService")
 	ctx := context.Background()
 	dockerClient, err := client.NewEnvClient()
 
@@ -182,15 +177,11 @@ func CreatePluginService(config *PluginServiceConfig) (types.ServiceCreateRespon
 		return types.ServiceCreateResponse{}, err
 	}
 
-	// log.Printf("Generating service spec\n")
-
 	serviceSpec, err := generateServiceSpec(config)
 
 	if err != nil {
 		return types.ServiceCreateResponse{}, err
 	}
-
-	// log.Printf("Service spec created: %v", serviceSpec)
 
 	resp, err := dockerClient.ServiceCreate(ctx, *serviceSpec, types.ServiceCreateOptions{})
 	log.Printf("Started service %+v", resp)

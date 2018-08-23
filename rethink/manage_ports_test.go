@@ -2,7 +2,6 @@ package rethink
 
 import (
 	"context"
-	"log"
 	"os"
 	"testing"
 	"time"
@@ -108,7 +107,8 @@ func TestAddPort(t *testing.T) {
 	testRes := make(map[string]interface{})
 	testRes, err = getCurrentEntry("192.168.1.1", session)
 	if err != nil {
-		log.Printf("%v", err)
+		t.Errorf("%v", err)
+		return
 	}
 
 	var (
@@ -226,7 +226,8 @@ func TestRemovePort(t *testing.T) {
 	testRes := make(map[string]interface{})
 	testRes, err = getCurrentEntry("192.168.1.1", session)
 	if err != nil {
-		log.Printf("%v", err)
+		t.Errorf("%v", err)
+		return
 	}
 
 	var (

@@ -99,14 +99,11 @@ func AddPort(IPaddr string, newPort string, protocol swarm.PortConfigProtocol) e
 		return errors.New("only tcp and udp are supported protocols")
 	}
 	//update the entry
-	log.Printf("updating database with %+v\n", port)
-	res, err := r.DB("Controller").Table("Ports").Get(port["id"]).Update(port).RunWrite(session)
+	_, err = r.DB("Controller").Table("Ports").Get(port["id"]).Update(port).RunWrite(session)
 	if err != nil {
 		log.Printf("%v", err)
 		return err
 	}
-	log.Printf("%+v\n", res)
-	log.Printf("port added: %+v\n", port)
 	return nil
 }
 
@@ -148,13 +145,10 @@ func RemovePort(IPaddr string, remPort string, protocol swarm.PortConfigProtocol
 		return errors.New("only tcp and udp are supported protocols")
 	}
 	// update entry
-	resp, err := r.DB("Controller").Table("Ports").Get(port["id"]).Update(port).RunWrite(session)
+	_, err = r.DB("Controller").Table("Ports").Get(port["id"]).Update(port).RunWrite(session)
 	if err != nil {
 		log.Printf("%v", err)
 		return err
-	}
-	if resp.Unchanged == 1 {
-		log.Printf("port doesn't exits\n")
 	}
 	return nil
 }

@@ -2,7 +2,6 @@ package dockerservicemanager
 
 import (
 	"context"
-	"log"
 	"os"
 	"testing"
 	"time"
@@ -59,7 +58,8 @@ func TestUpdatePluginService(t *testing.T) {
 
 	_, err = r.DB("Controller").Table("Ports").Insert(e).RunWrite(session)
 	if err != nil {
-		log.Printf("%v", err)
+		t.Errorf("%v", err)
+		return
 	}
 
 	netID, err := test.CheckCreateNet("test_update")

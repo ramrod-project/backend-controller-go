@@ -138,7 +138,6 @@ func Test_IntegrationNoDB(t *testing.T) {
 					select {
 					case <-timeoutCtx.Done():
 						<-deadDocker
-						log.Printf("Done (main)")
 						break L
 					case v := <-deadDocker:
 						if v {
@@ -328,7 +327,6 @@ func Test_Integration(t *testing.T) {
 					select {
 					case <-timeoutCtx.Done():
 						<-portsDB
-						log.Printf("Done (main)")
 						break L
 					case v := <-portsDB:
 						if v {
@@ -437,7 +435,6 @@ func Test_Integration(t *testing.T) {
 					select {
 					case <-timeoutCtx.Done():
 						<-pluginsDB
-						log.Printf("Done (main)")
 						break L
 					case v := <-pluginsDB:
 						if v {
@@ -584,7 +581,6 @@ func Test_Integration(t *testing.T) {
 				})
 
 				portCheck := helper.TimeoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
-					log.Printf("starting portcheck\n")
 					sessionTest, err := r.Connect(r.ConnectOpts{
 						Address: "127.0.0.1",
 					})
@@ -613,17 +609,14 @@ func Test_Integration(t *testing.T) {
 					for {
 						select {
 						case <-cntxt.Done():
-							log.Printf("Port done\n")
 							return false
 						case e := <-errChan:
 							log.Println(fmt.Errorf("%v", e))
 							return false
 						case d := <-changeChan:
-							log.Printf("%+v", d)
 							if _, ok := d["new_val"]; !ok {
 								break
 							}
-							log.Printf("%+v", d["new_val"])
 							if d["new_val"].(map[string]interface{})["Interface"].(string) != dockerservicemanager.GetManagerIP() {
 								break
 							}
@@ -650,7 +643,6 @@ func Test_Integration(t *testing.T) {
 						<-startDockerVerify
 						<-startDB
 						<-portCheck
-						log.Printf("Done (main)")
 						break L
 					case v := <-startDocker:
 						if v {
@@ -969,7 +961,6 @@ func Test_Integration(t *testing.T) {
 						<-restartedDockerUpdated
 						<-restartedDBUpdated
 						<-PortCheck
-						log.Printf("Done (main)")
 						break L
 					case v := <-restartDocker:
 						if v {
@@ -1206,7 +1197,6 @@ func Test_Integration(t *testing.T) {
 						<-startDocker
 						<-startDockerVerify
 						<-startDB
-						log.Printf("Done (main)")
 						break L
 					case v := <-startDocker:
 						if v {
@@ -1359,7 +1349,6 @@ func Test_Integration(t *testing.T) {
 				})
 
 				portCheck := helper.TimeoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
-					log.Printf("starting portcheck\n")
 					sessionTest, err := r.Connect(r.ConnectOpts{
 						Address: "127.0.0.1",
 					})
@@ -1388,17 +1377,14 @@ func Test_Integration(t *testing.T) {
 					for {
 						select {
 						case <-cntxt.Done():
-							log.Printf("Port done\n")
 							return false
 						case e := <-errChan:
 							log.Println(fmt.Errorf("%v", e))
 							return false
 						case d := <-changeChan:
-							log.Printf("%+v", d)
 							if _, ok := d["new_val"]; !ok {
 								break
 							}
-							log.Printf("%+v", d["new_val"])
 							if len(d["new_val"].(map[string]interface{})["TCPPorts"].([]interface{})) != 1 {
 								break
 							}
@@ -1475,7 +1461,6 @@ func Test_Integration(t *testing.T) {
 						<-stopDocker
 						<-stopDB
 						<-portCheck
-						log.Printf("Done (main)")
 						break L
 					case v := <-stopDocker:
 						if v {

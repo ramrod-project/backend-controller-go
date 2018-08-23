@@ -368,7 +368,6 @@ func TestStartupServiceStatus(t *testing.T) {
 					select {
 					case <-timeoutCtx.Done():
 						<-pluginDB
-						log.Printf("Done (main)")
 						break L
 					case v := <-pluginDB:
 						if v {
@@ -468,7 +467,6 @@ func TestStartupServiceStatus(t *testing.T) {
 					select {
 					case <-timeoutCtx.Done():
 						<-pluginDB
-						log.Printf("Done (main)")
 						break L
 					case v := <-pluginDB:
 						if v {

@@ -272,7 +272,6 @@ func TestStartupServices(t *testing.T) {
 					case <-timeoutCtx.Done():
 						<-startHarness
 						<-startAux
-						log.Printf("Done (main)")
 						break L
 					case v := <-startHarness:
 						if v {
