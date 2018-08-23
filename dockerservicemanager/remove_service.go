@@ -19,7 +19,10 @@ func RemovePluginService(serviceID string) error {
 		return err
 	}
 
-	serv, _, _ := dockerClient.ServiceInspectWithRaw(ctx, serviceID)
+	serv, _, err := dockerClient.ServiceInspectWithRaw(ctx, serviceID)
+	if err != nil {
+		return err
+	}
 	//update ports
 	servIP := rethink.GetIPFromID(serviceID)
 
