@@ -96,7 +96,7 @@ func AddPort(IPaddr string, newPort string, protocol swarm.PortConfigProtocol) e
 		log.Printf("%v", err)
 		return err
 	}
-	log.Printf("%+v", res)
+	log.Printf("%+v\n", res)
 	log.Printf("port added: %+v\n", port)
 	return nil
 }
