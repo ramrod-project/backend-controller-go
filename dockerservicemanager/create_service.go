@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"time"
 
 	types "github.com/docker/docker/api/types"
@@ -198,7 +199,7 @@ func CreatePluginService(config *PluginServiceConfig) (types.ServiceCreateRespon
 	log.Printf("%+v", config)
 	for _, port := range config.Ports {
 		log.Printf("Adding: %+v", port)
-		rethink.AddPort(config.Address, string(port.PublishedPort), port.Protocol)
+		rethink.AddPort(config.Address, strconv.FormatUint(uint64(port.PublishedPort), 10), port.Protocol)
 	}
 
 	return resp, err
