@@ -3,6 +3,7 @@ package dockerservicemanager
 import (
 	"context"
 	"log"
+	"strconv"
 
 	client "github.com/docker/docker/client"
 	"github.com/ramrod-project/backend-controller-go/rethink"
@@ -20,13 +21,18 @@ func RemovePluginService(serviceID string) error {
 
 	serv, _, _ := dockerClient.ServiceInspectWithRaw(ctx, serviceID)
 	//update ports
-	for _, port := range serv.Spec.EndpointSpec.Ports {
-		rethink.RemovePort(rethink.GetIPFromID(serviceID), string(port.PublishedPort), port.Protocol)
-	}
+	servIP := rethink.GetIPFromID(serviceID)
 
 	log.Printf("Removing service %v\n", serviceID)
 
 	err = dockerClient.ServiceRemove(ctx, serviceID)
+
+	for _, port := range serv.Spec.EndpointSpec.Ports {
+		err := rethink.RemovePort(servIP, strconv.FormatUint(uint64(port.PublishedPort), 10), port.Protocol)
+		if err != nil {
+			log.Printf("%v", err)
+		}
+	}
 
 	return err
 }

@@ -196,9 +196,7 @@ func CreatePluginService(config *PluginServiceConfig) (types.ServiceCreateRespon
 	log.Printf("Started service %+v", resp)
 
 	//update ports
-	log.Printf("%+v", config)
 	for _, port := range config.Ports {
-		log.Printf("Adding: %+v", port)
 		err := rethink.AddPort(config.Address, strconv.FormatUint(uint64(port.PublishedPort), 10), port.Protocol)
 		if err != nil {
 			log.Printf("%v", err)

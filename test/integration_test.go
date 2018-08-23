@@ -1259,7 +1259,7 @@ func Test_Integration(t *testing.T) {
 			},
 			wait: func(t *testing.T, timeout time.Duration) bool {
 				var (
-					dockerStopped, dbStopped bool = false, false
+					dockerStopped, dbStopped, portChecked bool = false, false, false
 				)
 
 				// Initialize parent context (with timeout)
@@ -1296,6 +1296,61 @@ func Test_Integration(t *testing.T) {
 								break
 							}
 							return true
+						}
+						time.Sleep(100 * time.Millisecond)
+					}
+				})
+
+				portCheck := helper.TimeoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
+					log.Printf("starting portcheck\n")
+					sessionTest, err := r.Connect(r.ConnectOpts{
+						Address: "127.0.0.1",
+					})
+					if err != nil {
+						t.Errorf("%v", err)
+						return false
+					}
+					cntxt := args[0].(context.Context)
+					changeChan, errChan := func(s *r.Session) (<-chan map[string]interface{}, <-chan error) {
+						changes := make(chan map[string]interface{})
+						errs := make(chan error)
+						go func() {
+							cursor, err := r.DB("Controller").Table("Ports").Changes().Run(s)
+							if err != nil {
+								log.Println(fmt.Errorf("%v", err))
+								errs <- err
+							}
+							var doc map[string]interface{}
+							for cursor.Next(&doc) {
+								changes <- doc
+							}
+						}()
+						return changes, errs
+					}(sessionTest)
+
+					for {
+						select {
+						case <-cntxt.Done():
+							log.Printf("Port done\n")
+							return false
+						case e := <-errChan:
+							log.Println(fmt.Errorf("%v", e))
+							return false
+						case d := <-changeChan:
+							log.Printf("%+v", d)
+							if _, ok := d["new_val"]; !ok {
+								break
+							}
+							log.Printf("%+v", d["new_val"])
+							if len(d["new_val"].(map[string]interface{})["TCPPorts"].([]interface{})) != 1 {
+								break
+							}
+							if d["new_val"].(map[string]interface{})["TCPPorts"].([]interface{})[0].(string) != "6000" {
+								break
+							}
+							return true
+						default:
+							break
 						}
 						time.Sleep(100 * time.Millisecond)
 					}
@@ -1362,6 +1417,7 @@ func Test_Integration(t *testing.T) {
 					case <-timeoutCtx.Done():
 						<-stopDocker
 						<-stopDB
+						<-portCheck
 						log.Printf("Done (main)")
 						break L
 					case v := <-stopDocker:
@@ -1374,10 +1430,15 @@ func Test_Integration(t *testing.T) {
 							log.Printf("Setting dbStopped to %v", v)
 							dbStopped = v
 						}
+					case v := <-portCheck:
+						if v {
+							log.Printf("Setting PortChecked to %v", v)
+							portChecked = v
+						}
 					default:
 						break
 					}
-					if dockerStopped && dbStopped {
+					if dockerStopped && dbStopped && portChecked {
 						break L
 					}
 					time.Sleep(100 * time.Millisecond)
