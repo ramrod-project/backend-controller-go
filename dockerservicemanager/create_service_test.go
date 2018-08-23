@@ -19,6 +19,8 @@ import (
 // get leader node IP to use to verify tests
 
 func Test_CreatePluginService(t *testing.T) {
+	env := os.Getenv("STAGE")
+	os.Setenv("STAGE", "TESTING")
 
 	ctx := context.Background()
 	dockerClient, err := client.NewEnvClient()
@@ -146,6 +148,7 @@ func Test_CreatePluginService(t *testing.T) {
 	if err := test.DockerCleanUp(ctx, dockerClient, netID); err != nil {
 		t.Errorf("cleanup error: %v", err)
 	}
+	os.Setenv("STAGE", env)
 }
 
 func Test_generateServiceSpec(t *testing.T) {

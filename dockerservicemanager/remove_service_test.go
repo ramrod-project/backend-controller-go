@@ -16,6 +16,8 @@ import (
 )
 
 func TestRemovePluginService(t *testing.T) {
+	env := os.Getenv("STAGE")
+	os.Setenv("STAGE", "TESTING")
 	var (
 		maxAttempts     = uint64(3)
 		placementConfig = &swarm.Placement{}
@@ -140,4 +142,5 @@ func TestRemovePluginService(t *testing.T) {
 
 	//Docker cleanup
 	dockerClient.NetworkRemove(ctx, netID)
+	os.Setenv("STAGE", env)
 }

@@ -178,7 +178,8 @@ func Test_pluginToConfig(t *testing.T) {
 }
 
 func Test_selectChange(t *testing.T) {
-
+	env := os.Getenv("STAGE")
+	os.Setenv("STAGE", "TESTING")
 	ctx := context.Background()
 	dockerClient, err := client.NewEnvClient()
 	if err != nil {
@@ -343,4 +344,5 @@ func Test_selectChange(t *testing.T) {
 	if err := test.DockerCleanUp(ctx, dockerClient, netID); err != nil {
 		t.Errorf("cleanup error: %v", err)
 	}
+	os.Setenv("STAGE", env)
 }
