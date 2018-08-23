@@ -15,6 +15,8 @@ import (
 )
 
 func TestUpdatePluginService(t *testing.T) {
+	env := os.Getenv("STAGE")
+	os.Setenv("STAGE", "TESTING")
 	var (
 		maxAttempts     = uint64(3)
 		placementConfig = &swarm.Placement{}
@@ -37,6 +39,12 @@ func TestUpdatePluginService(t *testing.T) {
 	// Set up clean environment
 	if err := test.DockerCleanUp(ctx, dockerClient, ""); err != nil {
 		t.Errorf("setup error: %v", err)
+	}
+
+	_, brainID, err := test.StartBrain(ctx, t, dockerClient, test.BrainSpec)
+	if err != nil {
+		t.Errorf("%v", err)
+		return
 	}
 
 	netID, err := test.CheckCreateNet("test_update")
@@ -217,10 +225,14 @@ func TestUpdatePluginService(t *testing.T) {
 		})
 	}
 
+	test.KillService(ctx, dockerClient, brainID)
+
 	//Docker cleanup
 	if err := test.DockerCleanUp(ctx, dockerClient, netID); err != nil {
 		t.Errorf("cleanup error: %v", err)
 	}
+
+	os.Setenv("STAGE", env)
 }
 
 func Test_checkReady(t *testing.T) {

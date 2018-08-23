@@ -3,6 +3,7 @@ package dockerservicemanager
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 	"testing"
@@ -13,6 +14,7 @@ import (
 	rethink "github.com/ramrod-project/backend-controller-go/rethink"
 	"github.com/ramrod-project/backend-controller-go/test"
 	"github.com/stretchr/testify/assert"
+	r "gopkg.in/gorethink/gorethink.v4"
 )
 
 func validateService(config rethink.Plugin, result swarm.Service, netID string) error {
@@ -192,10 +194,23 @@ func Test_selectChange(t *testing.T) {
 		t.Errorf("setup error: %v", err)
 	}
 
-	_, brainID, err := test.StartBrain(ctx, t, dockerClient, test.BrainSpec)
+	session, brainID, err := test.StartBrain(ctx, t, dockerClient, test.BrainSpec)
 	if err != nil {
 		t.Errorf("%v", err)
 		return
+	}
+
+	e := map[string]interface{}{
+		"Interface":    "192.168.1.1",
+		"NodeHostName": "ubuntu",
+		"OS":           "posix",
+		"TCPPorts":     []string{},
+		"UDPPorts":     []string{},
+	}
+
+	_, err = r.DB("Controller").Table("Ports").Insert(e).RunWrite(session)
+	if err != nil {
+		log.Printf("%v", err)
 	}
 
 	nodeInspect, err := dockerClient.NodeList(ctx, types.NodeListOptions{})
@@ -224,7 +239,7 @@ func Test_selectChange(t *testing.T) {
 					ServiceName:   "HarnessService1",
 					DesiredState:  "Activate",
 					State:         "Available",
-					Address:       "",
+					Address:       GetManagerIP(),
 					ExternalPorts: []string{"5000/tcp"},
 					InternalPorts: []string{"5000/tcp"},
 					OS:            rethink.PluginOSAll,
@@ -242,7 +257,7 @@ func Test_selectChange(t *testing.T) {
 					ServiceName:   "HarnessService2",
 					DesiredState:  "Activate",
 					State:         "Available",
-					Address:       "",
+					Address:       GetManagerIP(),
 					ExternalPorts: []string{"5001/tcp"},
 					InternalPorts: []string{"5001/tcp"},
 					OS:            rethink.PluginOSPosix,
@@ -263,7 +278,7 @@ func Test_selectChange(t *testing.T) {
 					ServiceName:   "HarnessService1",
 					DesiredState:  "Restart",
 					State:         "Active",
-					Address:       "",
+					Address:       GetManagerIP(),
 					ExternalPorts: []string{"5000/tcp", "6000/tcp"},
 					InternalPorts: []string{"5000/tcp", "6000/tcp"},
 					OS:            rethink.PluginOSAll,
@@ -281,7 +296,7 @@ func Test_selectChange(t *testing.T) {
 					ServiceName:   "HarnessService2",
 					DesiredState:  "Restart",
 					State:         "Active",
-					Address:       "",
+					Address:       GetManagerIP(),
 					ExternalPorts: []string{"5001/tcp", "9999/tcp"},
 					InternalPorts: []string{"5001/tcp", "9999/tcp"},
 					OS:            rethink.PluginOSPosix,

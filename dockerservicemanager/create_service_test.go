@@ -29,15 +29,15 @@ func Test_CreatePluginService(t *testing.T) {
 		return
 	}
 
+	// Set up clean environment
+	if err := test.DockerCleanUp(ctx, dockerClient, ""); err != nil {
+		t.Errorf("setup error: %v", err)
+	}
+	
 	_, brainID, err := test.StartBrain(ctx, t, dockerClient, test.BrainSpec)
 	if err != nil {
 		t.Errorf("%v", err)
 		return
-	}
-
-	// Set up clean environment
-	if err := test.DockerCleanUp(ctx, dockerClient, ""); err != nil {
-		t.Errorf("setup error: %v", err)
 	}
 
 	netID, err := test.CheckCreateNet("test_create")
