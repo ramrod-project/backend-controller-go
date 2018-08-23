@@ -3,6 +3,7 @@ package dockerservicemanager
 import (
 	"context"
 	"fmt"
+	"log"
 	"strconv"
 	"time"
 
@@ -98,8 +99,14 @@ func UpdatePluginService(serviceID string, config *PluginServiceConfig) (types.S
 
 	resp, err := dockerClient.ServiceUpdate(ctx, serviceID, swarm.Version{Index: version}, *serviceSpec, types.ServiceUpdateOptions{})
 	for _, port := range config.Ports {
-		rethink.RemovePort(config.Address, strconv.FormatUint(uint64(port.PublishedPort), 10), port.Protocol)
-		rethink.AddPort(config.Address, strconv.FormatUint(uint64(port.PublishedPort), 10), port.Protocol)
+		err = rethink.RemovePort(config.Address, strconv.FormatUint(uint64(port.PublishedPort), 10), port.Protocol)
+		if err != nil {
+			log.Printf("%v", err)
+		}
+		err = rethink.AddPort(config.Address, strconv.FormatUint(uint64(port.PublishedPort), 10), port.Protocol)
+		if err != nil {
+			log.Printf("%v", err)
+		}
 	}
 
 	return resp, err
