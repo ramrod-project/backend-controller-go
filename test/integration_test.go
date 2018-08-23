@@ -897,7 +897,7 @@ func Test_Integration(t *testing.T) {
 							if _, ok := d["new_val"]; !ok {
 								break
 							}
-							if len(d["new_val"].(map[string]interface{})["TCPPorts"].([]interface{}) != 1) {
+							if len(d["new_val"].(map[string]interface{})["TCPPorts"].([]interface{})) != 1 {
 								break
 							}
 							if d["new_val"].(map[string]interface{})["TCPPorts"].([]interface{})[0].(string) != "5005" {
