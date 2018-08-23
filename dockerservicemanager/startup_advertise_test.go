@@ -60,7 +60,7 @@ func Test_getRethinkHost(t *testing.T) {
 
 func Test_getNodes(t *testing.T) {
 
-	ctx := context.TODO()
+	ctx := context.Background()
 	dockerClient, err := client.NewEnvClient()
 	if err != nil {
 		t.Errorf("%v", err)
@@ -109,11 +109,16 @@ func Test_advertiseIPs(t *testing.T) {
 	oldEnv := os.Getenv("STAGE")
 	os.Setenv("STAGE", "TESTING")
 
-	ctx := context.TODO()
+	ctx := context.Background()
 	dockerClient, err := client.NewEnvClient()
 	if err != nil {
 		t.Errorf("%v", err)
 		return
+	}
+
+	// Set up clean environment
+	if err := test.DockerCleanUp(ctx, dockerClient, ""); err != nil {
+		t.Errorf("setup error: %v", err)
 	}
 
 	session, brainID, err := test.StartBrain(ctx, t, dockerClient, test.BrainSpec)
@@ -126,10 +131,11 @@ func Test_advertiseIPs(t *testing.T) {
 		entries []map[string]interface{}
 	}
 	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
-		err     error
+		name     string
+		existing map[string]interface{}
+		args     args
+		wantErr  bool
+		err      error
 	}{
 		{
 			name: "One node",
@@ -166,6 +172,27 @@ func Test_advertiseIPs(t *testing.T) {
 					},
 				},
 			},
+		},
+		{
+			name: "Existing node",
+			existing: map[string]interface{}{
+				"Interface":    "10.0.0.1",
+				"NodeHostName": "ubuntu",
+				"OS":           "posix",
+				"TCPPorts":     []string{},
+				"UDPPorts":     []string{},
+			},
+			args: args{
+				entries: []map[string]interface{}{
+					map[string]interface{}{
+						"Interface":    "10.0.0.3",
+						"NodeHostName": "ubuntu",
+						"OS":           "posix",
+						"TCPPorts":     []string{},
+						"UDPPorts":     []string{},
+					},
+				},
+			},
 			wantErr: false,
 		},
 		{
@@ -179,6 +206,14 @@ func Test_advertiseIPs(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.existing != nil {
+				_, err := r.DB("Controller").Table("Ports").Insert(tt.existing).RunWrite(session)
+				if err != nil {
+					t.Errorf("Rethink error: %v", err)
+					return
+				}
+				time.Sleep(time.Second)
+			}
 			if err := advertiseIPs(tt.args.entries); (err != nil) != tt.wantErr {
 				t.Errorf("advertiseIPs() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -309,11 +344,16 @@ func Test_advertisePlugins(t *testing.T) {
 	oldEnv := os.Getenv("STAGE")
 	os.Setenv("STAGE", "TESTING")
 
-	ctx := context.TODO()
+	ctx := context.Background()
 	dockerClient, err := client.NewEnvClient()
 	if err != nil {
 		t.Errorf("%v", err)
 		return
+	}
+
+	// Set up clean environment
+	if err := test.DockerCleanUp(ctx, dockerClient, ""); err != nil {
+		t.Errorf("setup error: %v", err)
 	}
 
 	session, brainID, err := test.StartBrain(ctx, t, dockerClient, test.BrainSpec)
@@ -324,6 +364,7 @@ func Test_advertisePlugins(t *testing.T) {
 
 	tests := []struct {
 		name     string
+		existing map[string]interface{}
 		manifest []ManifestPlugin
 		want     []map[string]interface{}
 		wantErr  bool
@@ -394,6 +435,42 @@ func Test_advertisePlugins(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "Existing plugin",
+			existing: map[string]interface{}{
+				"Name":          "ExistingPlugin",
+				"ServiceID":     "",
+				"ServiceName":   "",
+				"DesiredState":  "",
+				"State":         "Available",
+				"Interface":     "",
+				"ExternalPorts": []string{},
+				"InternalPorts": []string{},
+				"OS":            string(rethink.PluginOSAll),
+				"Environment":   []string{},
+			},
+			manifest: []ManifestPlugin{
+				ManifestPlugin{
+					Name: "ExistingPlugin",
+					OS:   rethink.PluginOSPosix,
+				},
+			},
+			want: []map[string]interface{}{
+				map[string]interface{}{
+					"Name":          "ExistingPlugin",
+					"ServiceID":     "",
+					"ServiceName":   "",
+					"DesiredState":  "",
+					"State":         "Available",
+					"Interface":     "",
+					"ExternalPorts": []string{},
+					"InternalPorts": []string{},
+					"OS":            string(rethink.PluginOSAll),
+					"Environment":   []string{},
+				},
+			},
+			wantErr: false,
+		},
+		{
 			name:     "No plugin",
 			manifest: []ManifestPlugin{},
 			wantErr:  true,
@@ -402,6 +479,13 @@ func Test_advertisePlugins(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.existing != nil {
+				_, err := r.DB("Controller").Table("Plugins").Insert(tt.existing).RunWrite(session)
+				if err != nil {
+					t.Errorf("%v", err)
+					return
+				}
+			}
 			err := advertisePlugins(tt.manifest)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("%v", err)
@@ -462,22 +546,6 @@ func Test_advertisePlugins(t *testing.T) {
 
 	test.DockerCleanUp(ctx, dockerClient, "")
 }
-
-/*func TestPluginAdvertise(t *testing.T) {
-	tests := []struct {
-		name    string
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-	}
-	for tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if err := PluginAdvertise(); (err != nil) != tt.wantErr {
-				t.Errorf("PluginAdvertise() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}*/
 
 func Test_advertiseStartupService(t *testing.T) {
 	oldEnv := os.Getenv("STAGE")
@@ -628,7 +696,10 @@ func Test_advertiseStartupService(t *testing.T) {
 	test.KillService(ctx, dockerClient, brainID)
 	os.Setenv("STAGE", oldEnv)
 
-	test.DockerCleanUp(ctx, dockerClient, "")
+	//Docker cleanup
+	if err := test.DockerCleanUp(ctx, dockerClient, ""); err != nil {
+		t.Errorf("cleanup error: %v", err)
+	}
 }
 
 func Test_getLeaderHostname(t *testing.T) {

@@ -35,10 +35,12 @@ func TestRemovePluginService(t *testing.T) {
 		return
 	}
 
-	netRes, err := dockerClient.NetworkCreate(ctx, "test_remove", types.NetworkCreate{
-		Driver:     "overlay",
-		Attachable: true,
-	})
+	// Set up clean environment
+	if err := test.DockerCleanUp(ctx, dockerClient, ""); err != nil {
+		t.Errorf("setup error: %v", err)
+	}
+
+	netID, err := test.CheckCreateNet("testremove")
 	if err != nil {
 		t.Errorf("%v", err)
 		return
@@ -72,7 +74,7 @@ func TestRemovePluginService(t *testing.T) {
 			Placement: placementConfig,
 			Networks: []swarm.NetworkAttachmentConfig{
 				swarm.NetworkAttachmentConfig{
-					Target: "test_remove",
+					Target: "testremove",
 				},
 			},
 		},
@@ -127,6 +129,9 @@ func TestRemovePluginService(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := RemovePluginService(tt.args.serviceID); (err != nil) != tt.wantErr {
 				t.Errorf("RemovePluginService() error = %v, wantErr %v", err, tt.wantErr)
+				if err := test.DockerCleanUp(ctx, dockerClient, netID); err != nil {
+					t.Errorf("cleanup error: %v", err)
+				}
 			} else if tt.wantErr {
 				assert.Equal(t, tt.err, err)
 			}
@@ -134,7 +139,5 @@ func TestRemovePluginService(t *testing.T) {
 	}
 
 	//Docker cleanup
-	if err := test.DockerCleanUp(ctx, dockerClient, netRes.ID); err != nil {
-		t.Errorf("cleanup error: %v", err)
-	}
+	dockerClient.NetworkRemove(ctx, netID)
 }

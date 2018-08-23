@@ -63,7 +63,7 @@ func hostString(h string, i string) string {
 }
 
 func GetManagerIP() string {
-	ctx := context.TODO()
+	ctx := context.Background()
 	dockerClient, err := client.NewEnvClient()
 	if err != nil {
 		panic(err)
@@ -102,6 +102,7 @@ func generateServiceSpec(config *PluginServiceConfig) (*swarm.ServiceSpec, error
 		imageName.Name = "ramrodpcp/auxiliary-wrapper"
 	} else if config.OS == rethink.PluginOSPosix || config.OS == rethink.PluginOSAll {
 		imageName.Name = "ramrodpcp/interpreter-plugin"
+		placementConfig.Constraints = []string{"node.labels.os==posix"}
 	} else if config.OS == rethink.PluginOSWindows {
 		imageName.Name = "ramrodpcp/interpreter-plugin-windows"
 		placementConfig.Constraints = []string{"node.labels.os==nt"}
@@ -173,7 +174,7 @@ func generateServiceSpec(config *PluginServiceConfig) (*swarm.ServiceSpec, error
 func CreatePluginService(config *PluginServiceConfig) (types.ServiceCreateResponse, error) {
 
 	// log.Printf("Entering CreatePluginService")
-	ctx := context.TODO()
+	ctx := context.Background()
 	dockerClient, err := client.NewEnvClient()
 
 	if err != nil {
@@ -195,7 +196,7 @@ func CreatePluginService(config *PluginServiceConfig) (types.ServiceCreateRespon
 
 	//update ports
 	for _, port := range config.Ports {
-		log.Printf("Adding: %v, %v",config.Address, string(port.PublishedPort))
+		log.Printf("Adding: %v, %v", config.Address, string(port.PublishedPort))
 		rethink.AddPort(config.Address, string(port.PublishedPort), port.Protocol)
 	}
 

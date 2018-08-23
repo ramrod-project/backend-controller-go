@@ -3,7 +3,6 @@ package dockerservicemanager
 import (
 	"context"
 	"errors"
-	"log"
 	"os"
 	"testing"
 	"time"
@@ -28,10 +27,12 @@ func Test_CreatePluginService(t *testing.T) {
 		return
 	}
 
-	netRes, err := dockerClient.NetworkCreate(ctx, "test_create", types.NetworkCreate{
-		Driver:     "overlay",
-		Attachable: true,
-	})
+	// Set up clean environment
+	if err := test.DockerCleanUp(ctx, dockerClient, ""); err != nil {
+		t.Errorf("setup error: %v", err)
+	}
+
+	netID, err := test.CheckCreateNet("test_create")
 	if err != nil {
 		t.Errorf("%v", err)
 		return
@@ -138,23 +139,20 @@ func Test_CreatePluginService(t *testing.T) {
 				assert.Equal(t, tt.err, err)
 			}
 			assert.Equal(t, tt.want.Warnings, got.Warnings)
-			log.Printf("Warnings: %v\n", got.Warnings)
-			log.Printf("ID created: %v\n\n", got.ID)
 			generatedIDs[i] = got.ID
 		})
 	}
 	//Docker cleanup
-	if err := test.DockerCleanUp(ctx, dockerClient, netRes.ID); err != nil {
+	if err := test.DockerCleanUp(ctx, dockerClient, netID); err != nil {
 		t.Errorf("cleanup error: %v", err)
 	}
 }
 
 func Test_generateServiceSpec(t *testing.T) {
 	var (
-		maxAttempts     = uint64(3)
-		placementConfig = &swarm.Placement{}
-		replicas        = uint64(1)
-		second          = time.Second
+		maxAttempts = uint64(3)
+		replicas    = uint64(1)
+		second      = time.Second
 	)
 
 	ctx := context.Background()
@@ -228,7 +226,9 @@ func Test_generateServiceSpec(t *testing.T) {
 						Condition:   "on-failure",
 						MaxAttempts: &maxAttempts,
 					},
-					Placement: placementConfig,
+					Placement: &swarm.Placement{
+						Constraints: []string{"node.labels.os==posix"},
+					},
 					Networks: []swarm.NetworkAttachmentConfig{
 						swarm.NetworkAttachmentConfig{
 							Target: "goodnet",
@@ -411,7 +411,7 @@ func Test_getTagFromEnv(t *testing.T) {
 
 func Test_getManagerIP(t *testing.T) {
 
-	ctx := context.TODO()
+	ctx := context.Background()
 	dockerClient, err := client.NewEnvClient()
 	if err != nil {
 		t.Errorf("%v", err)

@@ -135,13 +135,13 @@ func RemovePort(IPaddr string, remPort string, protocol swarm.PortConfigProtocol
 		return errors.New("only tcp and udp are supported protocols")
 	}
 	// update entry
-	_, err = r.DB("Controller").Table("Ports").Get(port["id"]).Update(port).RunWrite(session)
+	resp, err := r.DB("Controller").Table("Ports").Get(port["id"]).Update(port).RunWrite(session)
 	if err != nil {
 		log.Printf("%v", err)
 		return err
 	}
-	// if resp.Unchanged == 1 {
-	// 	return errors.New("port doesn't exits")
-	// }
+	if resp.Unchanged == 1 {
+		log.Printf("port doesn't exits\n")
+	}
 	return nil
 }
