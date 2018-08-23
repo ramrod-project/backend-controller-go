@@ -580,6 +580,7 @@ func Test_Integration(t *testing.T) {
 				})
 
 				portCheck := helper.TimeoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
+					log.Printf("starting portcheck\n")
 					sessionTest, err := r.Connect(r.ConnectOpts{
 						Address: "127.0.0.1",
 					})
@@ -608,6 +609,7 @@ func Test_Integration(t *testing.T) {
 					for {
 						select {
 						case <-cntxt.Done():
+							log.Printf("Port done\n")
 							return false
 						case e := <-errChan:
 							log.Println(fmt.Errorf("%v", e))
@@ -625,6 +627,7 @@ func Test_Integration(t *testing.T) {
 							}
 							return true
 						default:
+							log.Printf("%+v", d)
 							break
 						}
 						time.Sleep(100 * time.Millisecond)
