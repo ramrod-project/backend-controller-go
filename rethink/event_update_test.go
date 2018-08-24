@@ -600,29 +600,106 @@ func Test_handleService(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    string
-		want1   map[string]string
+		wantSvc string
+		wantUpd map[string]string
 		wantErr bool
+		err     error
 	}{
 		{
 			name: "service updating event",
+			args: args{
+				event: events.Message{
+					Action: "update",
+					Actor: events.Actor{
+						Attributes: map[string]string{
+							"name":            "testservice",
+							"updatestate.new": "updating",
+						},
+					},
+				},
+			},
+			wantSvc: "testservice",
+			wantUpd: map[string]string{
+				"State":        "Restarting",
+				"DesiredState": "",
+			},
+		},
+		{
+			name: "empty service name",
+			args: args{
+				event: events.Message{
+					Action: "update",
+					Actor: events.Actor{
+						Attributes: map[string]string{},
+					},
+				},
+			},
+			wantSvc: "",
+			wantUpd: map[string]string{},
+			wantErr: true,
+			err:     fmt.Errorf("no service 'name' Attribute"),
+		},
+		{
+			name: "empty update state",
+			args: args{
+				event: events.Message{
+					Action: "update",
+					Actor: events.Actor{
+						Attributes: map[string]string{
+							"name": "testservice",
+						},
+					},
+				},
+			},
+			wantSvc: "",
+			wantUpd: map[string]string{},
+			wantErr: true,
+			err: fmt.Errorf("unhandled service event: %+v", events.Message{
+				Action: "update",
+				Actor: events.Actor{
+					Attributes: map[string]string{
+						"name": "testservice",
+					},
+				},
+			}),
 		},
 		{
 			name: "service create event (dont get)",
+			args: args{
+				event: events.Message{
+					Action: "create",
+					Actor: events.Actor{
+						Attributes: map[string]string{
+							"name": "testservice",
+						},
+					},
+				},
+			},
+			wantSvc: "",
+			wantUpd: map[string]string{},
+			wantErr: true,
+			err: fmt.Errorf("unhandled service event: %+v", events.Message{
+				Action: "create",
+				Actor: events.Actor{
+					Attributes: map[string]string{
+						"name": "testservice",
+					},
+				},
+			}),
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, got1, err := handleService(tt.args.event)
+			gotSvc, gotUpd, err := handleService(tt.args.event)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("handleService() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if got != tt.want {
-				t.Errorf("handleService() got = %v, want %v", got, tt.want)
+			if gotSvc != tt.wantSvc {
+				t.Errorf("handleService() got = %v, want %v", gotSvc, tt.wantSvc)
 			}
-			if !reflect.DeepEqual(got1, tt.want1) {
-				t.Errorf("handleService() got1 = %v, want %v", got1, tt.want1)
+			if !reflect.DeepEqual(gotUpd, tt.wantUpd) {
+				t.Errorf("handleService() got1 = %v, want %v", gotUpd, tt.wantUpd)
 			}
 		})
 	}
