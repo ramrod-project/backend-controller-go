@@ -1,17 +1,11 @@
 package rethink
 
 import (
-	"context"
-	"fmt"
 	"os"
-	"reflect"
-	"testing"
+	"time"
 
-	events "github.com/docker/docker/api/types/events"
-	"github.com/docker/docker/client"
-	"github.com/ramrod-project/backend-controller-go/test"
-	"github.com/stretchr/testify/assert"
-	r "gopkg.in/gorethink/gorethink.v4"
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/swarm"
 )
 
 /*func Test_handleEvent(t *testing.T) {
@@ -235,17 +229,190 @@ import (
 	test.KillService(ctx, dockerClient, brainID)
 }*/
 
-func TestEventUpdate(t *testing.T) {
-	type args struct {
-		in <-chan events.Message
+func getTagFromEnv() string {
+	temp := os.Getenv("TAG")
+	if temp == "" {
+		temp = "latest"
 	}
+	return temp
+}
+
+var testPluginService = swarm.ServiceSpec{
+	Annotations: swarm.Annotations{
+		Name: "TestService",
+	},
+	TaskTemplate: swarm.TaskSpec{
+		ContainerSpec: swarm.ContainerSpec{
+			Env: []string{
+				"PLUGIN=Harness",
+				"PORT=5000",
+				"LOGLEVEL=DEBUG",
+				"STAGE=DEV",
+			},
+			Healthcheck: &container.HealthConfig{
+				Interval: time.Second,
+				Timeout:  time.Second * 3,
+				Retries:  3,
+			},
+			Image: "ramrodpcp/interpreter-plugin" + getTagFromEnv(),
+		},
+		RestartPolicy: &swarm.RestartPolicy{
+			Condition: "on-failure",
+		},
+		Networks: []swarm.NetworkAttachmentConfig{
+			swarm.NetworkAttachmentConfig{
+				Target: "pcp",
+			},
+		},
+	},
+	UpdateConfig: &swarm.UpdateConfig{
+		Parallelism: 0,
+		Delay:       0,
+	},
+	EndpointSpec: &swarm.EndpointSpec{
+		Mode: swarm.ResolutionModeVIP,
+		Ports: []swarm.PortConfig{
+			swarm.PortConfig{
+				Protocol:      swarm.PortConfigProtocolTCP,
+				PublishedPort: 5000,
+				TargetPort:    5000,
+			},
+		},
+	},
+}
+
+/*func TestEventUpdate(t *testing.T) {
+	oldStage := os.Getenv("STAGE")
+	os.Setenv("STAGE", "TESTING")
+
+	ctx := context.Background()
+	dockerClient, err := client.NewEnvClient()
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+
+	var eventBrainSpec = test.BrainSpec
+	eventBrainSpec.Networks = []swarm.NetworkAttachmentConfig{
+		swarm.NetworkAttachmentConfig{
+			Target:  "pcp",
+			Aliases: []string{"rethinkdb"},
+		},
+	}
+	session, brainID, err := test.StartBrain(ctx, t, dockerClient, eventBrainSpec)
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+
+	_, err = r.DB("Controller").Table("Plugins").Insert(map[string]interface{}{
+		"Name":          "TestPlugin",
+		"ServiceID":     "",
+		"ServiceName":   "testing",
+		"DesiredState":  "Activate",
+		"State":         "Available",
+		"Interface":     "192.168.1.1",
+		"ExternalPorts": []string{"1080/tcp"},
+		"InternalPorts": []string{"1080/tcp"},
+		"OS":            string(PluginOSAll),
+	}).RunWrite(session)
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+
 	tests := []struct {
-		name string
-		args args
-		want <-chan error
+		name    string
+		run     func(t *testing.T) bool
+		wait    func(t *testing.T, timeout time.Duration) bool
+		timeout time.Duration
 	}{
 		{
 			name: "service start",
+			run: func(t *testing.T) bool {
+				_, err := test.StartIntegrationTestService(ctx, dockerClient, testPluginService)
+				if err != nil {
+					t.Errorf("%v", err)
+					return false
+				}
+				return true
+			},
+			wait: func(t *testing.T, timeout time.Duration) bool {
+				var (
+					startedService = false
+				)
+
+				// Initialize parent context (with timeout)
+				timeoutCtx, cancel := context.WithTimeout(context.Background(), timeout)
+
+				startDocker := helper.TimeoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
+					dc, err := client.NewEnvClient()
+					if err != nil {
+						t.Errorf("%v", err)
+						return false
+					}
+					cntxt := args[0].(context.Context)
+					eventChan, errChan :=
+
+					for {
+						select {
+						case <-cntxt.Done():
+							return false
+						case e := <-errChan:
+							log.Println(fmt.Errorf("%v", e))
+							return false
+						case e := <-eventChan:
+							if e.Type != "service" {
+								break
+							}
+							if e.Action != "create" {
+								break
+							}
+							if v, ok := e.Actor.Attributes["name"]; ok {
+								if v != "TestPlugin" {
+									break
+								}
+							} else {
+								break
+							}
+							targetService = e.Actor.ID
+							return true
+						}
+						time.Sleep(100 * time.Millisecond)
+					}
+				})
+
+				defer cancel()
+
+				// for loop that iterates until context <-Done()
+				// once <-Done() then get return from all goroutines
+			L:
+				for {
+					select {
+					case <-timeoutCtx.Done():
+						<-portsDB
+						break L
+					case v := <-portsDB:
+						if v {
+							log.Printf("Setting foundService to %v", v)
+							portsFound = v
+						}
+					default:
+						break
+					}
+					if portsFound {
+						break L
+					}
+					time.Sleep(100 * time.Millisecond)
+				}
+
+				if !portsFound {
+					t.Errorf("Plugins (Harness) not found in DB.")
+				}
+
+				return portsFound
+			},
+			timeout: 20 * time.Second,
 		},
 		{
 			name: "service update",
@@ -256,12 +423,11 @@ func TestEventUpdate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := EventUpdate(tt.args.in)
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("EventUpdate() got = %v, want %v", got, tt.want)
-			}
+
 		})
 	}
+	test.KillService(ctx, dockerClient, brainID)
+	os.Setenv("STAGE", oldStage)
 }
 
 func Test_updatePluginStatus(t *testing.T) {
@@ -281,17 +447,21 @@ func Test_updatePluginStatus(t *testing.T) {
 		return
 	}
 
-	r.DB("Controller").Table("Plugins").Insert(map[string]interface{}{
+	_, err = r.DB("Controller").Table("Plugins").Insert(map[string]interface{}{
 		"Name":          "TestPlugin",
 		"ServiceID":     "",
 		"ServiceName":   "testing",
-		"DesiredState":  "Activate",
+		"DesiredState":  "",
 		"State":         "Available",
 		"Interface":     "192.168.1.1",
 		"ExternalPorts": []string{"1080/tcp"},
 		"InternalPorts": []string{"1080/tcp"},
 		"OS":            string(PluginOSAll),
 	}).RunWrite(session)
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
 
 	type args struct {
 		serviceName string
@@ -703,4 +873,4 @@ func Test_handleService(t *testing.T) {
 			}
 		})
 	}
-}
+}*/

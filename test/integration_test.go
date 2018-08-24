@@ -248,7 +248,7 @@ func Test_Integration(t *testing.T) {
 			wait: func(t *testing.T, timeout time.Duration) bool {
 				var (
 					ips        []string
-					portsFound bool = true
+					portsFound = false
 				)
 
 				// get local interfaces from node
@@ -357,7 +357,7 @@ func Test_Integration(t *testing.T) {
 			},
 			wait: func(t *testing.T, timeout time.Duration) bool {
 				var (
-					pluginsFound bool = true
+					pluginsFound bool = false
 				)
 
 				// Initialize parent context (with timeout)
