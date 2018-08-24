@@ -1382,14 +1382,14 @@ func Test_Integration(t *testing.T) {
 							return false
 						case d := <-changeChan:
 							log.Printf("change:\n%+v\n", d)
-							log.Printf("\n%v", d["new_val"].(map[string]interface{})["TCPPorts"].([]interface{})[0].(string))
+							log.Printf("\n%+v", d["new_val"].(map[string]interface{})["TCPPorts"])
 							if _, ok := d["new_val"]; !ok {
 								break
 							}
 							if len(d["new_val"].(map[string]interface{})["TCPPorts"].([]interface{})) != 1 {
 								break
 							}
-							if d["new_val"].(map[string]interface{})["TCPPorts"].([]interface{})[0].(string) != "5005" {
+							if d["new_val"].(map[string]interface{})["TCPPorts"].([]interface{})[0].(string) != "6000" {
 								break
 							}
 							return true
