@@ -101,16 +101,19 @@ func UpdatePluginService(serviceID string, config *PluginServiceConfig) (types.S
 	if err != nil {
 		log.Printf("%v", err)
 	}
+	log.Printf("serv:\n%+v\n", serv)
 	resp, err := dockerClient.ServiceUpdate(ctx, serviceID, swarm.Version{Index: version}, *serviceSpec, types.ServiceUpdateOptions{})
 	if err != nil {
 		return resp, err
 	}
 	for _, port := range serv.PreviousSpec.EndpointSpec.Ports {
+		log.Printf("port:\n%+v\n", port)
 		err = rethink.RemovePort(config.Address, strconv.FormatUint(uint64(port.PublishedPort), 10), port.Protocol)
 		if err != nil {
 			log.Printf("%v", err)
 		}
 	}
+	log.Printf("updating ports removed")
 	for _, port := range config.Ports {
 		err = rethink.AddPort(config.Address, strconv.FormatUint(uint64(port.PublishedPort), 10), port.Protocol)
 		if err != nil {
