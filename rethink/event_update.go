@@ -2,7 +2,6 @@ package rethink
 
 import (
 	"fmt"
-	"log"
 
 	events "github.com/docker/docker/api/types/events"
 	r "gopkg.in/gorethink/gorethink.v4"
@@ -29,7 +28,6 @@ func handleContainer(event events.Message) (string, map[string]string, error) {
 	var serviceName string
 	update := make(map[string]string)
 
-	log.Printf("container event: %+v", event)
 	if _, ok := event.Actor.Attributes["com.docker.swarm.service.name"]; !ok {
 		return "", update, fmt.Errorf("no container 'com.docker.swarm.service.name' Attribute")
 	}
@@ -51,7 +49,6 @@ func handleService(event events.Message) (string, map[string]string, error) {
 	var serviceName string
 	update := make(map[string]string)
 
-	log.Printf("service event: %+v", event)
 	if _, ok := event.Actor.Attributes["name"]; !ok {
 		return "", update, fmt.Errorf("no service 'name' Attribute")
 	}

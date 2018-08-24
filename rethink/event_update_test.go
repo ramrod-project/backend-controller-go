@@ -426,18 +426,154 @@ func Test_handleContainer(t *testing.T) {
 		wantSvc string
 		wantUpd map[string]string
 		wantErr bool
+		err     error
 	}{
 		{
 			name: "container healthy event",
+			args: args{
+				event: events.Message{
+					Status: "health_status: healthy",
+					Actor: events.Actor{
+						Attributes: map[string]string{
+							"com.docker.swarm.service.id":   "testserviceid",
+							"com.docker.swarm.service.name": "testservice",
+						},
+					},
+				},
+			},
+			wantSvc: "testservice",
+			wantUpd: map[string]string{
+				"State":        "Active",
+				"ServiceID":    "testserviceid",
+				"DesiredState": "",
+			},
+		},
+		{
+			name: "container healthy event 2",
+			args: args{
+				event: events.Message{
+					Action: "health_status: healthy",
+					Actor: events.Actor{
+						Attributes: map[string]string{
+							"com.docker.swarm.service.id":   "testserviceid",
+							"com.docker.swarm.service.name": "testservice",
+						},
+					},
+				},
+			},
+			wantSvc: "testservice",
+			wantUpd: map[string]string{
+				"State":        "Active",
+				"ServiceID":    "testserviceid",
+				"DesiredState": "",
+			},
 		},
 		{
 			name: "container unhealthy event",
+			args: args{
+				event: events.Message{
+					Status: "health_status: unhealthy",
+					Actor: events.Actor{
+						Attributes: map[string]string{
+							"com.docker.swarm.service.id":   "testserviceid",
+							"com.docker.swarm.service.name": "testservice",
+						},
+					},
+				},
+			},
+			wantSvc: "testservice",
+			wantUpd: map[string]string{
+				"State":        "Stopped",
+				"DesiredState": "",
+			},
+		},
+		{
+			name: "container unhealthy event 2",
+			args: args{
+				event: events.Message{
+					Action: "health_status: unhealthy",
+					Actor: events.Actor{
+						Attributes: map[string]string{
+							"com.docker.swarm.service.id":   "testserviceid",
+							"com.docker.swarm.service.name": "testservice",
+						},
+					},
+				},
+			},
+			wantSvc: "testservice",
+			wantUpd: map[string]string{
+				"State":        "Stopped",
+				"DesiredState": "",
+			},
 		},
 		{
 			name: "container die event",
+			args: args{
+				event: events.Message{
+					Action: "die",
+					Actor: events.Actor{
+						Attributes: map[string]string{
+							"com.docker.swarm.service.id":   "testserviceid",
+							"com.docker.swarm.service.name": "testservice",
+						},
+					},
+				},
+			},
+			wantSvc: "testservice",
+			wantUpd: map[string]string{
+				"State":        "Stopped",
+				"DesiredState": "",
+			},
+		},
+		{
+			name: "empty service name",
+			args: args{
+				event: events.Message{
+					Action: "health_status: unhealthy",
+					Actor: events.Actor{
+						Attributes: map[string]string{
+							"com.docker.swarm.service.id": "testserviceid",
+						},
+					},
+				},
+			},
+			wantSvc: "",
+			wantUpd: map[string]string{},
+			wantErr: true,
+			err: fmt.Errorf("unhandled container event: %+v", events.Message{
+				Action: "health_status: unhealthy",
+				Actor: events.Actor{
+					Attributes: map[string]string{
+						"com.docker.swarm.service.id": "testserviceid",
+					},
+				},
+			}),
 		},
 		{
 			name: "container kill event (dont get)",
+			args: args{
+				event: events.Message{
+					Action: "kill",
+					Actor: events.Actor{
+						Attributes: map[string]string{
+							"com.docker.swarm.service.name": "testservice",
+							"com.docker.swarm.service.id":   "testserviceid",
+						},
+					},
+				},
+			},
+			wantSvc: "",
+			wantUpd: map[string]string{},
+			wantErr: true,
+			err: fmt.Errorf("unhandled container event: %+v", events.Message{
+				Action: "kill",
+				Actor: events.Actor{
+					Attributes: map[string]string{
+						"com.docker.swarm.service.name": "testservice",
+						"com.docker.swarm.service.id":   "testserviceid",
+					},
+				},
+			}),
 		},
 	}
 	for _, tt := range tests {
