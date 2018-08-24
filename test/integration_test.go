@@ -1381,13 +1381,14 @@ func Test_Integration(t *testing.T) {
 							log.Println(fmt.Errorf("%v", e))
 							return false
 						case d := <-changeChan:
+							log.Printf("%+v", d)
 							if _, ok := d["new_val"]; !ok {
 								break
 							}
 							if len(d["new_val"].(map[string]interface{})["TCPPorts"].([]interface{})) != 1 {
 								break
 							}
-							if d["new_val"].(map[string]interface{})["TCPPorts"].([]interface{})[0].(string) != "6000" {
+							if d["new_val"].(map[string]interface{})["TCPPorts"].([]interface{})[0].(string) != "5005" {
 								break
 							}
 							return true
@@ -1492,7 +1493,7 @@ func Test_Integration(t *testing.T) {
 					t.Errorf("Database stop event not detected")
 				}
 				if !portChecked {
-					t.Errorf("stop pot check event not detected")
+					t.Errorf("stop port check event not detected")
 				}
 
 				return dockerStopped && dbStopped && portChecked
