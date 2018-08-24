@@ -1381,7 +1381,8 @@ func Test_Integration(t *testing.T) {
 							log.Println(fmt.Errorf("%v", e))
 							return false
 						case d := <-changeChan:
-							log.Printf("%+v", d)
+							log.Printf("change:\n%+v\n", d)
+							log.Printf("\n%v", d["new_val"].(map[string]interface{})["TCPPorts"].([]interface{})[0].(string))
 							if _, ok := d["new_val"]; !ok {
 								break
 							}
