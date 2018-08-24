@@ -927,21 +927,14 @@ func Test_Integration(t *testing.T) {
 							log.Println(fmt.Errorf("%v", e))
 							return false
 						case e := <-eventChan:
-							if e.Type != "service" {
+							if e.Type != "container" {
 								break
 							}
-							if e.Action != "update" {
+							if e.Action != "health_status: healthy" && e.Status != "health_status: healthy" {
 								break
 							}
-							if v, ok := e.Actor.Attributes["name"]; ok {
+							if v, ok := e.Actor.Attributes["com.docker.swarm.service.name"]; ok {
 								if v != "TestPlugin" {
-									break
-								}
-							} else {
-								break
-							}
-							if v, ok := e.Actor.Attributes["updatestate.new"]; ok {
-								if v != "completed" {
 									break
 								}
 							} else {
@@ -1498,8 +1491,11 @@ func Test_Integration(t *testing.T) {
 				if !dbStopped {
 					t.Errorf("Database stop event not detected")
 				}
+				if !portChecked {
+					t.Errorf("stop pot check event not detected")
+				}
 
-				return dockerStopped && dbStopped
+				return dockerStopped && dbStopped && portChecked
 			},
 			timeout: 60 * time.Second,
 		},

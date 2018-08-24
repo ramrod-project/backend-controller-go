@@ -1,21 +1,13 @@
 package rethink
 
 import (
-	"context"
-	"fmt"
 	"reflect"
 	"testing"
-	"time"
-
-	"github.com/ramrod-project/backend-controller-go/test"
-	"github.com/stretchr/testify/assert"
 
 	events "github.com/docker/docker/api/types/events"
-	"github.com/docker/docker/client"
-	r "gopkg.in/gorethink/gorethink.v4"
 )
 
-func Test_handleEvent(t *testing.T) {
+/*func Test_handleEvent(t *testing.T) {
 	ctx := context.Background()
 	dockerClient, err := client.NewEnvClient()
 	if err != nil {
@@ -234,7 +226,7 @@ func Test_handleEvent(t *testing.T) {
 	}
 
 	test.KillService(ctx, dockerClient, brainID)
-}
+}*/
 
 func TestEventUpdate(t *testing.T) {
 	type args struct {
@@ -252,6 +244,87 @@ func TestEventUpdate(t *testing.T) {
 			got := EventUpdate(tt.args.in)
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("EventUpdate() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_updatePluginStatus(t *testing.T) {
+	type args struct {
+		serviceName string
+		update      map[string]string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		// TODO: Add test cases.
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := updatePluginStatus(tt.args.serviceName, tt.args.update); (err != nil) != tt.wantErr {
+				t.Errorf("updatePluginStatus() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func Test_handleContainer(t *testing.T) {
+	type args struct {
+		event events.Message
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    string
+		want1   map[string]string
+		wantErr bool
+	}{
+		// TODO: Add test cases.
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, got1, err := handleContainer(tt.args.event)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("handleContainer() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("handleContainer() got = %v, want %v", got, tt.want)
+			}
+			if !reflect.DeepEqual(got1, tt.want1) {
+				t.Errorf("handleContainer() got1 = %v, want %v", got1, tt.want1)
+			}
+		})
+	}
+}
+
+func Test_handleService(t *testing.T) {
+	type args struct {
+		event events.Message
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    string
+		want1   map[string]string
+		wantErr bool
+	}{
+		// TODO: Add test cases.
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, got1, err := handleService(tt.args.event)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("handleService() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("handleService() got = %v, want %v", got, tt.want)
+			}
+			if !reflect.DeepEqual(got1, tt.want1) {
+				t.Errorf("handleService() got1 = %v, want %v", got1, tt.want1)
 			}
 		})
 	}
