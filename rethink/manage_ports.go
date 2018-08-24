@@ -11,7 +11,7 @@ import (
 
 func GetIPFromID(servID string) (string, error) {
 	session, err := r.Connect(r.ConnectOpts{
-		Address: "127.0.0.1",
+		Address: GetRethinkHost(),
 	})
 	if err != nil {
 		return "", err
