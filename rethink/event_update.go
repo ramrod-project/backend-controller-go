@@ -18,7 +18,10 @@ func updatePluginStatus(serviceName string, update map[string]string) error {
 		return err
 	}
 
-	_, err = r.DB("Controller").Table("Plugins").Filter(filter).Update(update).RunWrite(session)
+	res, err := r.DB("Controller").Table("Plugins").Filter(filter).Update(update).RunWrite(session)
+	if res.Errors > 0 || !(res.Replaced > 0 || res.Updated > 0) {
+		return fmt.Errorf("no plugin to update")
+	}
 	return err
 }
 

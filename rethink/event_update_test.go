@@ -1,10 +1,17 @@
 package rethink
 
 import (
+	"context"
+	"fmt"
+	"os"
 	"reflect"
 	"testing"
 
 	events "github.com/docker/docker/api/types/events"
+	"github.com/docker/docker/client"
+	"github.com/ramrod-project/backend-controller-go/test"
+	"github.com/stretchr/testify/assert"
+	r "gopkg.in/gorethink/gorethink.v4"
 )
 
 /*func Test_handleEvent(t *testing.T) {
@@ -237,7 +244,15 @@ func TestEventUpdate(t *testing.T) {
 		args args
 		want <-chan error
 	}{
-		// TODO: Add test cases.
+		{
+			name: "service start",
+		},
+		{
+			name: "service update",
+		},
+		{
+			name: "service remove",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -250,6 +265,34 @@ func TestEventUpdate(t *testing.T) {
 }
 
 func Test_updatePluginStatus(t *testing.T) {
+	oldStage := os.Getenv("STAGE")
+	os.Setenv("STAGE", "TESTING")
+
+	ctx := context.Background()
+	dockerClient, err := client.NewEnvClient()
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+
+	session, brainID, err := test.StartBrain(ctx, t, dockerClient, test.BrainSpec)
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+
+	r.DB("Controller").Table("Plugins").Insert(map[string]interface{}{
+		"Name":          "TestPlugin",
+		"ServiceID":     "",
+		"ServiceName":   "testing",
+		"DesiredState":  "Activate",
+		"State":         "Available",
+		"Interface":     "192.168.1.1",
+		"ExternalPorts": []string{"1080/tcp"},
+		"InternalPorts": []string{"1080/tcp"},
+		"OS":            string(PluginOSAll),
+	}).RunWrite(session)
+
 	type args struct {
 		serviceName string
 		update      map[string]string
@@ -257,17 +300,120 @@ func Test_updatePluginStatus(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
+		wantDB  map[string]interface{}
 		wantErr bool
+		err     error
 	}{
-		// TODO: Add test cases.
+		{
+			name: "service start",
+			args: args{
+				serviceName: "testing",
+				update: map[string]string{
+					"State":        "Active",
+					"ServiceID":    "hfaldfhak87dfhsddfvns0naef",
+					"DesiredState": "",
+				},
+			},
+			wantDB: map[string]interface{}{
+				"Name":          "TestPlugin",
+				"ServiceID":     "hfaldfhak87dfhsddfvns0naef",
+				"ServiceName":   "testing",
+				"DesiredState":  "",
+				"State":         "Active",
+				"Interface":     "192.168.1.1",
+				"ExternalPorts": []string{"1080/tcp"},
+				"InternalPorts": []string{"1080/tcp"},
+				"OS":            string(PluginOSAll),
+			},
+		},
+		{
+			name: "service update",
+			args: args{
+				serviceName: "testing",
+				update: map[string]string{
+					"State":        "Restarting",
+					"DesiredState": "",
+				},
+			},
+			wantDB: map[string]interface{}{
+				"Name":          "TestPlugin",
+				"ServiceID":     "hfaldfhak87dfhsddfvns0naef",
+				"ServiceName":   "testing",
+				"DesiredState":  "",
+				"State":         "Restarting",
+				"Interface":     "192.168.1.1",
+				"ExternalPorts": []string{"1080/tcp"},
+				"InternalPorts": []string{"1080/tcp"},
+				"OS":            string(PluginOSAll),
+			},
+		},
+		{
+			name: "service remove",
+			args: args{
+				serviceName: "testing",
+				update: map[string]string{
+					"State":        "Stopped",
+					"DesiredState": "",
+				},
+			},
+			wantDB: map[string]interface{}{
+				"Name":          "TestPlugin",
+				"ServiceID":     "hfaldfhak87dfhsddfvns0naef",
+				"ServiceName":   "testing",
+				"DesiredState":  "",
+				"State":         "Stopped",
+				"Interface":     "192.168.1.1",
+				"ExternalPorts": []string{"1080/tcp"},
+				"InternalPorts": []string{"1080/tcp"},
+				"OS":            string(PluginOSAll),
+			},
+		},
+		{
+			name: "bad service",
+			args: args{
+				serviceName: "testingbad",
+				update: map[string]string{
+					"State":        "Active",
+					"ServiceID":    "hfaldfhak87dfhsddfvns0naef",
+					"DesiredState": "",
+				},
+			},
+			wantErr: true,
+			err:     fmt.Errorf("no plugin to update"),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			var doc map[string]interface{}
 			if err := updatePluginStatus(tt.args.serviceName, tt.args.update); (err != nil) != tt.wantErr {
 				t.Errorf("updatePluginStatus() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			} else if tt.wantErr {
+				assert.Equal(t, tt.err, err)
+				return
 			}
+			cursor, err := r.DB("Controller").Table("Plugins").Run(session)
+			if err != nil {
+				t.Errorf("rethink error: %v", err)
+				return
+			}
+			if !cursor.Next(&doc) {
+				t.Errorf("cursor empty")
+				return
+			}
+			assert.Equal(t, tt.wantDB["Name"].(string), doc["Name"].(string))
+			assert.Equal(t, tt.wantDB["ServiceID"].(string), doc["ServiceID"].(string))
+			assert.Equal(t, tt.wantDB["ServiceName"].(string), doc["ServiceName"].(string))
+			assert.Equal(t, tt.wantDB["DesiredState"].(string), doc["DesiredState"].(string))
+			assert.Equal(t, tt.wantDB["State"].(string), doc["State"].(string))
+			assert.Equal(t, tt.wantDB["Interface"].(string), doc["Interface"].(string))
+			assert.Equal(t, tt.wantDB["ExternalPorts"].([]string)[0], doc["ExternalPorts"].([]interface{})[0].(string))
+			assert.Equal(t, tt.wantDB["InternalPorts"].([]string)[0], doc["InternalPorts"].([]interface{})[0].(string))
+			assert.Equal(t, tt.wantDB["OS"].(string), doc["OS"].(string))
 		})
 	}
+	test.KillService(ctx, dockerClient, brainID)
+	os.Setenv("STAGE", oldStage)
 }
 
 func Test_handleContainer(t *testing.T) {
@@ -277,24 +423,35 @@ func Test_handleContainer(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    string
-		want1   map[string]string
+		wantSvc string
+		wantUpd map[string]string
 		wantErr bool
 	}{
-		// TODO: Add test cases.
+		{
+			name: "container healthy event",
+		},
+		{
+			name: "container unhealthy event",
+		},
+		{
+			name: "container die event",
+		},
+		{
+			name: "container kill event (dont get)",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, got1, err := handleContainer(tt.args.event)
+			gotSvc, gotUpd, err := handleContainer(tt.args.event)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("handleContainer() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if got != tt.want {
-				t.Errorf("handleContainer() got = %v, want %v", got, tt.want)
+			if gotSvc != tt.wantSvc {
+				t.Errorf("handleContainer() got = %v, want %v", gotSvc, tt.wantSvc)
 			}
-			if !reflect.DeepEqual(got1, tt.want1) {
-				t.Errorf("handleContainer() got1 = %v, want %v", got1, tt.want1)
+			if !reflect.DeepEqual(gotUpd, tt.wantUpd) {
+				t.Errorf("handleContainer() got1 = %v, want %v", gotUpd, tt.wantUpd)
 			}
 		})
 	}
@@ -311,7 +468,12 @@ func Test_handleService(t *testing.T) {
 		want1   map[string]string
 		wantErr bool
 	}{
-		// TODO: Add test cases.
+		{
+			name: "service updating event",
+		},
+		{
+			name: "service create event (dont get)",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
