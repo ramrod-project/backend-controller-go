@@ -106,7 +106,7 @@ func UpdatePluginService(serviceID string, config *PluginServiceConfig) (types.S
 	if err != nil {
 		return resp, err
 	}
-	for _, port := range serv.PreviousSpec.EndpointSpec.Ports {
+	for _, port := range serv.Spec.EndpointSpec.Ports {
 		log.Printf("port:\n%+v\n", port)
 		err = rethink.RemovePort(config.Address, strconv.FormatUint(uint64(port.PublishedPort), 10), port.Protocol)
 		if err != nil {
