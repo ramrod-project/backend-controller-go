@@ -1292,7 +1292,6 @@ func Test_Integration(t *testing.T) {
 		{
 			name: "Stop services",
 			run: func(t *testing.T) bool {
-				dumpEverything(ctx, t, dockerClient, session)
 				filter := make(map[string]string)
 				update := make(map[string]string)
 				filter["ServiceName"] = "TestPlugin"
@@ -1497,6 +1496,8 @@ func Test_Integration(t *testing.T) {
 				if !portChecked {
 					t.Errorf("stop port check event not detected")
 				}
+
+				dumpEverything(ctx, t, dockerClient, session)
 
 				return dockerStopped && dbStopped && portChecked
 			},
