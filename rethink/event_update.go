@@ -2,7 +2,6 @@ package rethink
 
 import (
 	"fmt"
-	"log"
 
 	events "github.com/docker/docker/api/types/events"
 	r "gopkg.in/gorethink/gorethink.v4"

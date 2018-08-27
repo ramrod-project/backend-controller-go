@@ -28,6 +28,7 @@ func RemovePluginService(serviceID string) error {
 	if err != nil {
 		log.Printf("%v", err)
 	}
+	log.Printf("serv id: \n%v", servIP)
 
 	log.Printf("Removing service %v\n", serviceID)
 
