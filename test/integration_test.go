@@ -330,7 +330,7 @@ func Test_Integration(t *testing.T) {
 						break L
 					case v := <-portsDB:
 						if v {
-							log.Printf("Setting foundService to %v", v)
+							log.Printf("Setting portsFound to %v", v)
 							portsFound = v
 						}
 					default:
@@ -1492,7 +1492,7 @@ func Test_Integration(t *testing.T) {
 					t.Errorf("Database stop event not detected")
 				}
 				if !portChecked {
-					t.Errorf("stop pot check event not detected")
+					t.Errorf("stop port check event not detected")
 				}
 
 				return dockerStopped && dbStopped && portChecked
