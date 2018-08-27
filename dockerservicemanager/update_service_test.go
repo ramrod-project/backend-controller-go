@@ -48,15 +48,14 @@ func TestUpdatePluginService(t *testing.T) {
 		return
 	}
 
-	e := map[string]interface{}{
+	testPort := map[string]interface{}{
 		"Interface":    GetManagerIP(),
-		"NodeHostName": "ubuntu",
-		"OS":           "posix",
 		"TCPPorts":     []string{},
 		"UDPPorts":     []string{},
+		"NodeHostName": "ubuntu",
+		"OS":           "posix",
 	}
-
-	_, err = r.DB("Controller").Table("Ports").Insert(e).RunWrite(session)
+	_, err = r.DB("Controller").Table("Ports").Insert(testPort).RunWrite(session)
 	if err != nil {
 		t.Errorf("%v", err)
 		return

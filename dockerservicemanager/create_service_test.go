@@ -13,6 +13,7 @@ import (
 	client "github.com/docker/docker/client"
 	"github.com/ramrod-project/backend-controller-go/test"
 	"github.com/stretchr/testify/assert"
+	r "gopkg.in/gorethink/gorethink.v4"
 )
 
 // TODO:
@@ -33,8 +34,21 @@ func Test_CreatePluginService(t *testing.T) {
 	if err := test.DockerCleanUp(ctx, dockerClient, ""); err != nil {
 		t.Errorf("setup error: %v", err)
 	}
-	
-	_, brainID, err := test.StartBrain(ctx, t, dockerClient, test.BrainSpec)
+
+	session, brainID, err := test.StartBrain(ctx, t, dockerClient, test.BrainSpec)
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+
+	testPort := map[string]interface{}{
+		"Interface":    GetManagerIP(),
+		"TCPPorts":     []string{},
+		"UDPPorts":     []string{},
+		"NodeHostName": "test",
+		"OS":           "posix",
+	}
+	_, err = r.DB("Controller").Table("Ports").Insert(testPort).RunWrite(session)
 	if err != nil {
 		t.Errorf("%v", err)
 		return
@@ -60,6 +74,7 @@ func Test_CreatePluginService(t *testing.T) {
 			name: "Test creating a plugin service",
 			args: args{
 				config: PluginServiceConfig{
+					Address: GetManagerIP(),
 					Environment: []string{
 						"STAGE=DEV",
 						"LOGLEVEL=DEBUG",
@@ -85,6 +100,7 @@ func Test_CreatePluginService(t *testing.T) {
 			name: "Bad network",
 			args: args{
 				config: PluginServiceConfig{
+					Address: GetManagerIP(),
 					Environment: []string{
 						"STAGE=DEV",
 						"LOGLEVEL=DEBUG",
@@ -112,6 +128,7 @@ func Test_CreatePluginService(t *testing.T) {
 			name: "Duplicate service name",
 			args: args{
 				config: PluginServiceConfig{
+					Address: GetManagerIP(),
 					Environment: []string{
 						"STAGE=DEV",
 						"LOGLEVEL=DEBUG",

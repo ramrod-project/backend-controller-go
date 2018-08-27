@@ -11,6 +11,7 @@ import (
 	swarm "github.com/docker/docker/api/types/swarm"
 	client "github.com/docker/docker/client"
 	"github.com/ramrod-project/backend-controller-go/test"
+	r "gopkg.in/gorethink/gorethink.v4"
 )
 
 func TestRemovePluginService(t *testing.T) {
@@ -40,7 +41,20 @@ func TestRemovePluginService(t *testing.T) {
 		t.Errorf("setup error: %v", err)
 	}
 
-	_, brainID, err := test.StartBrain(ctx, t, dockerClient, test.BrainSpec)
+	session, brainID, err := test.StartBrain(ctx, t, dockerClient, test.BrainSpec)
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+
+	testPort := map[string]interface{}{
+		"Interface":    GetManagerIP(),
+		"TCPPorts":     []string{"666"},
+		"UDPPorts":     []string{},
+		"NodeHostName": "test",
+		"OS":           "posix",
+	}
+	_, err = r.DB("Controller").Table("Ports").Insert(testPort).RunWrite(session)
 	if err != nil {
 		t.Errorf("%v", err)
 		return
