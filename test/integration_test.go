@@ -214,6 +214,7 @@ func Test_Integration(t *testing.T) {
 			Aliases: []string{"rethinkdb"},
 		},
 	}
+	intBrainSpec.Annotations.Labels = map[string]string{"com.docker.stack.namespace": "test"}
 
 	// Start the brain
 	session, brainID, err := StartBrain(ctx, t, dockerClient, intBrainSpec)
@@ -248,7 +249,7 @@ func Test_Integration(t *testing.T) {
 			wait: func(t *testing.T, timeout time.Duration) bool {
 				var (
 					ips        []string
-					portsFound bool = true
+					portsFound = false
 				)
 
 				// get local interfaces from node
@@ -330,7 +331,7 @@ func Test_Integration(t *testing.T) {
 						break L
 					case v := <-portsDB:
 						if v {
-							log.Printf("Setting foundService to %v", v)
+							log.Printf("Setting portsFound to %v", v)
 							portsFound = v
 						}
 					default:
@@ -357,7 +358,7 @@ func Test_Integration(t *testing.T) {
 			},
 			wait: func(t *testing.T, timeout time.Duration) bool {
 				var (
-					pluginsFound bool = true
+					pluginsFound bool = false
 				)
 
 				// Initialize parent context (with timeout)
@@ -397,6 +398,9 @@ func Test_Integration(t *testing.T) {
 							log.Println(fmt.Errorf("%v", e))
 							return false
 						case d := <-changeChan:
+							if d["Name"] == nil {
+								break
+							}
 							if d["Name"].(string) != "Harness" {
 								break
 							}
@@ -927,21 +931,14 @@ func Test_Integration(t *testing.T) {
 							log.Println(fmt.Errorf("%v", e))
 							return false
 						case e := <-eventChan:
-							if e.Type != "service" {
+							if e.Type != "container" {
 								break
 							}
-							if e.Action != "update" {
+							if e.Action != "health_status: healthy" && e.Status != "health_status: healthy" {
 								break
 							}
-							if v, ok := e.Actor.Attributes["name"]; ok {
+							if v, ok := e.Actor.Attributes["com.docker.swarm.service.name"]; ok {
 								if v != "TestPlugin" {
-									break
-								}
-							} else {
-								break
-							}
-							if v, ok := e.Actor.Attributes["updatestate.new"]; ok {
-								if v != "completed" {
 									break
 								}
 							} else {
@@ -1498,8 +1495,11 @@ func Test_Integration(t *testing.T) {
 				if !dbStopped {
 					t.Errorf("Database stop event not detected")
 				}
+				if !portChecked {
+					t.Errorf("stop port check event not detected")
+				}
 
-				return dockerStopped && dbStopped
+				return dockerStopped && dbStopped && portChecked
 			},
 			timeout: 60 * time.Second,
 		},

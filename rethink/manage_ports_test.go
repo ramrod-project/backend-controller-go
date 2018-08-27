@@ -90,7 +90,7 @@ func TestAddPort(t *testing.T) {
 				newPort:  "9990",
 				protocol: swarm.PortConfigProtocolTCP,
 			},
-			wantErr: true,
+			wantErr: false,
 		},
 	}
 	for _, tt := range tests {

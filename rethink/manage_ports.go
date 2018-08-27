@@ -11,7 +11,7 @@ import (
 
 func GetIPFromID(servID string) (string, error) {
 	session, err := r.Connect(r.ConnectOpts{
-		Address: "127.0.0.1",
+		Address: GetRethinkHost(),
 	})
 	if err != nil {
 		return "", err
@@ -87,12 +87,12 @@ func AddPort(IPaddr string, newPort string, protocol swarm.PortConfigProtocol) e
 	//update the ports
 	if protocol == swarm.PortConfigProtocolTCP {
 		if Contains(newTCP, newPort) {
-			return errors.New("port already in use")
+			return nil
 		}
 		port["TCPPorts"] = append(newTCP, newPort)
 	} else if protocol == swarm.PortConfigProtocolUDP {
 		if Contains(newUDP, newPort) {
-			return errors.New("port already in use")
+			return nil
 		}
 		port["UDPPorts"] = append(newUDP, newPort)
 	} else {
