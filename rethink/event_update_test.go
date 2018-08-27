@@ -241,31 +241,6 @@ import (
 	test.KillService(ctx, dockerClient, brainID)
 }*/
 
-func getTagFromEnv() string {
-	temp := os.Getenv("TAG")
-	if temp == "" {
-		temp = "latest"
-	}
-	return temp
-}
-
-func dbPluginChanges(s *r.Session) (<-chan map[string]interface{}, <-chan error) {
-	changes := make(chan map[string]interface{})
-	errs := make(chan error)
-	go func() {
-		cursor, err := r.DB("Controller").Table("Plugins").Changes().Run(s)
-		if err != nil {
-			log.Println(fmt.Errorf("%v", err))
-			errs <- err
-		}
-		var doc map[string]interface{}
-		for cursor.Next(&doc) {
-			changes <- doc
-		}
-	}()
-	return changes, errs
-}
-
 var testPluginService = swarm.ServiceSpec{
 	Annotations: swarm.Annotations{
 		Name: "TestService",
@@ -303,6 +278,101 @@ var testPluginService = swarm.ServiceSpec{
 			},
 		},
 	},
+}
+
+func getTagFromEnv() string {
+	temp := os.Getenv("TAG")
+	if temp == "" {
+		temp = "latest"
+	}
+	return temp
+}
+
+func dbPluginChanges(s *r.Session) (<-chan map[string]interface{}, <-chan error) {
+	changes := make(chan map[string]interface{})
+	errs := make(chan error)
+	go func() {
+		cursor, err := r.DB("Controller").Table("Plugins").Changes().Run(s)
+		if err != nil {
+			log.Println(fmt.Errorf("%v", err))
+			errs <- err
+		}
+		var doc map[string]interface{}
+		for cursor.Next(&doc) {
+			changes <- doc
+		}
+	}()
+	return changes, errs
+}
+
+// Takes a (1) context and a (2) condition checking function argument
+func dockerMonitor(args ...interface{}) bool {
+	dc, err := client.NewEnvClient()
+	if err != nil {
+		return false
+	}
+	// Get expected arguments
+	cntxt := args[0].(context.Context)
+	condition := args[1].(func(events.Message) bool)
+
+	filter := filters.NewArgs()
+	filter.Add("type", "container")
+	filter.Add("type", "service")
+	filter.Add("event", "die")
+	filter.Add("event", "health_status")
+	filter.Add("event", "update")
+	eventChan, errChan := dc.Events(cntxt, types.EventsOptions{
+		Filters: filter,
+	})
+
+	for {
+		select {
+		case <-cntxt.Done():
+			return false
+		case e := <-errChan:
+			log.Println(fmt.Errorf("%v", e))
+			return false
+		case e := <-eventChan:
+			if condition(e) {
+				return true
+			}
+			break
+		default:
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+}
+
+// Takes a (1) context and a (2) condition checking function argument
+func dbMonitor(args ...interface{}) bool {
+	sessionTest, err := r.Connect(r.ConnectOpts{
+		Address: "127.0.0.1",
+	})
+	if err != nil {
+		return false
+	}
+	cntxt := args[0].(context.Context)
+	condition := args[1].(func(map[string]interface{}) bool)
+	changeChan, errChan := dbPluginChanges(sessionTest)
+
+	for {
+		select {
+		case <-cntxt.Done():
+			return false
+		case e := <-errChan:
+			log.Println(fmt.Errorf("%v", e))
+			return false
+		case d := <-changeChan:
+			if condition(d) {
+				return true
+			}
+			break
+		default:
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
 }
 
 func TestEventUpdate(t *testing.T) {
@@ -356,6 +426,8 @@ func TestEventUpdate(t *testing.T) {
 		return
 	}
 
+	var targetService string
+
 	tests := []struct {
 		name    string
 		run     func(t *testing.T) bool
@@ -365,7 +437,7 @@ func TestEventUpdate(t *testing.T) {
 		{
 			name: "service start",
 			run: func(t *testing.T) bool {
-				_, err := test.StartIntegrationTestService(ctx, dockerClient, testPluginService)
+				targetService, err = test.StartIntegrationTestService(ctx, dockerClient, testPluginService)
 				if err != nil {
 					t.Errorf("%v", err)
 					return false
@@ -507,6 +579,277 @@ func TestEventUpdate(t *testing.T) {
 				}
 
 				return startedService && dbUpdated
+			},
+			timeout: 30 * time.Second,
+		},
+		{
+			name: "service update",
+			run: func(t *testing.T) bool {
+				newTestPluginService := testPluginService
+				newTestPluginService.TaskTemplate.ContainerSpec.Env = append(newTestPluginService.TaskTemplate.ContainerSpec.Env, "TEST=TEST2")
+
+				insp, _, err := dockerClient.ServiceInspectWithRaw(ctx, targetService)
+				if err != nil {
+					t.Errorf("%v", err)
+					return false
+				}
+				dockerClient.ServiceUpdate(ctx, targetService, insp.Meta.Version, newTestPluginService, types.ServiceUpdateOptions{})
+				if err != nil {
+					t.Errorf("%v", err)
+					return false
+				}
+				return true
+			},
+			wait: func(t *testing.T, timeout time.Duration) bool {
+				var (
+					serviceUpdating = false
+					dbUpdating      = false
+					serviceUpdated  = false
+					dbUpdated       = false
+					updatedDB       = make(<-chan bool)
+					updatedDocker   = make(<-chan bool)
+				)
+
+				// Initialize parent context (with timeout)
+				timeoutCtx, cancel := context.WithTimeout(context.Background(), timeout)
+
+				updatingDocker := helper.TimeoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
+					dc, err := client.NewEnvClient()
+					if err != nil {
+						t.Errorf("%v", err)
+						return false
+					}
+					cntxt := args[0].(context.Context)
+					filter := filters.NewArgs()
+					filter.Add("type", "container")
+					filter.Add("type", "service")
+					filter.Add("event", "die")
+					filter.Add("event", "health_status")
+					filter.Add("event", "update")
+					eventChan, errChan := dc.Events(cntxt, types.EventsOptions{
+						Filters: filter,
+					})
+
+					for {
+						select {
+						case <-cntxt.Done():
+							return false
+						case e := <-errChan:
+							log.Println(fmt.Errorf("%v", e))
+							return false
+						case e := <-eventChan:
+							if e.Type != "service" {
+								break
+							}
+							if e.Action != "update" {
+								break
+							}
+							if v, ok := e.Actor.Attributes["name"]; ok {
+								if v != "TestService" {
+									break
+								}
+							} else {
+								break
+							}
+							if v, ok := e.Actor.Attributes["updatestate.new"]; ok {
+								if v != "updating" {
+									break
+								}
+							} else {
+								break
+							}
+							return true
+						}
+						time.Sleep(100 * time.Millisecond)
+					}
+				})
+
+				updatingDB := helper.TimeoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
+					sessionTest, err := r.Connect(r.ConnectOpts{
+						Address: "127.0.0.1",
+					})
+					if err != nil {
+						t.Errorf("%v", err)
+						return false
+					}
+					cntxt := args[0].(context.Context)
+					changeChan, errChan := dbPluginChanges(sessionTest)
+
+					for {
+						select {
+						case <-cntxt.Done():
+							return false
+						case e := <-errChan:
+							log.Println(fmt.Errorf("%v", e))
+							return false
+						case d := <-changeChan:
+							var c map[string]interface{}
+							if v, ok := d["new_val"]; !ok {
+								break
+							} else {
+								c = v.(map[string]interface{})
+							}
+							if c["ServiceName"].(string) != "TestService" {
+								break
+							}
+							if c["DesiredState"].(string) != "" {
+								break
+							}
+							if c["State"].(string) != "Restarting" {
+								break
+							}
+							if c["ServiceID"].(string) == "" {
+								break
+							}
+							return true
+						default:
+							break
+						}
+						time.Sleep(100 * time.Millisecond)
+					}
+				})
+
+				defer cancel()
+
+				// for loop that iterates until context <-Done()
+				// once <-Done() then get return from all goroutines
+			L:
+				for {
+					select {
+					case <-timeoutCtx.Done():
+						<-updatingDB
+						<-updatingDocker
+						break L
+					case v := <-updatingDocker:
+						if v {
+							log.Printf("Setting serviceUpdating to %v", v)
+							serviceUpdating = v
+							updatedDocker = helper.TimeoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
+								dc, err := client.NewEnvClient()
+								if err != nil {
+									t.Errorf("%v", err)
+									return false
+								}
+								cntxt := args[0].(context.Context)
+								filter := filters.NewArgs()
+								filter.Add("type", "container")
+								filter.Add("type", "service")
+								filter.Add("event", "die")
+								filter.Add("event", "health_status")
+								filter.Add("event", "update")
+								eventChan, errChan := dc.Events(cntxt, types.EventsOptions{
+									Filters: filter,
+								})
+
+								for {
+									select {
+									case <-cntxt.Done():
+										return false
+									case e := <-errChan:
+										log.Println(fmt.Errorf("%v", e))
+										return false
+									case e := <-eventChan:
+										if e.Type != "container" {
+											break
+										}
+										if e.Action != "health_status: healthy" && e.Status != "health_status: healthy" {
+											break
+										}
+										if v, ok := e.Actor.Attributes["com.docker.swarm.service.name"]; ok {
+											if v != "TestService" {
+												break
+											}
+										} else {
+											break
+										}
+										return true
+									}
+									time.Sleep(100 * time.Millisecond)
+								}
+							})
+						}
+					case v := <-updatingDB:
+						if v {
+							log.Printf("Setting dbUpdating to %v", v)
+							dbUpdating = v
+							updatedDB = helper.TimeoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
+								sessionTest, err := r.Connect(r.ConnectOpts{
+									Address: "127.0.0.1",
+								})
+								if err != nil {
+									t.Errorf("%v", err)
+									return false
+								}
+								cntxt := args[0].(context.Context)
+								changeChan, errChan := dbPluginChanges(sessionTest)
+
+								for {
+									select {
+									case <-cntxt.Done():
+										return false
+									case e := <-errChan:
+										log.Println(fmt.Errorf("%v", e))
+										return false
+									case d := <-changeChan:
+										var c map[string]interface{}
+										if v, ok := d["new_val"]; !ok {
+											break
+										} else {
+											c = v.(map[string]interface{})
+										}
+										if c["ServiceName"].(string) != "TestService" {
+											break
+										}
+										if c["DesiredState"].(string) != "" {
+											break
+										}
+										if c["State"].(string) != "Active" {
+											break
+										}
+										if c["ServiceID"].(string) == "" {
+											break
+										}
+										return true
+									default:
+										break
+									}
+									time.Sleep(100 * time.Millisecond)
+								}
+							})
+						}
+					case v := <-updatedDocker:
+						if v {
+							log.Printf("Setting serviceUpdated to %v", v)
+							serviceUpdated = v
+						}
+					case v := <-updatedDB:
+						if v {
+							log.Printf("Setting dbUpdated to %v", v)
+							dbUpdated = v
+						}
+					default:
+						break
+					}
+					if serviceUpdating && dbUpdating && serviceUpdated && dbUpdated {
+						break L
+					}
+					time.Sleep(100 * time.Millisecond)
+				}
+
+				if !serviceUpdating {
+					t.Errorf("service updating not detected in Docker")
+				}
+				if !dbUpdating {
+					t.Errorf("DB not updated with service updating info")
+				}
+				if !serviceUpdated {
+					t.Errorf("service update complete not detected in Docker")
+				}
+				if !dbUpdated {
+					t.Errorf("DB not updated with service update complete info")
+				}
+
+				return serviceUpdating && dbUpdating && serviceUpdated && dbUpdated
 			},
 			timeout: 30 * time.Second,
 		},
