@@ -1,11 +1,23 @@
 package rethink
 
 import (
+	"context"
+	"fmt"
+	"log"
 	"os"
+	"reflect"
+	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types"
+	events "github.com/docker/docker/api/types/events"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/swarm"
+	"github.com/docker/docker/client"
+	"github.com/ramrod-project/backend-controller-go/helper"
+	"github.com/ramrod-project/backend-controller-go/test"
+	"github.com/stretchr/testify/assert"
+	r "gopkg.in/gorethink/gorethink.v4"
 )
 
 /*func Test_handleEvent(t *testing.T) {
@@ -237,6 +249,23 @@ func getTagFromEnv() string {
 	return temp
 }
 
+func dbPluginChanges(s *r.Session) (<-chan map[string]interface{}, <-chan error) {
+	changes := make(chan map[string]interface{})
+	errs := make(chan error)
+	go func() {
+		cursor, err := r.DB("Controller").Table("Plugins").Changes().Run(s)
+		if err != nil {
+			log.Println(fmt.Errorf("%v", err))
+			errs <- err
+		}
+		var doc map[string]interface{}
+		for cursor.Next(&doc) {
+			changes <- doc
+		}
+	}()
+	return changes, errs
+}
+
 var testPluginService = swarm.ServiceSpec{
 	Annotations: swarm.Annotations{
 		Name: "TestService",
@@ -245,16 +274,11 @@ var testPluginService = swarm.ServiceSpec{
 		ContainerSpec: swarm.ContainerSpec{
 			Env: []string{
 				"PLUGIN=Harness",
-				"PORT=5000",
+				"PORT=1080",
 				"LOGLEVEL=DEBUG",
 				"STAGE=DEV",
 			},
-			Healthcheck: &container.HealthConfig{
-				Interval: time.Second,
-				Timeout:  time.Second * 3,
-				Retries:  3,
-			},
-			Image: "ramrodpcp/interpreter-plugin" + getTagFromEnv(),
+			Image: "ramrodpcp/interpreter-plugin:" + getTagFromEnv(),
 		},
 		RestartPolicy: &swarm.RestartPolicy{
 			Condition: "on-failure",
@@ -274,19 +298,30 @@ var testPluginService = swarm.ServiceSpec{
 		Ports: []swarm.PortConfig{
 			swarm.PortConfig{
 				Protocol:      swarm.PortConfigProtocolTCP,
-				PublishedPort: 5000,
-				TargetPort:    5000,
+				PublishedPort: 1080,
+				TargetPort:    1080,
 			},
 		},
 	},
 }
 
-/*func TestEventUpdate(t *testing.T) {
+func TestEventUpdate(t *testing.T) {
 	oldStage := os.Getenv("STAGE")
 	os.Setenv("STAGE", "TESTING")
 
 	ctx := context.Background()
 	dockerClient, err := client.NewEnvClient()
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+
+	// Set up clean environment
+	if err := test.DockerCleanUp(ctx, dockerClient, ""); err != nil {
+		t.Errorf("setup error: %v", err)
+	}
+
+	netID, err := test.CheckCreateNet("pcp")
 	if err != nil {
 		t.Errorf("%v", err)
 		return
@@ -308,7 +343,7 @@ var testPluginService = swarm.ServiceSpec{
 	_, err = r.DB("Controller").Table("Plugins").Insert(map[string]interface{}{
 		"Name":          "TestPlugin",
 		"ServiceID":     "",
-		"ServiceName":   "testing",
+		"ServiceName":   "TestService",
 		"DesiredState":  "Activate",
 		"State":         "Available",
 		"Interface":     "192.168.1.1",
@@ -340,6 +375,7 @@ var testPluginService = swarm.ServiceSpec{
 			wait: func(t *testing.T, timeout time.Duration) bool {
 				var (
 					startedService = false
+					dbUpdated      = false
 				)
 
 				// Initialize parent context (with timeout)
@@ -352,7 +388,15 @@ var testPluginService = swarm.ServiceSpec{
 						return false
 					}
 					cntxt := args[0].(context.Context)
-					eventChan, errChan :=
+					filter := filters.NewArgs()
+					filter.Add("type", "container")
+					filter.Add("type", "service")
+					filter.Add("event", "die")
+					filter.Add("event", "health_status")
+					filter.Add("event", "update")
+					eventChan, errChan := dc.Events(cntxt, types.EventsOptions{
+						Filters: filter,
+					})
 
 					for {
 						select {
@@ -362,21 +406,65 @@ var testPluginService = swarm.ServiceSpec{
 							log.Println(fmt.Errorf("%v", e))
 							return false
 						case e := <-eventChan:
-							if e.Type != "service" {
+							if e.Type != "container" {
 								break
 							}
-							if e.Action != "create" {
+							if e.Action != "health_status: healthy" && e.Status != "health_status: healthy" {
 								break
 							}
-							if v, ok := e.Actor.Attributes["name"]; ok {
-								if v != "TestPlugin" {
+							if v, ok := e.Actor.Attributes["com.docker.swarm.service.name"]; ok {
+								if v != "TestService" {
 									break
 								}
 							} else {
 								break
 							}
-							targetService = e.Actor.ID
 							return true
+						}
+						time.Sleep(100 * time.Millisecond)
+					}
+				})
+
+				startDB := helper.TimeoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
+					sessionTest, err := r.Connect(r.ConnectOpts{
+						Address: "127.0.0.1",
+					})
+					if err != nil {
+						t.Errorf("%v", err)
+						return false
+					}
+					cntxt := args[0].(context.Context)
+					changeChan, errChan := dbPluginChanges(sessionTest)
+
+					for {
+						select {
+						case <-cntxt.Done():
+							return false
+						case e := <-errChan:
+							log.Println(fmt.Errorf("%v", e))
+							return false
+						case d := <-changeChan:
+							var c map[string]interface{}
+							if v, ok := d["new_val"]; !ok {
+								break
+							} else {
+								c = v.(map[string]interface{})
+							}
+							if c["ServiceName"].(string) != "TestService" {
+								break
+							}
+							if c["DesiredState"].(string) != "" {
+								break
+							}
+							if c["State"].(string) != "Active" {
+								break
+							}
+							if c["ServiceID"].(string) == "" {
+								break
+							}
+							return true
+						default:
+							break
 						}
 						time.Sleep(100 * time.Millisecond)
 					}
@@ -390,43 +478,72 @@ var testPluginService = swarm.ServiceSpec{
 				for {
 					select {
 					case <-timeoutCtx.Done():
-						<-portsDB
+						<-startDocker
 						break L
-					case v := <-portsDB:
+					case v := <-startDocker:
 						if v {
-							log.Printf("Setting foundService to %v", v)
-							portsFound = v
+							log.Printf("Setting startedService to %v", v)
+							startedService = v
+						}
+					case v := <-startDB:
+						if v {
+							log.Printf("Setting dbUpdated to %v", v)
+							dbUpdated = v
 						}
 					default:
 						break
 					}
-					if portsFound {
+					if startedService && dbUpdated {
 						break L
 					}
 					time.Sleep(100 * time.Millisecond)
 				}
 
-				if !portsFound {
-					t.Errorf("Plugins (Harness) not found in DB.")
+				if !startedService {
+					t.Errorf("Service start not detected in Docker")
+				}
+				if !dbUpdated {
+					t.Errorf("DB not updated with service start info.")
 				}
 
-				return portsFound
+				return startedService && dbUpdated
 			},
-			timeout: 20 * time.Second,
+			timeout: 30 * time.Second,
 		},
-		{
+		/*{
 			name: "service update",
 		},
 		{
 			name: "service remove",
-		},
+		},*/
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			res := make(chan bool)
+			go func() {
+				res <- tt.wait(t, tt.timeout)
+				close(res)
+				return
+			}()
 
+			timeoutCtx, cancel := context.WithTimeout(context.Background(), tt.timeout)
+			defer cancel()
+			events, _ := dockerClient.Events(timeoutCtx, types.EventsOptions{})
+			errs := EventUpdate(events)
+			go func() {
+				for e := range errs {
+					log.Printf("error: %v", e)
+				}
+			}()
+
+			time.Sleep(3 * time.Second)
+			assert.True(t, tt.run(t))
+			assert.True(t, <-res)
+			time.Sleep(3 * time.Second)
 		})
 	}
 	test.KillService(ctx, dockerClient, brainID)
+	test.DockerCleanUp(ctx, dockerClient, netID)
 	os.Setenv("STAGE", oldStage)
 }
 
@@ -873,4 +990,4 @@ func Test_handleService(t *testing.T) {
 			}
 		})
 	}
-}*/
+}

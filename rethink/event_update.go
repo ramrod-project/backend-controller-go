@@ -2,12 +2,17 @@ package rethink
 
 import (
 	"fmt"
+	"log"
 
 	events "github.com/docker/docker/api/types/events"
 	r "gopkg.in/gorethink/gorethink.v4"
 )
 
 func updatePluginStatus(serviceName string, update map[string]string) error {
+	if serviceName == "" {
+		return fmt.Errorf("cannot update without valid ServiceName")
+	}
+
 	filter := map[string]string{"ServiceName": serviceName}
 
 	session, err := r.Connect(r.ConnectOpts{
@@ -16,8 +21,10 @@ func updatePluginStatus(serviceName string, update map[string]string) error {
 	if err != nil {
 		return err
 	}
+	log.Printf("updating %v to %+v", serviceName, update)
 
 	res, err := r.DB("Controller").Table("Plugins").Filter(filter).Update(update).RunWrite(session)
+	log.Printf("res: %+v", res)
 	if res.Errors > 0 || !(res.Replaced > 0 || res.Updated > 0) {
 		return fmt.Errorf("no plugin to update")
 	}
@@ -42,7 +49,7 @@ func handleContainer(event events.Message) (string, map[string]string, error) {
 		update["DesiredState"] = ""
 		return serviceName, update, nil
 	}
-	return "", update, fmt.Errorf("unhandled container event: %+v", event)
+	return "", update, fmt.Errorf("unhandled container event: %v", event.Action)
 }
 
 func handleService(event events.Message) (string, map[string]string, error) {
@@ -58,7 +65,7 @@ func handleService(event events.Message) (string, map[string]string, error) {
 		update["State"] = "Restarting"
 		return serviceName, update, nil
 	}
-	return "", update, fmt.Errorf("unhandled service event: %+v", event)
+	return "", update, fmt.Errorf("unhandled service event: %v", event.Action)
 }
 
 // EventUpdate consumes the event channel from the docker
@@ -68,13 +75,13 @@ func EventUpdate(in <-chan events.Message) <-chan error {
 	outErr := make(chan error)
 
 	go func(in <-chan events.Message) {
-		var (
-			err         error
-			serviceName string
-			update      map[string]string
-		)
 	L:
 		for event := range in {
+			var (
+				err         error
+				serviceName string
+				update      map[string]string
+			)
 			switch event.Type {
 			case "service":
 				// Check if updatestatus.new == updating
@@ -85,6 +92,10 @@ func EventUpdate(in <-chan events.Message) <-chan error {
 				serviceName, update, err = handleContainer(event)
 			default:
 				outErr <- fmt.Errorf("not container or service type")
+				continue L
+			}
+			if err != nil {
+				outErr <- err
 				continue L
 			}
 			err = updatePluginStatus(serviceName, update)
