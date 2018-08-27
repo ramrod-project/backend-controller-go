@@ -453,94 +453,50 @@ func TestEventUpdate(t *testing.T) {
 				// Initialize parent context (with timeout)
 				timeoutCtx, cancel := context.WithTimeout(context.Background(), timeout)
 
-				startDocker := helper.TimeoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
-					dc, err := client.NewEnvClient()
-					if err != nil {
-						t.Errorf("%v", err)
-						return false
-					}
-					cntxt := args[0].(context.Context)
-					filter := filters.NewArgs()
-					filter.Add("type", "container")
-					filter.Add("type", "service")
-					filter.Add("event", "die")
-					filter.Add("event", "health_status")
-					filter.Add("event", "update")
-					eventChan, errChan := dc.Events(cntxt, types.EventsOptions{
-						Filters: filter,
-					})
-
-					for {
-						select {
-						case <-cntxt.Done():
+				startDocker := helper.TimeoutTester(timeoutCtx, []interface{}{
+					timeoutCtx,
+					func(e events.Message) bool {
+						if e.Type != "container" {
 							return false
-						case e := <-errChan:
-							log.Println(fmt.Errorf("%v", e))
-							return false
-						case e := <-eventChan:
-							if e.Type != "container" {
-								break
-							}
-							if e.Action != "health_status: healthy" && e.Status != "health_status: healthy" {
-								break
-							}
-							if v, ok := e.Actor.Attributes["com.docker.swarm.service.name"]; ok {
-								if v != "TestService" {
-									break
-								}
-							} else {
-								break
-							}
-							return true
 						}
-						time.Sleep(100 * time.Millisecond)
-					}
-				})
-
-				startDB := helper.TimeoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
-					sessionTest, err := r.Connect(r.ConnectOpts{
-						Address: "127.0.0.1",
-					})
-					if err != nil {
-						t.Errorf("%v", err)
-						return false
-					}
-					cntxt := args[0].(context.Context)
-					changeChan, errChan := dbPluginChanges(sessionTest)
-
-					for {
-						select {
-						case <-cntxt.Done():
+						if e.Action != "health_status: healthy" && e.Status != "health_status: healthy" {
 							return false
-						case e := <-errChan:
-							log.Println(fmt.Errorf("%v", e))
-							return false
-						case d := <-changeChan:
-							var c map[string]interface{}
-							if v, ok := d["new_val"]; !ok {
-								break
-							} else {
-								c = v.(map[string]interface{})
-							}
-							if c["ServiceName"].(string) != "TestService" {
-								break
-							}
-							if c["DesiredState"].(string) != "" {
-								break
-							}
-							if c["State"].(string) != "Active" {
-								break
-							}
-							if c["ServiceID"].(string) == "" {
-								break
-							}
-							return true
-						default:
-							break
 						}
-						time.Sleep(100 * time.Millisecond)
-					}
-				})
+						if v, ok := e.Actor.Attributes["com.docker.swarm.service.name"]; ok {
+							if v != "TestService" {
+								return false
+							}
+						} else {
+							return false
+						}
+						return true
+					},
+				}, dockerMonitor)
+
+				startDB := helper.TimeoutTester(timeoutCtx, []interface{}{
+					timeoutCtx,
+					func(d map[string]interface{}) bool {
+						var c map[string]interface{}
+						if v, ok := d["new_val"]; !ok {
+							return false
+						} else {
+							c = v.(map[string]interface{})
+						}
+						if c["ServiceName"].(string) != "TestService" {
+							return false
+						}
+						if c["DesiredState"].(string) != "" {
+							return false
+						}
+						if c["State"].(string) != "Active" {
+							return false
+						}
+						if c["ServiceID"].(string) == "" {
+							return false
+						}
+						return true
+					},
+				}, dbMonitor)
 
 				defer cancel()
 
@@ -550,6 +506,7 @@ func TestEventUpdate(t *testing.T) {
 				for {
 					select {
 					case <-timeoutCtx.Done():
+						<-startDB
 						<-startDocker
 						break L
 					case v := <-startDocker:
@@ -613,101 +570,57 @@ func TestEventUpdate(t *testing.T) {
 				// Initialize parent context (with timeout)
 				timeoutCtx, cancel := context.WithTimeout(context.Background(), timeout)
 
-				updatingDocker := helper.TimeoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
-					dc, err := client.NewEnvClient()
-					if err != nil {
-						t.Errorf("%v", err)
-						return false
-					}
-					cntxt := args[0].(context.Context)
-					filter := filters.NewArgs()
-					filter.Add("type", "container")
-					filter.Add("type", "service")
-					filter.Add("event", "die")
-					filter.Add("event", "health_status")
-					filter.Add("event", "update")
-					eventChan, errChan := dc.Events(cntxt, types.EventsOptions{
-						Filters: filter,
-					})
-
-					for {
-						select {
-						case <-cntxt.Done():
+				updatingDocker := helper.TimeoutTester(timeoutCtx, []interface{}{
+					timeoutCtx,
+					func(e events.Message) bool {
+						if e.Type != "service" {
 							return false
-						case e := <-errChan:
-							log.Println(fmt.Errorf("%v", e))
-							return false
-						case e := <-eventChan:
-							if e.Type != "service" {
-								break
-							}
-							if e.Action != "update" {
-								break
-							}
-							if v, ok := e.Actor.Attributes["name"]; ok {
-								if v != "TestService" {
-									break
-								}
-							} else {
-								break
-							}
-							if v, ok := e.Actor.Attributes["updatestate.new"]; ok {
-								if v != "updating" {
-									break
-								}
-							} else {
-								break
-							}
-							return true
 						}
-						time.Sleep(100 * time.Millisecond)
-					}
-				})
-
-				updatingDB := helper.TimeoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
-					sessionTest, err := r.Connect(r.ConnectOpts{
-						Address: "127.0.0.1",
-					})
-					if err != nil {
-						t.Errorf("%v", err)
-						return false
-					}
-					cntxt := args[0].(context.Context)
-					changeChan, errChan := dbPluginChanges(sessionTest)
-
-					for {
-						select {
-						case <-cntxt.Done():
+						if e.Action != "update" {
 							return false
-						case e := <-errChan:
-							log.Println(fmt.Errorf("%v", e))
-							return false
-						case d := <-changeChan:
-							var c map[string]interface{}
-							if v, ok := d["new_val"]; !ok {
-								break
-							} else {
-								c = v.(map[string]interface{})
-							}
-							if c["ServiceName"].(string) != "TestService" {
-								break
-							}
-							if c["DesiredState"].(string) != "" {
-								break
-							}
-							if c["State"].(string) != "Restarting" {
-								break
-							}
-							if c["ServiceID"].(string) == "" {
-								break
-							}
-							return true
-						default:
-							break
 						}
-						time.Sleep(100 * time.Millisecond)
-					}
-				})
+						if v, ok := e.Actor.Attributes["name"]; ok {
+							if v != "TestService" {
+								return false
+							}
+						} else {
+							return false
+						}
+						if v, ok := e.Actor.Attributes["updatestate.new"]; ok {
+							if v != "updating" {
+								return false
+							}
+						} else {
+							return false
+						}
+						return true
+					},
+				}, dockerMonitor)
+
+				updatingDB := helper.TimeoutTester(timeoutCtx, []interface{}{
+					timeoutCtx,
+					func(d map[string]interface{}) bool {
+						var c map[string]interface{}
+						if v, ok := d["new_val"]; !ok {
+							return false
+						} else {
+							c = v.(map[string]interface{})
+						}
+						if c["ServiceName"].(string) != "TestService" {
+							return false
+						}
+						if c["DesiredState"].(string) != "" {
+							return false
+						}
+						if c["State"].(string) != "Restarting" {
+							return false
+						}
+						if c["ServiceID"].(string) == "" {
+							return false
+						}
+						return true
+					},
+				}, dbMonitor)
 
 				defer cancel()
 
@@ -718,104 +631,62 @@ func TestEventUpdate(t *testing.T) {
 					select {
 					case <-timeoutCtx.Done():
 						<-updatingDB
+						<-updatedDB
 						<-updatingDocker
+						<-updatedDocker
 						break L
 					case v := <-updatingDocker:
 						if v {
 							log.Printf("Setting serviceUpdating to %v", v)
 							serviceUpdating = v
-							updatedDocker = helper.TimeoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
-								dc, err := client.NewEnvClient()
-								if err != nil {
-									t.Errorf("%v", err)
-									return false
-								}
-								cntxt := args[0].(context.Context)
-								filter := filters.NewArgs()
-								filter.Add("type", "container")
-								filter.Add("type", "service")
-								filter.Add("event", "die")
-								filter.Add("event", "health_status")
-								filter.Add("event", "update")
-								eventChan, errChan := dc.Events(cntxt, types.EventsOptions{
-									Filters: filter,
-								})
-
-								for {
-									select {
-									case <-cntxt.Done():
+							updatedDocker = helper.TimeoutTester(timeoutCtx, []interface{}{
+								timeoutCtx,
+								func(e events.Message) bool {
+									if e.Type != "container" {
 										return false
-									case e := <-errChan:
-										log.Println(fmt.Errorf("%v", e))
-										return false
-									case e := <-eventChan:
-										if e.Type != "container" {
-											break
-										}
-										if e.Action != "health_status: healthy" && e.Status != "health_status: healthy" {
-											break
-										}
-										if v, ok := e.Actor.Attributes["com.docker.swarm.service.name"]; ok {
-											if v != "TestService" {
-												break
-											}
-										} else {
-											break
-										}
-										return true
 									}
-									time.Sleep(100 * time.Millisecond)
-								}
-							})
+									if e.Action != "health_status: healthy" && e.Status != "health_status: healthy" {
+										return false
+									}
+									if v, ok := e.Actor.Attributes["com.docker.swarm.service.name"]; ok {
+										if v != "TestService" {
+											return false
+										}
+									} else {
+										return false
+									}
+									return true
+								},
+							}, dockerMonitor)
 						}
 					case v := <-updatingDB:
 						if v {
 							log.Printf("Setting dbUpdating to %v", v)
 							dbUpdating = v
-							updatedDB = helper.TimeoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
-								sessionTest, err := r.Connect(r.ConnectOpts{
-									Address: "127.0.0.1",
-								})
-								if err != nil {
-									t.Errorf("%v", err)
-									return false
-								}
-								cntxt := args[0].(context.Context)
-								changeChan, errChan := dbPluginChanges(sessionTest)
-
-								for {
-									select {
-									case <-cntxt.Done():
+							updatedDB = helper.TimeoutTester(timeoutCtx, []interface{}{
+								timeoutCtx,
+								func(d map[string]interface{}) bool {
+									var c map[string]interface{}
+									if v, ok := d["new_val"]; !ok {
 										return false
-									case e := <-errChan:
-										log.Println(fmt.Errorf("%v", e))
-										return false
-									case d := <-changeChan:
-										var c map[string]interface{}
-										if v, ok := d["new_val"]; !ok {
-											break
-										} else {
-											c = v.(map[string]interface{})
-										}
-										if c["ServiceName"].(string) != "TestService" {
-											break
-										}
-										if c["DesiredState"].(string) != "" {
-											break
-										}
-										if c["State"].(string) != "Active" {
-											break
-										}
-										if c["ServiceID"].(string) == "" {
-											break
-										}
-										return true
-									default:
-										break
+									} else {
+										c = v.(map[string]interface{})
 									}
-									time.Sleep(100 * time.Millisecond)
-								}
-							})
+									if c["ServiceName"].(string) != "TestService" {
+										return false
+									}
+									if c["DesiredState"].(string) != "" {
+										return false
+									}
+									if c["State"].(string) != "Active" {
+										return false
+									}
+									if c["ServiceID"].(string) == "" {
+										return false
+									}
+									return true
+								},
+							}, dbMonitor)
 						}
 					case v := <-updatedDocker:
 						if v {
@@ -853,12 +724,111 @@ func TestEventUpdate(t *testing.T) {
 			},
 			timeout: 30 * time.Second,
 		},
-		/*{
-			name: "service update",
-		},
 		{
-			name: "service remove",
-		},*/
+			name: "service stop",
+			run: func(t *testing.T) bool {
+				err = dockerClient.ServiceRemove(ctx, targetService)
+				if err != nil {
+					t.Errorf("%v", err)
+					return false
+				}
+				return true
+			},
+			wait: func(t *testing.T, timeout time.Duration) bool {
+				var (
+					dockerStopped = false
+					dbStopped     = false
+				)
+
+				// Initialize parent context (with timeout)
+				timeoutCtx, cancel := context.WithTimeout(context.Background(), timeout)
+
+				stopDocker := helper.TimeoutTester(timeoutCtx, []interface{}{
+					timeoutCtx,
+					func(e events.Message) bool {
+						if e.Type != "container" {
+							return false
+						}
+						if e.Action != "die" {
+							return false
+						}
+						if v, ok := e.Actor.Attributes["com.docker.swarm.service.name"]; ok {
+							if v != "TestService" {
+								return false
+							}
+						} else {
+							return false
+						}
+						return true
+					},
+				}, dockerMonitor)
+
+				stopDB := helper.TimeoutTester(timeoutCtx, []interface{}{
+					timeoutCtx,
+					func(d map[string]interface{}) bool {
+						var c map[string]interface{}
+						if v, ok := d["new_val"]; !ok {
+							return false
+						} else {
+							c = v.(map[string]interface{})
+						}
+						if c["ServiceName"].(string) != "TestService" {
+							return false
+						}
+						if c["DesiredState"].(string) != "" {
+							return false
+						}
+						if c["State"].(string) != "Stopped" {
+							return false
+						}
+						if c["ServiceID"].(string) == "" {
+							return false
+						}
+						return true
+					},
+				}, dbMonitor)
+
+				defer cancel()
+
+				// for loop that iterates until context <-Done()
+				// once <-Done() then get return from all goroutines
+			L:
+				for {
+					select {
+					case <-timeoutCtx.Done():
+						<-stopDB
+						<-stopDocker
+						break L
+					case v := <-stopDocker:
+						if v {
+							log.Printf("Setting dockerStopped to %v", v)
+							dockerStopped = v
+						}
+					case v := <-stopDB:
+						if v {
+							log.Printf("Setting dbStopped to %v", v)
+							dbStopped = v
+						}
+					default:
+						break
+					}
+					if dockerStopped && dbStopped {
+						break L
+					}
+					time.Sleep(100 * time.Millisecond)
+				}
+
+				if !dockerStopped {
+					t.Errorf("service stop not detected in Docker")
+				}
+				if !dbStopped {
+					t.Errorf("db not updated with service stop info")
+				}
+
+				return dockerStopped && dbStopped
+			},
+			timeout: 30 * time.Second,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -873,6 +843,7 @@ func TestEventUpdate(t *testing.T) {
 			defer cancel()
 			events, _ := dockerClient.Events(timeoutCtx, types.EventsOptions{})
 			errs := EventUpdate(events)
+			// have to get errors so they don't block
 			go func() {
 				for e := range errs {
 					log.Printf("error: %v", e)
