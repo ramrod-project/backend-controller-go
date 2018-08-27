@@ -214,6 +214,7 @@ func Test_Integration(t *testing.T) {
 			Aliases: []string{"rethinkdb"},
 		},
 	}
+	intBrainSpec.Annotations.Labels = map[string]string{"com.docker.stack.namespace": "test"}
 
 	// Start the brain
 	session, brainID, err := StartBrain(ctx, t, dockerClient, intBrainSpec)
@@ -397,6 +398,9 @@ func Test_Integration(t *testing.T) {
 							log.Println(fmt.Errorf("%v", e))
 							return false
 						case d := <-changeChan:
+							if d["Name"] == nil {
+								break
+							}
 							if d["Name"].(string) != "Harness" {
 								break
 							}
@@ -1381,8 +1385,6 @@ func Test_Integration(t *testing.T) {
 							log.Println(fmt.Errorf("%v", e))
 							return false
 						case d := <-changeChan:
-							log.Printf("change:\n%+v\n", d)
-							log.Printf("\n%+v", d["new_val"].(map[string]interface{})["TCPPorts"])
 							if _, ok := d["new_val"]; !ok {
 								break
 							}
@@ -1496,9 +1498,6 @@ func Test_Integration(t *testing.T) {
 				if !portChecked {
 					t.Errorf("stop port check event not detected")
 				}
-
-				//dumpEverything(ctx, t, dockerClient, session)
-				log.Printf("\n%v\n%v\n%v", dockerStopped, dbStopped, portChecked)
 
 				return dockerStopped && dbStopped && portChecked
 			},

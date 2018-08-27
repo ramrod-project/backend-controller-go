@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"reflect"
 	"strconv"
 	"time"
 
@@ -13,49 +14,6 @@ import (
 	swarm "github.com/docker/docker/api/types/swarm"
 	client "github.com/docker/docker/client"
 )
-
-/*func generateUpdateSpec(ctx context.Context, dockerClient *client.Client, id string, config *PluginServiceConfig) (*swarm.ServiceSpec, uint64, error) {
-
-	log.Printf("Updating service %v with config %v\n", id, config)
-
-	log.Printf("Inspecting service %v\n", id)
-	inspectResults, _, err := dockerClient.ServiceInspectWithRaw(ctx, id)
-	if err != nil {
-		return &swarm.ServiceSpec{}, 0, err
-	} else if inspectResults.UpdateStatus.State == swarm.UpdateStateUpdating {
-		return &swarm.ServiceSpec{}, 0, fmt.Errorf("service %v already updating; cannot update", id)
-	}
-	log.Printf("Got service: %v version: %v", inspectResults.Spec, inspectResults.Meta.Version)
-
-	log.Printf("Creating updated service spec\n")
-	serviceSpec := inspectResults.Spec
-	version := inspectResults.Meta.Version.Index
-
-	if config.Environment != nil && !reflect.DeepEqual(serviceSpec.TaskTemplate.ContainerSpec.Env, config.Environment) {
-		serviceSpec.TaskTemplate.ContainerSpec.Env = config.Environment
-		log.Printf("Assigned environment %v", config.Environment)
-	}
-
-	if config.Volumes != nil && !reflect.DeepEqual(serviceSpec.TaskTemplate.ContainerSpec.Mounts, config.Volumes) {
-		serviceSpec.TaskTemplate.ContainerSpec.Mounts = config.Volumes
-		log.Printf("Assigning Mounts %v", config.Volumes)
-	}
-
-	osString := "node.labels.os==" + string(config.OS)
-	if len(serviceSpec.TaskTemplate.Placement.Constraints) == 0 {
-		log.Printf("No constraints")
-	} else if serviceSpec.TaskTemplate.Placement.Constraints[0] != osString && config.OS != rethink.PluginOSAll {
-		serviceSpec.TaskTemplate.Placement.Constraints[0] = osString
-		log.Printf("Assigned OS %v", osString)
-	}
-
-	if !reflect.DeepEqual(serviceSpec.EndpointSpec.Ports, config.Ports) {
-		serviceSpec.EndpointSpec.Ports = config.Ports
-		log.Printf("Assigned Ports %v", config.Ports)
-	}
-
-	return &serviceSpec, version, nil
-}*/
 
 func checkReady(ctx context.Context, dockerClient *client.Client, serviceID string) (uint64, error) {
 
@@ -74,6 +32,15 @@ func checkReady(ctx context.Context, dockerClient *client.Client, serviceID stri
 		time.Sleep(time.Second)
 	}
 	return 0, fmt.Errorf("timeout: service %v still updating", serviceID)
+}
+
+func containsPort(port *swarm.PortConfig, comparePorts *[]swarm.PortConfig) bool {
+	for _, cP := range *comparePorts {
+		if reflect.DeepEqual(*port, cP) {
+			return true
+		}
+	}
+	return false
 }
 
 // UpdatePluginService updates a given service by ID string
@@ -106,9 +73,12 @@ func UpdatePluginService(serviceID string, config *PluginServiceConfig) (types.S
 		return resp, err
 	}
 	for _, port := range serv.Spec.EndpointSpec.Ports {
-		err = rethink.RemovePort(config.Address, strconv.FormatUint(uint64(port.PublishedPort), 10), port.Protocol)
-		if err != nil {
-			log.Printf("%v", err)
+		// if old port is not in new ports
+		if !containsPort(&port, &config.Ports) {
+			err = rethink.RemovePort(config.Address, strconv.FormatUint(uint64(port.PublishedPort), 10), port.Protocol)
+			if err != nil {
+				log.Printf("%v", err)
+			}
 		}
 	}
 	for _, port := range config.Ports {

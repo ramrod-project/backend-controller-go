@@ -20,10 +20,8 @@ func updatePluginStatus(serviceName string, update map[string]string) error {
 	if err != nil {
 		return err
 	}
-	log.Printf("updating %v to %+v", serviceName, update)
 
 	res, err := r.DB("Controller").Table("Plugins").Filter(filter).Update(update).RunWrite(session)
-	log.Printf("res: %+v", res)
 	if res.Errors > 0 || !(res.Replaced > 0 || res.Updated > 0) {
 		return fmt.Errorf("no plugin to update")
 	}

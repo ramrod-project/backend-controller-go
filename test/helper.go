@@ -334,6 +334,9 @@ var BrainSpec = swarm.ServiceSpec{
 var controllerSpec = swarm.ServiceSpec{
 	Annotations: swarm.Annotations{
 		Name: "controller",
+		Labels: map[string]string{
+			"com.docker.stack.namespace": "test",
+		},
 	},
 	TaskTemplate: swarm.TaskSpec{
 		ContainerSpec: swarm.ContainerSpec{

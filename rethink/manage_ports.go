@@ -87,12 +87,12 @@ func AddPort(IPaddr string, newPort string, protocol swarm.PortConfigProtocol) e
 	//update the ports
 	if protocol == swarm.PortConfigProtocolTCP {
 		if Contains(newTCP, newPort) {
-			return errors.New("port already in use")
+			return nil
 		}
 		port["TCPPorts"] = append(newTCP, newPort)
 	} else if protocol == swarm.PortConfigProtocolUDP {
 		if Contains(newUDP, newPort) {
-			return errors.New("port already in use")
+			return nil
 		}
 		port["UDPPorts"] = append(newUDP, newPort)
 	} else {
