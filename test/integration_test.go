@@ -1497,7 +1497,8 @@ func Test_Integration(t *testing.T) {
 					t.Errorf("stop port check event not detected")
 				}
 
-				dumpEverything(ctx, t, dockerClient, session)
+				//dumpEverything(ctx, t, dockerClient, session)
+				log.Printf("\n%v\n%v\n%v", dockerStopped, dbStopped, portChecked)
 
 				return dockerStopped && dbStopped && portChecked
 			},
