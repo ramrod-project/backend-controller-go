@@ -2,7 +2,6 @@ package dockerservicemanager
 
 import (
 	"context"
-	"log"
 
 	"github.com/docker/docker/api/types"
 	events "github.com/docker/docker/api/types/events"
@@ -55,13 +54,11 @@ func EventMonitor() (<-chan events.Message, <-chan error) {
 	containerFilter.Add("image", "ramrodpcp/auxiliary-services")
 	containerFilter.Add("event", "die")
 	containerFilter.Add("event", "health_status")
-	log.Printf("Filtering containers: %+v", containerFilter)
 
 	// Filter service update events
 	serviceFilter := filters.NewArgs()
 	serviceFilter.Add("type", "service")
 	containerFilter.Add("event", "update")
-	log.Printf("Filtering services: %+v", serviceFilter)
 
 	containerChan, errContainerChan := dockerClient.Events(ctx, types.EventsOptions{
 		Filters: containerFilter,
