@@ -55,6 +55,7 @@ func handleWindowsService(event events.Message, update *map[string]string) error
 
 	if event.Action == "create" { // Special Windows case: Active
 		(*update)["DesiredState"] = ""
+		(*update)["ServiceID"] = event.Actor.ID
 		(*update)["State"] = "Active"
 		return nil
 	} else if event.Action == "remove" { // Special Windows case: Stopped
