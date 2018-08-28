@@ -61,6 +61,14 @@ func handleService(event events.Message) (string, map[string]string, error) {
 		update["DesiredState"] = ""
 		update["State"] = "Restarting"
 		return serviceName, update, nil
+	} else if event.Actor.Attributes["os"] == "nt" && event.Action == "create" { // Special Windows case
+		update["DesiredState"] = ""
+		update["State"] = "Active"
+		return serviceName, update, nil
+	} else if event.Actor.Attributes["os"] == "nt" && event.Action == "remove" { // Special Windows case
+		update["DesiredState"] = ""
+		update["State"] = "Stopped"
+		return serviceName, update, nil
 	}
 	return "", update, fmt.Errorf("unhandled service event: %v", event.Action)
 }
