@@ -1,9 +1,11 @@
 package rethink
 
 import (
+	"context"
 	"fmt"
 
 	events "github.com/docker/docker/api/types/events"
+	"github.com/docker/docker/client"
 	r "gopkg.in/gorethink/gorethink.v4"
 )
 
@@ -49,25 +51,57 @@ func handleContainer(event events.Message) (string, map[string]string, error) {
 	return "", update, fmt.Errorf("unhandled container event: %v", event.Action)
 }
 
+func handleWindowsService(event events.Message, update *map[string]string) error {
+
+	if event.Action == "create" { // Special Windows case: Active
+		(*update)["DesiredState"] = ""
+		(*update)["State"] = "Active"
+		return nil
+	} else if event.Action == "remove" { // Special Windows case: Stopped
+		(*update)["DesiredState"] = ""
+		(*update)["State"] = "Stopped"
+		return nil
+	} else if v, ok := event.Actor.Attributes["updatestate.new"]; ok && v == "updating" { // Special Windows case: Restarting
+		(*update)["DesiredState"] = ""
+		(*update)["State"] = "Restarting"
+		return nil
+	} else if v, ok := event.Actor.Attributes["updatestate.new"]; ok && v == "completed" { // Special Windows case: Restarted
+		(*update)["DesiredState"] = ""
+		(*update)["State"] = "Active"
+		return nil
+	}
+	return fmt.Errorf("unhandled windows service event: %v", event.Action)
+}
+
 func handleService(event events.Message) (string, map[string]string, error) {
-	var serviceName string
-	update := make(map[string]string)
+	var (
+		serviceName string
+		update      = make(map[string]string)
+	)
+
+	ctx := context.Background()
+	dockerClient, err := client.NewEnvClient()
+	if err != nil {
+		panic(err)
+	}
 
 	if _, ok := event.Actor.Attributes["name"]; !ok {
 		return "", update, fmt.Errorf("no service 'name' Attribute")
 	}
 	serviceName = event.Actor.Attributes["name"]
-	if val, ok := event.Actor.Attributes["updatestate.new"]; ok && val == "updating" {
+
+	insp, _, err := dockerClient.ServiceInspectWithRaw(ctx, event.Actor.ID)
+
+	if v, ok := insp.Spec.Annotations.Labels["os"]; ok && v == "nt" {
+		err := handleWindowsService(event, &update)
+		return serviceName, update, err
+	} else if !ok {
+		return "", update, fmt.Errorf("service os unrecognized: %v", insp)
+	}
+
+	if v, ok := event.Actor.Attributes["updatestate.new"]; ok && v == "updating" {
 		update["DesiredState"] = ""
 		update["State"] = "Restarting"
-		return serviceName, update, nil
-	} else if event.Actor.Attributes["os"] == "nt" && event.Action == "create" { // Special Windows case
-		update["DesiredState"] = ""
-		update["State"] = "Active"
-		return serviceName, update, nil
-	} else if event.Actor.Attributes["os"] == "nt" && event.Action == "remove" { // Special Windows case
-		update["DesiredState"] = ""
-		update["State"] = "Stopped"
 		return serviceName, update, nil
 	}
 	return "", update, fmt.Errorf("unhandled service event: %v", event.Action)

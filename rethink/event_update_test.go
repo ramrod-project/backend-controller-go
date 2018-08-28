@@ -23,6 +23,9 @@ import (
 var testPluginService = swarm.ServiceSpec{
 	Annotations: swarm.Annotations{
 		Name: "TestService",
+		Labels: map[string]string{
+			"os": "posix",
+		},
 	},
 	TaskTemplate: swarm.TaskSpec{
 		ContainerSpec: swarm.ContainerSpec{
@@ -54,6 +57,48 @@ var testPluginService = swarm.ServiceSpec{
 				Protocol:      swarm.PortConfigProtocolTCP,
 				PublishedPort: 1080,
 				TargetPort:    1080,
+			},
+		},
+	},
+}
+
+var testPluginServiceWin = swarm.ServiceSpec{
+	Annotations: swarm.Annotations{
+		Name: "TestServiceWin",
+		Labels: map[string]string{
+			"os": "nt",
+		},
+	},
+	TaskTemplate: swarm.TaskSpec{
+		ContainerSpec: swarm.ContainerSpec{
+			Env: []string{
+				"PLUGIN=Harness",
+				"PORT=2080",
+				"LOGLEVEL=DEBUG",
+				"STAGE=DEV",
+			},
+			Image: "ramrodpcp/interpreter-plugin:" + getTagFromEnv(),
+		},
+		RestartPolicy: &swarm.RestartPolicy{
+			Condition: "on-failure",
+		},
+		Networks: []swarm.NetworkAttachmentConfig{
+			swarm.NetworkAttachmentConfig{
+				Target: "pcp",
+			},
+		},
+	},
+	UpdateConfig: &swarm.UpdateConfig{
+		Parallelism: 0,
+		Delay:       0,
+	},
+	EndpointSpec: &swarm.EndpointSpec{
+		Mode: swarm.ResolutionModeVIP,
+		Ports: []swarm.PortConfig{
+			swarm.PortConfig{
+				Protocol:      swarm.PortConfigProtocolTCP,
+				PublishedPort: 2080,
+				TargetPort:    2080,
 			},
 		},
 	},
@@ -97,9 +142,6 @@ func dockerMonitor(args ...interface{}) bool {
 	filter := filters.NewArgs()
 	filter.Add("type", "container")
 	filter.Add("type", "service")
-	filter.Add("event", "die")
-	filter.Add("event", "health_status")
-	filter.Add("event", "update")
 	eventChan, errChan := dc.Events(cntxt, types.EventsOptions{
 		Filters: filter,
 	})
@@ -205,7 +247,26 @@ func TestEventUpdate(t *testing.T) {
 		return
 	}
 
-	var targetService string
+	_, err = r.DB("Controller").Table("Plugins").Insert(map[string]interface{}{
+		"Name":          "TestPluginWin",
+		"ServiceID":     "",
+		"ServiceName":   "TestServiceWin",
+		"DesiredState":  "Activate",
+		"State":         "Available",
+		"Interface":     "192.168.1.2",
+		"ExternalPorts": []string{"2080/tcp"},
+		"InternalPorts": []string{"2080/tcp"},
+		"OS":            string(PluginOSAll),
+	}).RunWrite(session)
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+
+	var (
+		targetService    string
+		targetServiceWin string
+	)
 
 	tests := []struct {
 		name    string
@@ -552,6 +613,408 @@ func TestEventUpdate(t *testing.T) {
 							c = v.(map[string]interface{})
 						}
 						if c["ServiceName"].(string) != "TestService" {
+							return false
+						}
+						if c["DesiredState"].(string) != "" {
+							return false
+						}
+						if c["State"].(string) != "Stopped" {
+							return false
+						}
+						if c["ServiceID"].(string) == "" {
+							return false
+						}
+						return true
+					},
+				}, dbMonitor)
+
+				defer cancel()
+
+				// for loop that iterates until context <-Done()
+				// once <-Done() then get return from all goroutines
+			L:
+				for {
+					select {
+					case <-timeoutCtx.Done():
+						<-stopDB
+						<-stopDocker
+						break L
+					case v := <-stopDocker:
+						if v {
+							log.Printf("Setting dockerStopped to %v", v)
+							dockerStopped = v
+						}
+					case v := <-stopDB:
+						if v {
+							log.Printf("Setting dbStopped to %v", v)
+							dbStopped = v
+						}
+					default:
+						break
+					}
+					if dockerStopped && dbStopped {
+						break L
+					}
+					time.Sleep(100 * time.Millisecond)
+				}
+
+				if !dockerStopped {
+					t.Errorf("service stop not detected in Docker")
+				}
+				if !dbStopped {
+					t.Errorf("db not updated with service stop info")
+				}
+
+				return dockerStopped && dbStopped
+			},
+			timeout: 30 * time.Second,
+		},
+		{
+			name: "service start (windows)",
+			run: func(t *testing.T) bool {
+				targetServiceWin, err = test.StartIntegrationTestService(ctx, dockerClient, testPluginServiceWin)
+				if err != nil {
+					t.Errorf("%v", err)
+					return false
+				}
+				return true
+			},
+			wait: func(t *testing.T, timeout time.Duration) bool {
+				var (
+					startedService = false
+					dbUpdated      = false
+				)
+
+				// Initialize parent context (with timeout)
+				timeoutCtx, cancel := context.WithTimeout(context.Background(), timeout)
+
+				startDocker := helper.TimeoutTester(timeoutCtx, []interface{}{
+					timeoutCtx,
+					func(e events.Message) bool {
+						if e.Type != "service" {
+							return false
+						}
+						if e.Action != "create" {
+							return false
+						}
+						if v, ok := e.Actor.Attributes["name"]; ok {
+							if v != "TestServiceWin" {
+								return false
+							}
+						} else {
+							return false
+						}
+						return true
+					},
+				}, dockerMonitor)
+
+				startDB := helper.TimeoutTester(timeoutCtx, []interface{}{
+					timeoutCtx,
+					func(d map[string]interface{}) bool {
+						var c map[string]interface{}
+						if v, ok := d["new_val"]; !ok {
+							return false
+						} else {
+							c = v.(map[string]interface{})
+						}
+						if c["ServiceName"].(string) != "TestServiceWin" {
+							return false
+						}
+						if c["DesiredState"].(string) != "" {
+							return false
+						}
+						if c["State"].(string) != "Active" {
+							return false
+						}
+						if c["ServiceID"].(string) == "" {
+							return false
+						}
+						return true
+					},
+				}, dbMonitor)
+
+				defer cancel()
+
+				// for loop that iterates until context <-Done()
+				// once <-Done() then get return from all goroutines
+			L:
+				for {
+					select {
+					case <-timeoutCtx.Done():
+						<-startDB
+						<-startDocker
+						break L
+					case v := <-startDocker:
+						if v {
+							log.Printf("Setting startedService to %v", v)
+							startedService = v
+						}
+					case v := <-startDB:
+						if v {
+							log.Printf("Setting dbUpdated to %v", v)
+							dbUpdated = v
+						}
+					default:
+						break
+					}
+					if startedService && dbUpdated {
+						break L
+					}
+					time.Sleep(100 * time.Millisecond)
+				}
+
+				if !startedService {
+					t.Errorf("Service start not detected in Docker")
+				}
+				if !dbUpdated {
+					t.Errorf("DB not updated with service start info.")
+				}
+
+				return startedService && dbUpdated
+			},
+			timeout: 30 * time.Second,
+		},
+		{
+			name: "service update (windows)",
+			run: func(t *testing.T) bool {
+				newTestPluginServiceWin := testPluginServiceWin
+				newTestPluginServiceWin.TaskTemplate.ContainerSpec.Env = append(newTestPluginServiceWin.TaskTemplate.ContainerSpec.Env, "TEST=TEST2")
+
+				insp, _, err := dockerClient.ServiceInspectWithRaw(ctx, targetServiceWin)
+				if err != nil {
+					t.Errorf("%v", err)
+					return false
+				}
+				dockerClient.ServiceUpdate(ctx, targetServiceWin, insp.Meta.Version, newTestPluginServiceWin, types.ServiceUpdateOptions{})
+				if err != nil {
+					t.Errorf("%v", err)
+					return false
+				}
+				return true
+			},
+			wait: func(t *testing.T, timeout time.Duration) bool {
+				var (
+					serviceUpdating = false
+					dbUpdating      = false
+					serviceUpdated  = false
+					dbUpdated       = false
+					updatedDB       = make(<-chan bool)
+					updatedDocker   = make(<-chan bool)
+				)
+
+				// Initialize parent context (with timeout)
+				timeoutCtx, cancel := context.WithTimeout(context.Background(), timeout)
+
+				updatingDocker := helper.TimeoutTester(timeoutCtx, []interface{}{
+					timeoutCtx,
+					func(e events.Message) bool {
+						if e.Type != "service" {
+							return false
+						}
+						if e.Action != "update" {
+							return false
+						}
+						if v, ok := e.Actor.Attributes["name"]; ok {
+							if v != "TestServiceWin" {
+								return false
+							}
+						} else {
+							return false
+						}
+						if v, ok := e.Actor.Attributes["updatestate.new"]; ok {
+							if v != "updating" {
+								return false
+							}
+						} else {
+							return false
+						}
+						return true
+					},
+				}, dockerMonitor)
+
+				updatingDB := helper.TimeoutTester(timeoutCtx, []interface{}{
+					timeoutCtx,
+					func(d map[string]interface{}) bool {
+						var c map[string]interface{}
+						if v, ok := d["new_val"]; !ok {
+							return false
+						} else {
+							c = v.(map[string]interface{})
+						}
+						if c["ServiceName"].(string) != "TestServiceWin" {
+							return false
+						}
+						if c["DesiredState"].(string) != "" {
+							return false
+						}
+						if c["State"].(string) != "Restarting" {
+							return false
+						}
+						if c["ServiceID"].(string) == "" {
+							return false
+						}
+						return true
+					},
+				}, dbMonitor)
+
+				defer cancel()
+
+				// for loop that iterates until context <-Done()
+				// once <-Done() then get return from all goroutines
+			L:
+				for {
+					select {
+					case <-timeoutCtx.Done():
+						<-updatingDB
+						<-updatedDB
+						<-updatingDocker
+						<-updatedDocker
+						break L
+					case v := <-updatingDocker:
+						if v {
+							log.Printf("Setting serviceUpdating to %v", v)
+							serviceUpdating = v
+							updatedDocker = helper.TimeoutTester(timeoutCtx, []interface{}{
+								timeoutCtx,
+								func(e events.Message) bool {
+									if e.Type != "service" {
+										return false
+									}
+									if e.Action != "update" {
+										return false
+									}
+									if v, ok := e.Actor.Attributes["name"]; ok {
+										if v != "TestServiceWin" {
+											return false
+										}
+									} else {
+										return false
+									}
+									if v, ok := e.Actor.Attributes["updatestate.new"]; ok {
+										if v != "completed" {
+											return false
+										}
+									} else {
+										return false
+									}
+									return true
+								},
+							}, dockerMonitor)
+						}
+					case v := <-updatingDB:
+						if v {
+							log.Printf("Setting dbUpdating to %v", v)
+							dbUpdating = v
+							updatedDB = helper.TimeoutTester(timeoutCtx, []interface{}{
+								timeoutCtx,
+								func(d map[string]interface{}) bool {
+									var c map[string]interface{}
+									if v, ok := d["new_val"]; !ok {
+										return false
+									} else {
+										c = v.(map[string]interface{})
+									}
+									if c["ServiceName"].(string) != "TestServiceWin" {
+										return false
+									}
+									if c["DesiredState"].(string) != "" {
+										return false
+									}
+									if c["State"].(string) != "Active" {
+										return false
+									}
+									if c["ServiceID"].(string) == "" {
+										return false
+									}
+									return true
+								},
+							}, dbMonitor)
+						}
+					case v := <-updatedDocker:
+						if v {
+							log.Printf("Setting serviceUpdated to %v", v)
+							serviceUpdated = v
+						}
+					case v := <-updatedDB:
+						if v {
+							log.Printf("Setting dbUpdated to %v", v)
+							dbUpdated = v
+						}
+					default:
+						break
+					}
+					if serviceUpdating && dbUpdating && serviceUpdated && dbUpdated {
+						break L
+					}
+					time.Sleep(100 * time.Millisecond)
+				}
+
+				if !serviceUpdating {
+					t.Errorf("service updating not detected in Docker")
+				}
+				if !dbUpdating {
+					t.Errorf("DB not updated with service updating info")
+				}
+				if !serviceUpdated {
+					t.Errorf("service update complete not detected in Docker")
+				}
+				if !dbUpdated {
+					t.Errorf("DB not updated with service update complete info")
+				}
+
+				return serviceUpdating && dbUpdating && serviceUpdated && dbUpdated
+			},
+			timeout: 30 * time.Second,
+		},
+		{
+			name: "service stop (windows)",
+			run: func(t *testing.T) bool {
+				err = dockerClient.ServiceRemove(ctx, targetServiceWin)
+				if err != nil {
+					t.Errorf("%v", err)
+					return false
+				}
+				return true
+			},
+			wait: func(t *testing.T, timeout time.Duration) bool {
+				var (
+					dockerStopped = false
+					dbStopped     = false
+				)
+
+				// Initialize parent context (with timeout)
+				timeoutCtx, cancel := context.WithTimeout(context.Background(), timeout)
+
+				stopDocker := helper.TimeoutTester(timeoutCtx, []interface{}{
+					timeoutCtx,
+					func(e events.Message) bool {
+						if e.Type != "service" {
+							return false
+						}
+						if e.Action != "remove" {
+							return false
+						}
+						if v, ok := e.Actor.Attributes["name"]; ok {
+							if v != "TestServiceWin" {
+								return false
+							}
+						} else {
+							return false
+						}
+						return true
+					},
+				}, dockerMonitor)
+
+				stopDB := helper.TimeoutTester(timeoutCtx, []interface{}{
+					timeoutCtx,
+					func(d map[string]interface{}) bool {
+						var c map[string]interface{}
+						if v, ok := d["new_val"]; !ok {
+							return false
+						} else {
+							c = v.(map[string]interface{})
+						}
+						if c["ServiceName"].(string) != "TestServiceWin" {
 							return false
 						}
 						if c["DesiredState"].(string) != "" {

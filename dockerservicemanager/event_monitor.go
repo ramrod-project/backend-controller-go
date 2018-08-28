@@ -58,9 +58,6 @@ func EventMonitor() (<-chan events.Message, <-chan error) {
 	// Filter service update events
 	serviceFilter := filters.NewArgs()
 	serviceFilter.Add("type", "service")
-	containerFilter.Add("event", "update")
-	containerFilter.Add("event", "create")
-	containerFilter.Add("event", "remove")
 
 	containerChan, errContainerChan := dockerClient.Events(ctx, types.EventsOptions{
 		Filters: containerFilter,
