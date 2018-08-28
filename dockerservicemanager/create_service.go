@@ -76,7 +76,7 @@ func GetManagerIP() string {
 	}
 
 	for _, node := range list {
-		if node.ManagerStatus.Leader {
+		if node.Spec.Role == swarm.NodeRoleManager {
 			return node.Status.Addr
 		}
 	}
