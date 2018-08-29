@@ -85,6 +85,10 @@ func GetManagerIP() string {
 
 func generateServiceSpec(config *PluginServiceConfig) (*swarm.ServiceSpec, error) {
 	var (
+		annotations = swarm.Annotations{
+			Name:   config.ServiceName,
+			Labels: make(map[string]string),
+		}
 		hosts     []string
 		imageName = &dockerImageName{
 			Tag: getTagFromEnv(),
@@ -100,9 +104,11 @@ func generateServiceSpec(config *PluginServiceConfig) (*swarm.ServiceSpec, error
 	if config.ServiceName == "AuxiliaryServices" {
 		imageName.Name = "ramrodpcp/auxiliary-wrapper"
 	} else if config.OS == rethink.PluginOSPosix || config.OS == rethink.PluginOSAll {
+		annotations.Labels["os"] = "posix"
 		imageName.Name = "ramrodpcp/interpreter-plugin"
 		placementConfig.Constraints = []string{"node.labels.os==posix"}
 	} else if config.OS == rethink.PluginOSWindows {
+		annotations.Labels["os"] = "nt"
 		imageName.Name = "ramrodpcp/interpreter-plugin-windows"
 		placementConfig.Constraints = []string{"node.labels.os==nt"}
 		hosts = append(hosts, hostString("rethinkdb", GetManagerIP()))
@@ -117,9 +123,7 @@ func generateServiceSpec(config *PluginServiceConfig) (*swarm.ServiceSpec, error
 	}
 
 	serviceSpec := &swarm.ServiceSpec{
-		Annotations: swarm.Annotations{
-			Name: config.ServiceName,
-		},
+		Annotations: annotations,
 		TaskTemplate: swarm.TaskSpec{
 			ContainerSpec: swarm.ContainerSpec{
 				DNSConfig: &swarm.DNSConfig{},
