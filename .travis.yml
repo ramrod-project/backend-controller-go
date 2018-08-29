@@ -62,7 +62,7 @@ script:
   # integration tests
   - go test -v -parallel 1 github.com/ramrod-project/backend-controller-go/test
   # e2e tests
-  - curl https://raw.githubusercontent.com/ramrod-project/integration-stack/$TRAVIS_BRANCH/scripts/e2e.sh | /bin/bash -
+  - bash <(curl -s https://raw.githubusercontent.com/ramrod-project/integration-stack/$TRAVIS_BRANCH/scripts/e2e.sh)
 
 after_success:
   - docker tag ramrodpcp/backend-controller:test ramrodpcp/backend-controller:$TAG
