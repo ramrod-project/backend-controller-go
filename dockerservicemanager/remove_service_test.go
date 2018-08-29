@@ -2,7 +2,6 @@ package dockerservicemanager
 
 import (
 	"context"
-	"errors"
 	"os"
 	"testing"
 	"time"
@@ -12,10 +11,12 @@ import (
 	swarm "github.com/docker/docker/api/types/swarm"
 	client "github.com/docker/docker/client"
 	"github.com/ramrod-project/backend-controller-go/test"
-	"github.com/stretchr/testify/assert"
+	r "gopkg.in/gorethink/gorethink.v4"
 )
 
 func TestRemovePluginService(t *testing.T) {
+	env := os.Getenv("STAGE")
+	os.Setenv("STAGE", "TESTING")
 	var (
 		maxAttempts     = uint64(3)
 		placementConfig = &swarm.Placement{}
@@ -35,10 +36,31 @@ func TestRemovePluginService(t *testing.T) {
 		return
 	}
 
-	netRes, err := dockerClient.NetworkCreate(ctx, "test_remove", types.NetworkCreate{
-		Driver:     "overlay",
-		Attachable: true,
-	})
+	// Set up clean environment
+	if err := test.DockerCleanUp(ctx, dockerClient, ""); err != nil {
+		t.Errorf("setup error: %v", err)
+	}
+
+	session, brainID, err := test.StartBrain(ctx, t, dockerClient, test.BrainSpec)
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+
+	testPort := map[string]interface{}{
+		"Interface":    GetManagerIP(),
+		"TCPPorts":     []string{"666"},
+		"UDPPorts":     []string{},
+		"NodeHostName": "test",
+		"OS":           "posix",
+	}
+	_, err = r.DB("Controller").Table("Ports").Insert(testPort).RunWrite(session)
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+
+	netID, err := test.CheckCreateNet("testremove")
 	if err != nil {
 		t.Errorf("%v", err)
 		return
@@ -72,7 +94,7 @@ func TestRemovePluginService(t *testing.T) {
 			Placement: placementConfig,
 			Networks: []swarm.NetworkAttachmentConfig{
 				swarm.NetworkAttachmentConfig{
-					Target: "test_remove",
+					Target: "testremove",
 				},
 			},
 		},
@@ -105,7 +127,6 @@ func TestRemovePluginService(t *testing.T) {
 		name    string
 		args    args
 		wantErr bool
-		err     error
 	}{
 		{
 			name: "Shutdown existing service",
@@ -120,21 +141,22 @@ func TestRemovePluginService(t *testing.T) {
 				serviceID: "whatisthis",
 			},
 			wantErr: true,
-			err:     errors.New("Error response from daemon: service whatisthis not found"),
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := RemovePluginService(tt.args.serviceID); (err != nil) != tt.wantErr {
 				t.Errorf("RemovePluginService() error = %v, wantErr %v", err, tt.wantErr)
-			} else if tt.wantErr {
-				assert.Equal(t, tt.err, err)
+				if err := test.DockerCleanUp(ctx, dockerClient, netID); err != nil {
+					t.Errorf("cleanup error: %v", err)
+				}
 			}
 		})
 	}
 
+	test.KillService(ctx, dockerClient, brainID)
+
 	//Docker cleanup
-	if err := test.DockerCleanUp(ctx, dockerClient, netRes.ID); err != nil {
-		t.Errorf("cleanup error: %v", err)
-	}
+	dockerClient.NetworkRemove(ctx, netID)
+	os.Setenv("STAGE", env)
 }

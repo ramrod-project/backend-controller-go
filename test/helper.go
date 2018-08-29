@@ -24,6 +24,7 @@ func getTagFromEnv() string {
 	return temp
 }
 
+// GetServiceID Gets the service ID of a service given the name of the service
 func GetServiceID(ctx context.Context, dockerClient *client.Client, name string) string {
 	services, err := dockerClient.ServiceList(ctx, types.ServiceListOptions{})
 	if err != nil {
@@ -37,50 +38,130 @@ func GetServiceID(ctx context.Context, dockerClient *client.Client, name string)
 	return ""
 }
 
+// DockerCleanUp removes all services and containers
 func DockerCleanUp(ctx context.Context, dockerClient *client.Client, net string) error {
-	//Docker cleanup
-	services, err := dockerClient.ServiceList(ctx, types.ServiceListOptions{})
-	if err != nil {
-		return fmt.Errorf("%v", err)
-	}
-	for _, v := range services {
-		if v.ID == "" {
-			continue
-		}
-		err := dockerClient.ServiceRemove(ctx, v.ID)
-		if err != nil {
-			return fmt.Errorf("%v", err)
-		}
-	}
-	containers, err := dockerClient.ContainerList(ctx, types.ContainerListOptions{})
-	for _, c := range containers {
-		if c.ID == "" {
-			continue
-		}
-		err := dockerClient.ContainerKill(ctx, c.ID, "SIGKILL")
-		if err != nil {
-			return fmt.Errorf("%v", err)
-		}
-		err = dockerClient.ContainerRemove(ctx, c.ID, types.ContainerRemoveOptions{Force: true})
-		if err != nil {
-			return fmt.Errorf("%v", err)
-		}
-	}
-	start := time.Now()
-	for time.Since(start) < 10*time.Second {
-		dockerClient.NetworkRemove(ctx, net)
-		time.Sleep(time.Second)
-		_, err := dockerClient.NetworkInspect(ctx, net)
-		if err != nil {
-			_, err := dockerClient.NetworksPrune(ctx, filters.Args{})
-			if err == nil {
-				break
+	// Timeout
+	timeoutContext, cancel := context.WithTimeout(ctx, 45*time.Second)
+	defer cancel()
+
+	// Remove Services
+	delSvc := func() <-chan struct{} {
+		res := make(chan struct{})
+		go func() {
+			for {
+				select {
+				case <-timeoutContext.Done():
+					close(res)
+					return
+				default:
+					break
+				}
+				time.Sleep(100 * time.Millisecond)
+				services, err := dockerClient.ServiceList(timeoutContext, types.ServiceListOptions{})
+				if len(services) == 0 {
+					res <- struct{}{}
+					return
+				}
+				if err != nil {
+					continue
+				}
+				for _, v := range services {
+					dockerClient.ServiceRemove(ctx, v.ID)
+				}
 			}
+		}()
+		return res
+	}()
+
+	// Wait for no services
+	select {
+	case <-timeoutContext.Done():
+		return fmt.Errorf("services not killed in timeout")
+	case <-delSvc:
+		break
+	}
+
+	// Remove Containers
+	delCon := func() <-chan struct{} {
+		res := make(chan struct{})
+		go func() {
+			for {
+				select {
+				case <-timeoutContext.Done():
+					close(res)
+					return
+				default:
+					break
+				}
+				time.Sleep(100 * time.Millisecond)
+				containers, err := dockerClient.ContainerList(ctx, types.ContainerListOptions{})
+				if len(containers) == 0 {
+					res <- struct{}{}
+					return
+				}
+				if err != nil {
+					continue
+				}
+				for _, c := range containers {
+					dockerClient.ContainerKill(ctx, c.ID, "SIGKILL")
+					dockerClient.ContainerRemove(ctx, c.ID, types.ContainerRemoveOptions{Force: true})
+				}
+			}
+		}()
+		return res
+	}()
+
+	// Wait for no containers
+	select {
+	case <-timeoutContext.Done():
+		return fmt.Errorf("containers not killed in timeout")
+	case <-delCon:
+		break
+	}
+
+	if net != "" {
+		delNet := func() <-chan struct{} {
+			res := make(chan struct{})
+			go func() {
+			L:
+				for {
+					select {
+					case <-timeoutContext.Done():
+						close(res)
+						return
+					default:
+						break
+					}
+					dockerClient.NetworksPrune(ctx, filters.Args{})
+					time.Sleep(500 * time.Millisecond)
+					netList, err := dockerClient.NetworkList(ctx, types.NetworkListOptions{})
+					if err != nil {
+						continue L
+					}
+					for _, n := range netList {
+						if n.ID == net {
+							continue L
+						}
+					}
+					res <- struct{}{}
+					return
+				}
+			}()
+			return res
+		}()
+
+		// Wait for network removal
+		select {
+		case <-timeoutContext.Done():
+			return fmt.Errorf("network not removed")
+		case <-delNet:
+			break
 		}
 	}
 	return nil
 }
 
+// GetImage gets the image name with its tag
 func GetImage(image string) string {
 	var stringBuf bytes.Buffer
 
@@ -96,40 +177,108 @@ func GetImage(image string) string {
 	return stringBuf.String()
 }
 
-func StartBrain(ctx context.Context, t *testing.T, dockerClient *client.Client, spec swarm.ServiceSpec) (*r.Session, string, error) {
-	// Start brain
-	result, err := dockerClient.ServiceCreate(ctx, spec, types.ServiceCreateOptions{})
+// CheckCreateNet checks to see if the given network is created and creates
+// it if it is not
+func CheckCreateNet(net string) (string, error) {
+	ctx := context.Background()
+	dockerClient, err := client.NewEnvClient()
 	if err != nil {
-		t.Errorf("%v", err)
-		return nil, "", err
+		return "", err
 	}
 
-	// Test setup
-	session, err := r.Connect(r.ConnectOpts{
-		Address: "127.0.0.1",
-	})
-	start := time.Now()
+	nets, err := dockerClient.NetworkList(ctx, types.NetworkListOptions{})
 	if err != nil {
-		for {
-			if time.Since(start) >= 20*time.Second {
-				t.Errorf("%v", err)
-				return nil, "", err
-			}
-			session, err = r.Connect(r.ConnectOpts{
-				Address: "127.0.0.1",
-			})
-			if err == nil {
-				_, err := r.DB("Controller").Table("Plugins").Run(session)
-				if err == nil {
-					break
-				}
-			}
-			time.Sleep(time.Second)
+		return "", err
+	}
+	for _, n := range nets {
+		if n.Name == net {
+			return n.ID, nil
 		}
 	}
-	return session, result.ID, nil
+
+	netID, err := dockerClient.NetworkCreate(ctx, net, types.NetworkCreate{
+		Driver:     "overlay",
+		Attachable: true,
+	})
+	if err != nil {
+		return "", err
+	}
+	return netID.ID, nil
 }
 
+// StartBrain starts an instance of the Brain module and returns a connection
+// (*Session) to it
+func StartBrain(ctx context.Context, t *testing.T, dockerClient *client.Client, spec swarm.ServiceSpec) (*r.Session, string, error) {
+	// Timeout
+	timeoutContext, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	// Start brain
+	var resID string
+	startB := func() <-chan string {
+		res := make(chan string)
+		go func() {
+			for {
+				time.Sleep(1000 * time.Millisecond)
+				result, err := dockerClient.ServiceCreate(timeoutContext, spec, types.ServiceCreateOptions{})
+				if err != nil {
+					if result.ID != "" {
+						KillService(timeoutContext, dockerClient, result.ID)
+					}
+					continue
+				}
+				res <- result.ID
+			}
+		}()
+		return res
+	}()
+
+	// Wait for successful start
+	select {
+	case <-timeoutContext.Done():
+		return nil, "", fmt.Errorf("brain no started in timeout")
+	case resID = <-startB:
+		if resID == "" {
+			return nil, "", fmt.Errorf("no ID received for brain")
+		}
+		break
+	}
+
+	// Test brain connection
+	testB := func() <-chan struct{} {
+		res := make(chan struct{})
+		go func() {
+			for {
+				time.Sleep(500 * time.Millisecond)
+				session, err := r.Connect(r.ConnectOpts{
+					Address: "127.0.0.1",
+				})
+				if err != nil {
+					continue
+				}
+				_, err = r.DB("Controller").Table("Plugins").Run(session)
+				if err != nil {
+					continue
+				}
+				res <- struct{}{}
+			}
+		}()
+		return res
+	}()
+
+	// Wait for successful connection
+	select {
+	case <-timeoutContext.Done():
+		return nil, "", fmt.Errorf("brain connection not established in timeout")
+	case <-testB:
+		sessionRet, err := r.Connect(r.ConnectOpts{
+			Address: "127.0.0.1",
+		})
+		return sessionRet, resID, err
+	}
+}
+
+// KillService Kills a docker service
 func KillService(ctx context.Context, dockerClient *client.Client, svcID string) {
 	start := time.Now()
 	for time.Since(start) < 10*time.Second {
@@ -156,6 +305,7 @@ func KillService(ctx context.Context, dockerClient *client.Client, svcID string)
 	}
 }
 
+// StartIntegrationTestService starts a service for the integration test
 func StartIntegrationTestService(ctx context.Context, dockerClient *client.Client, spec swarm.ServiceSpec) (string, error) {
 
 	// Start service
@@ -193,6 +343,9 @@ var BrainSpec = swarm.ServiceSpec{
 var controllerSpec = swarm.ServiceSpec{
 	Annotations: swarm.Annotations{
 		Name: "controller",
+		Labels: map[string]string{
+			"com.docker.stack.namespace": "test",
+		},
 	},
 	TaskTemplate: swarm.TaskSpec{
 		ContainerSpec: swarm.ContainerSpec{

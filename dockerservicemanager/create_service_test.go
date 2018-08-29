@@ -3,7 +3,6 @@ package dockerservicemanager
 import (
 	"context"
 	"errors"
-	"log"
 	"os"
 	"testing"
 	"time"
@@ -14,12 +13,15 @@ import (
 	client "github.com/docker/docker/client"
 	"github.com/ramrod-project/backend-controller-go/test"
 	"github.com/stretchr/testify/assert"
+	r "gopkg.in/gorethink/gorethink.v4"
 )
 
 // TODO:
 // get leader node IP to use to verify tests
 
 func Test_CreatePluginService(t *testing.T) {
+	env := os.Getenv("STAGE")
+	os.Setenv("STAGE", "TESTING")
 
 	ctx := context.Background()
 	dockerClient, err := client.NewEnvClient()
@@ -28,10 +30,31 @@ func Test_CreatePluginService(t *testing.T) {
 		return
 	}
 
-	netRes, err := dockerClient.NetworkCreate(ctx, "test_create", types.NetworkCreate{
-		Driver:     "overlay",
-		Attachable: true,
-	})
+	// Set up clean environment
+	if err := test.DockerCleanUp(ctx, dockerClient, ""); err != nil {
+		t.Errorf("setup error: %v", err)
+	}
+
+	session, brainID, err := test.StartBrain(ctx, t, dockerClient, test.BrainSpec)
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+
+	testPort := map[string]interface{}{
+		"Interface":    GetManagerIP(),
+		"TCPPorts":     []string{},
+		"UDPPorts":     []string{},
+		"NodeHostName": "test",
+		"OS":           "posix",
+	}
+	_, err = r.DB("Controller").Table("Ports").Insert(testPort).RunWrite(session)
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+
+	netID, err := test.CheckCreateNet("test_create")
 	if err != nil {
 		t.Errorf("%v", err)
 		return
@@ -51,6 +74,7 @@ func Test_CreatePluginService(t *testing.T) {
 			name: "Test creating a plugin service",
 			args: args{
 				config: PluginServiceConfig{
+					Address: GetManagerIP(),
 					Environment: []string{
 						"STAGE=DEV",
 						"LOGLEVEL=DEBUG",
@@ -76,6 +100,7 @@ func Test_CreatePluginService(t *testing.T) {
 			name: "Bad network",
 			args: args{
 				config: PluginServiceConfig{
+					Address: GetManagerIP(),
 					Environment: []string{
 						"STAGE=DEV",
 						"LOGLEVEL=DEBUG",
@@ -103,6 +128,7 @@ func Test_CreatePluginService(t *testing.T) {
 			name: "Duplicate service name",
 			args: args{
 				config: PluginServiceConfig{
+					Address: GetManagerIP(),
 					Environment: []string{
 						"STAGE=DEV",
 						"LOGLEVEL=DEBUG",
@@ -138,23 +164,24 @@ func Test_CreatePluginService(t *testing.T) {
 				assert.Equal(t, tt.err, err)
 			}
 			assert.Equal(t, tt.want.Warnings, got.Warnings)
-			log.Printf("Warnings: %v\n", got.Warnings)
-			log.Printf("ID created: %v\n\n", got.ID)
 			generatedIDs[i] = got.ID
 		})
 	}
+
+	test.KillService(ctx, dockerClient, brainID)
+
 	//Docker cleanup
-	if err := test.DockerCleanUp(ctx, dockerClient, netRes.ID); err != nil {
+	if err := test.DockerCleanUp(ctx, dockerClient, netID); err != nil {
 		t.Errorf("cleanup error: %v", err)
 	}
+	os.Setenv("STAGE", env)
 }
 
 func Test_generateServiceSpec(t *testing.T) {
 	var (
-		maxAttempts     = uint64(3)
-		placementConfig = &swarm.Placement{}
-		replicas        = uint64(1)
-		second          = time.Second
+		maxAttempts = uint64(3)
+		replicas    = uint64(1)
+		second      = time.Second
 	)
 
 	ctx := context.Background()
@@ -228,7 +255,9 @@ func Test_generateServiceSpec(t *testing.T) {
 						Condition:   "on-failure",
 						MaxAttempts: &maxAttempts,
 					},
-					Placement: placementConfig,
+					Placement: &swarm.Placement{
+						Constraints: []string{"node.labels.os==posix"},
+					},
 					Networks: []swarm.NetworkAttachmentConfig{
 						swarm.NetworkAttachmentConfig{
 							Target: "goodnet",
@@ -409,9 +438,9 @@ func Test_getTagFromEnv(t *testing.T) {
 	os.Setenv("TAG", oldEnvTag)
 }
 
-func Test_getManagerIP(t *testing.T) {
+func Test_GetManagerIP(t *testing.T) {
 
-	ctx := context.TODO()
+	ctx := context.Background()
 	dockerClient, err := client.NewEnvClient()
 	if err != nil {
 		t.Errorf("%v", err)
@@ -432,8 +461,8 @@ func Test_getManagerIP(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := getManagerIP(); got != tt.want {
-				t.Errorf("getManagerIP() = %v, want %v", got, tt.want)
+			if got := GetManagerIP(); got != tt.want {
+				t.Errorf("GetManagerIP() = %v, want %v", got, tt.want)
 			}
 		})
 	}

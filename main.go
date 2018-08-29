@@ -12,7 +12,7 @@ import (
 	r "gopkg.in/gorethink/gorethink.v4"
 )
 
-func checkDB(timeout time.Duration) bool {
+func checkDB(timeout time.Duration) bool { // pragma: no cover
 	// Verify db connection
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -54,7 +54,7 @@ func checkDB(timeout time.Duration) bool {
 	}
 }
 
-func main() {
+func main() { // pragma: no cover
 	// Check the connection to the database before
 	// doing anything.
 	if !checkDB(10 * time.Second) {
@@ -70,6 +70,12 @@ func main() {
 	// Populate with plugin data from manifest and
 	// update services.
 	err = dockerservicemanager.PluginAdvertise()
+	if err != nil {
+		log.Fatalf("fatal: %v", err)
+	}
+
+	// Advertise current plugin service status
+	err = dockerservicemanager.StartupServiceStatus()
 	if err != nil {
 		log.Fatalf("fatal: %v", err)
 	}

@@ -12,9 +12,12 @@ import (
 	client "github.com/docker/docker/client"
 	"github.com/ramrod-project/backend-controller-go/test"
 	"github.com/stretchr/testify/assert"
+	r "gopkg.in/gorethink/gorethink.v4"
 )
 
 func TestUpdatePluginService(t *testing.T) {
+	env := os.Getenv("STAGE")
+	os.Setenv("STAGE", "TESTING")
 	var (
 		maxAttempts     = uint64(3)
 		placementConfig = &swarm.Placement{}
@@ -34,10 +37,31 @@ func TestUpdatePluginService(t *testing.T) {
 		return
 	}
 
-	netRes, err := dockerClient.NetworkCreate(ctx, "test_update", types.NetworkCreate{
-		Driver:     "overlay",
-		Attachable: true,
-	})
+	// Set up clean environment
+	if err := test.DockerCleanUp(ctx, dockerClient, ""); err != nil {
+		t.Errorf("setup error: %v", err)
+	}
+
+	session, brainID, err := test.StartBrain(ctx, t, dockerClient, test.BrainSpec)
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+
+	testPort := map[string]interface{}{
+		"Interface":    GetManagerIP(),
+		"TCPPorts":     []string{},
+		"UDPPorts":     []string{},
+		"NodeHostName": "ubuntu",
+		"OS":           "posix",
+	}
+	_, err = r.DB("Controller").Table("Ports").Insert(testPort).RunWrite(session)
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+
+	netID, err := test.CheckCreateNet("test_update")
 	if err != nil {
 		t.Errorf("%v", err)
 		return
@@ -129,6 +153,7 @@ func TestUpdatePluginService(t *testing.T) {
 						PublishMode:   swarm.PortConfigPublishModeIngress,
 					}},
 					ServiceName: "GoodService",
+					Address:     GetManagerIP(),
 				},
 				id: id,
 			},
@@ -157,6 +182,7 @@ func TestUpdatePluginService(t *testing.T) {
 						PublishMode:   swarm.PortConfigPublishModeIngress,
 					}},
 					ServiceName: "GoodService",
+					Address:     GetManagerIP(),
 				},
 				id: "",
 			},
@@ -185,6 +211,7 @@ func TestUpdatePluginService(t *testing.T) {
 						PublishMode:   swarm.PortConfigPublishModeIngress,
 					}},
 					ServiceName: "BadServiceUpdate",
+					Address:     GetManagerIP(),
 				},
 				id: id,
 			},
@@ -215,10 +242,14 @@ func TestUpdatePluginService(t *testing.T) {
 		})
 	}
 
+	test.KillService(ctx, dockerClient, brainID)
+
 	//Docker cleanup
-	if err := test.DockerCleanUp(ctx, dockerClient, netRes.ID); err != nil {
+	if err := test.DockerCleanUp(ctx, dockerClient, netID); err != nil {
 		t.Errorf("cleanup error: %v", err)
 	}
+
+	os.Setenv("STAGE", env)
 }
 
 func Test_checkReady(t *testing.T) {

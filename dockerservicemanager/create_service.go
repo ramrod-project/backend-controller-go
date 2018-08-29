@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"time"
 
 	types "github.com/docker/docker/api/types"
@@ -62,8 +63,8 @@ func hostString(h string, i string) string {
 	return stringBuf.String()
 }
 
-func getManagerIP() string {
-	ctx := context.TODO()
+func GetManagerIP() string {
+	ctx := context.Background()
 	dockerClient, err := client.NewEnvClient()
 	if err != nil {
 		panic(err)
@@ -75,7 +76,7 @@ func getManagerIP() string {
 	}
 
 	for _, node := range list {
-		if node.Spec.Role == "manager" {
+		if node.Spec.Role == swarm.NodeRoleManager {
 			return node.Status.Addr
 		}
 	}
@@ -84,6 +85,10 @@ func getManagerIP() string {
 
 func generateServiceSpec(config *PluginServiceConfig) (*swarm.ServiceSpec, error) {
 	var (
+		annotations = swarm.Annotations{
+			Name:   config.ServiceName,
+			Labels: make(map[string]string),
+		}
 		hosts     []string
 		imageName = &dockerImageName{
 			Tag: getTagFromEnv(),
@@ -95,18 +100,19 @@ func generateServiceSpec(config *PluginServiceConfig) (*swarm.ServiceSpec, error
 		stopGrace       = time.Second
 	)
 
-	// log.Printf("Creating service %v with config %v\n", config.ServiceName, config)
-
 	// Determine container image
 	if config.ServiceName == "AuxiliaryServices" {
 		imageName.Name = "ramrodpcp/auxiliary-wrapper"
 	} else if config.OS == rethink.PluginOSPosix || config.OS == rethink.PluginOSAll {
+		annotations.Labels["os"] = "posix"
 		imageName.Name = "ramrodpcp/interpreter-plugin"
+		placementConfig.Constraints = []string{"node.labels.os==posix"}
 	} else if config.OS == rethink.PluginOSWindows {
+		annotations.Labels["os"] = "nt"
 		imageName.Name = "ramrodpcp/interpreter-plugin-windows"
 		placementConfig.Constraints = []string{"node.labels.os==nt"}
-		hosts = append(hosts, hostString("rethinkdb", getManagerIP()))
-		config.Environment = append(config.Environment, "RETHINK_HOST="+getManagerIP())
+		hosts = append(hosts, hostString("rethinkdb", GetManagerIP()))
+		config.Environment = append(config.Environment, "RETHINK_HOST="+GetManagerIP())
 	} else {
 		return &swarm.ServiceSpec{}, fmt.Errorf("invalid OS setting: %v", config.OS)
 	}
@@ -116,12 +122,8 @@ func generateServiceSpec(config *PluginServiceConfig) (*swarm.ServiceSpec, error
 		placementConfig.Constraints = append(placementConfig.Constraints, "node.labels.ip=="+config.Address)
 	}
 
-	// log.Printf("Creating service spec\n")
-
 	serviceSpec := &swarm.ServiceSpec{
-		Annotations: swarm.Annotations{
-			Name: config.ServiceName,
-		},
+		Annotations: annotations,
 		TaskTemplate: swarm.TaskSpec{
 			ContainerSpec: swarm.ContainerSpec{
 				DNSConfig: &swarm.DNSConfig{},
@@ -172,15 +174,12 @@ func generateServiceSpec(config *PluginServiceConfig) (*swarm.ServiceSpec, error
 // given a PluginServiceConfig.
 func CreatePluginService(config *PluginServiceConfig) (types.ServiceCreateResponse, error) {
 
-	// log.Printf("Entering CreatePluginService")
-	ctx := context.TODO()
+	ctx := context.Background()
 	dockerClient, err := client.NewEnvClient()
 
 	if err != nil {
 		return types.ServiceCreateResponse{}, err
 	}
-
-	// log.Printf("Generating service spec\n")
 
 	serviceSpec, err := generateServiceSpec(config)
 
@@ -188,10 +187,16 @@ func CreatePluginService(config *PluginServiceConfig) (types.ServiceCreateRespon
 		return types.ServiceCreateResponse{}, err
 	}
 
-	// log.Printf("Service spec created: %v", serviceSpec)
-
 	resp, err := dockerClient.ServiceCreate(ctx, *serviceSpec, types.ServiceCreateOptions{})
 	log.Printf("Started service %+v", resp)
+
+	//update ports
+	for _, port := range config.Ports {
+		err := rethink.AddPort(config.Address, strconv.FormatUint(uint64(port.PublishedPort), 10), port.Protocol)
+		if err != nil {
+			log.Printf("%v", err)
+		}
+	}
 
 	return resp, err
 

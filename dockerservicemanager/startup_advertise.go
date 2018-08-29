@@ -129,14 +129,12 @@ func getPlugins() ([]ManifestPlugin, error) {
 }
 
 func advertisePlugins(manifest []ManifestPlugin) error {
-	var plugins []map[string]interface{}
+	var (
+		doc map[string]interface{}
+	)
 
 	if len(manifest) < 1 {
 		return errors.New("no plugins to advertise")
-	}
-
-	for _, plugin := range manifest {
-		log.Printf("manifest entry: %+v", plugin)
 	}
 
 	session, err := r.Connect(r.ConnectOpts{
@@ -146,8 +144,9 @@ func advertisePlugins(manifest []ManifestPlugin) error {
 		return err
 	}
 
+L:
 	for _, plugin := range manifest {
-		plugins = append(plugins, map[string]interface{}{
+		pluginEntry := map[string]interface{}{
 			"Name":          plugin.Name,
 			"ServiceID":     "",
 			"ServiceName":   "",
@@ -158,10 +157,18 @@ func advertisePlugins(manifest []ManifestPlugin) error {
 			"InternalPorts": []string{},
 			"OS":            string(plugin.OS),
 			"Environment":   []string{},
-		})
+		}
+		cursor, err := r.DB("Controller").Table("Plugins").Run(session)
+		if err != nil {
+			return err
+		}
+		for cursor.Next(&doc) {
+			if doc["Name"].(string) == plugin.Name && doc["ServiceName"] == "" {
+				continue L
+			}
+		}
+		_, err = r.DB("Controller").Table("Plugins").Insert(pluginEntry).RunWrite(session)
 	}
-
-	_, err = r.DB("Controller").Table("Plugins").Insert(plugins).RunWrite(session)
 
 	return err
 
@@ -228,11 +235,10 @@ func advertiseStartupService(service map[string]interface{}) error {
 			doc["TCPPorts"] = newTCP
 			doc["UDPPorts"] = newUDP
 
-			resp, err := r.DB("Controller").Table("Ports").Get(doc["id"]).Update(doc).RunWrite(session)
+			_, err := r.DB("Controller").Table("Ports").Get(doc["id"]).Update(doc).RunWrite(session)
 			if err != nil {
 				return err
 			}
-			log.Printf("port doc inserted: %+v\nres: %+v", doc, resp)
 		} else {
 			return errors.New("leader port entry not found")
 		}
@@ -241,14 +247,29 @@ func advertiseStartupService(service map[string]interface{}) error {
 	return nil
 }
 
+func checkForNode(name string) string {
+	var doc map[string]interface{}
+
+	session, err := r.Connect(r.ConnectOpts{
+		Address: getRethinkHost(),
+	})
+	if err != nil {
+		return ""
+	}
+
+	cursor, err := r.DB("Controller").Table("Ports").Run(session)
+	for cursor.Next(&doc) {
+		if doc["NodeHostName"].(string) == name {
+			return doc["id"].(string)
+		}
+	}
+	return ""
+}
+
 func advertiseIPs(entries []map[string]interface{}) error {
 
 	if len(entries) < 1 {
 		return errors.New("no nodes to advertise")
-	}
-
-	for _, entry := range entries {
-		log.Printf("port entry: %+v", entry)
 	}
 
 	session, err := r.Connect(r.ConnectOpts{
@@ -258,7 +279,13 @@ func advertiseIPs(entries []map[string]interface{}) error {
 		return err
 	}
 
-	_, err = r.DB("Controller").Table("Ports").Insert(entries).RunWrite(session)
+	for _, e := range entries {
+		if resID := checkForNode(e["NodeHostName"].(string)); resID == "" {
+			_, err = r.DB("Controller").Table("Ports").Insert(e).RunWrite(session)
+		} else {
+			_, err = r.DB("Controller").Table("Ports").Get(resID).Update(e).RunWrite(session)
+		}
+	}
 
 	return err
 }
