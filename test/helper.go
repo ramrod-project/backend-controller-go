@@ -24,6 +24,7 @@ func getTagFromEnv() string {
 	return temp
 }
 
+// GetServiceID Gets the service ID of a service given the name of the service
 func GetServiceID(ctx context.Context, dockerClient *client.Client, name string) string {
 	services, err := dockerClient.ServiceList(ctx, types.ServiceListOptions{})
 	if err != nil {
@@ -37,6 +38,7 @@ func GetServiceID(ctx context.Context, dockerClient *client.Client, name string)
 	return ""
 }
 
+// DockerCleanUp removes all services and containers
 func DockerCleanUp(ctx context.Context, dockerClient *client.Client, net string) error {
 	// Timeout
 	timeoutContext, cancel := context.WithTimeout(ctx, 45*time.Second)
@@ -159,6 +161,7 @@ func DockerCleanUp(ctx context.Context, dockerClient *client.Client, net string)
 	return nil
 }
 
+// GetImage gets the image name with its tag
 func GetImage(image string) string {
 	var stringBuf bytes.Buffer
 
@@ -174,6 +177,8 @@ func GetImage(image string) string {
 	return stringBuf.String()
 }
 
+// CheckCreateNet checks to see if the given network is created and creates
+// it if it is not
 func CheckCreateNet(net string) (string, error) {
 	ctx := context.Background()
 	dockerClient, err := client.NewEnvClient()
@@ -201,6 +206,8 @@ func CheckCreateNet(net string) (string, error) {
 	return netID.ID, nil
 }
 
+// StartBrain starts an instance of the Brain module and returns a connection
+// (*Session) to it
 func StartBrain(ctx context.Context, t *testing.T, dockerClient *client.Client, spec swarm.ServiceSpec) (*r.Session, string, error) {
 	// Timeout
 	timeoutContext, cancel := context.WithTimeout(ctx, 30*time.Second)
@@ -271,6 +278,7 @@ func StartBrain(ctx context.Context, t *testing.T, dockerClient *client.Client, 
 	}
 }
 
+// KillService Kills a docker service
 func KillService(ctx context.Context, dockerClient *client.Client, svcID string) {
 	start := time.Now()
 	for time.Since(start) < 10*time.Second {
@@ -297,6 +305,7 @@ func KillService(ctx context.Context, dockerClient *client.Client, svcID string)
 	}
 }
 
+// StartIntegrationTestService starts a service for the integration test
 func StartIntegrationTestService(ctx context.Context, dockerClient *client.Client, spec swarm.ServiceSpec) (string, error) {
 
 	// Start service
