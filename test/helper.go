@@ -38,7 +38,7 @@ func GetServiceID(ctx context.Context, dockerClient *client.Client, name string)
 	return ""
 }
 
-// DockerCleanup removes all services and containers
+// DockerCleanUp removes all services and containers
 func DockerCleanUp(ctx context.Context, dockerClient *client.Client, net string) error {
 	// Timeout
 	timeoutContext, cancel := context.WithTimeout(ctx, 45*time.Second)
