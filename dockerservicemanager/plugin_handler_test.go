@@ -159,7 +159,7 @@ func Test_pluginToConfig(t *testing.T) {
 					Protocol:      swarm.PortConfigProtocolTCP,
 					TargetPort:    uint32(5000),
 					PublishedPort: uint32(5000),
-					PublishMode:   swarm.PortConfigPublishModeIngress,
+					PublishMode:   swarm.PortConfigPublishModeHost,
 				}},
 				ServiceName: "BasicPluginService",
 			},
