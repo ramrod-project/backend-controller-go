@@ -102,6 +102,8 @@ func generateServiceSpec(config *PluginServiceConfig) (*swarm.ServiceSpec, error
 
 	// Determine container image
 	if config.ServiceName == "AuxiliaryServices" {
+		annotations.Labels["os"] = "posix"
+		placementConfig.Constraints = []string{"node.labels.os==posix"}
 		imageName.Name = "ramrodpcp/auxiliary-wrapper"
 	} else if config.OS == rethink.PluginOSPosix || config.OS == rethink.PluginOSAll {
 		annotations.Labels["os"] = "posix"
