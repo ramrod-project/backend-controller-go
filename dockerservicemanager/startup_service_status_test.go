@@ -189,7 +189,7 @@ func TestStartupServiceStatus(t *testing.T) {
 		t.Errorf("setup error: %v", err)
 	}
 
-	netID, err := test.CheckCreateNet("pcp")
+	netID, err := test.CheckCreateNet("pcptest")
 	if err != nil {
 		t.Errorf("%v", err)
 		return
@@ -224,7 +224,7 @@ func TestStartupServiceStatus(t *testing.T) {
 			},
 			Networks: []swarm.NetworkAttachmentConfig{
 				swarm.NetworkAttachmentConfig{
-					Target: "pcp",
+					Target: "pcptest",
 				},
 			},
 		},
@@ -265,7 +265,7 @@ func TestStartupServiceStatus(t *testing.T) {
 			},
 			Networks: []swarm.NetworkAttachmentConfig{
 				swarm.NetworkAttachmentConfig{
-					Target: "pcp",
+					Target: "pcptest",
 				},
 			},
 		},

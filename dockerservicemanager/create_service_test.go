@@ -242,6 +242,7 @@ func Test_generateServiceSpec(t *testing.T) {
 							"LOGLEVEL=DEBUG",
 							"PORT=666",
 							"PLUGIN=GoodPlugin",
+							"RETHINK_HOST=" + GetManagerIP(),
 						},
 						Healthcheck: &container.HealthConfig{
 							Interval: time.Second,
