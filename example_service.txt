@@ -191,3 +191,25 @@
     'time': 1533221462,
     'timeNano': 1533221462057397809
 }
+ontainer event: {
+    Status: health_status: healthy
+    ID:0e6257dc8f616ff21dd1fdb7779090c56ec1a8e644ecf20b6ca3a0438482060a
+    From:ramrodpcp/interpreter-plugin:dev
+    Type:container
+    Action: health_status: healthy
+    Actor:{
+        ID:0e6257dc8f616ff21dd1fdb7779090c56ec1a8e644ecf20b6ca3a0438482060a
+        Attributes:map[
+            com.docker.swarm.task.id:layfnbre7fi21c3el5zcyi6sf
+            com.docker.swarm.task.name:TestPlugin.1.layfnbre7fi21c3el5zcyi6sf
+            image:ramrodpcp/interpreter-plugin:dev
+            name:TestPlugin.1.layfnbre7fi21c3el5zcyi6sf
+            com.docker.swarm.node.id:quodyhox5f9tbsppfsy26npg0
+            com.docker.swarm.service.id:kz8ake5f917cyuf3b3v72vy1f
+            com.docker.swarm.service.name:TestPlugin
+            com.docker.swarm.task:
+        ]
+    }
+    Time:1535130082
+    TimeNano:1535130082968001289
+}

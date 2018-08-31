@@ -1,0 +1,73 @@
+# TODO:
+# - Add Golint
+# - Add coverage tool
+
+sudo: required
+
+env:
+  global:
+    - DEP_VERSION="0.4.1"
+    - CC_TEST_REPORTER_ID=355a7f4947a6901e67ffd0fe3f09801c3ffb3037decb1c7aa0704bc10e735763
+
+language: go
+go:
+  - "1.10.3"
+
+services:
+  - docker
+
+branches:
+  only:
+  - master
+  - dev
+  - qa
+
+before_install:
+  - if [ "$TRAVIS_BRANCH" == "master" ]; 
+    then export TAG=latest;
+    else export TAG=$TRAVIS_BRANCH; fi
+  - curl -L -s https://github.com/golang/dep/releases/download/v${DEP_VERSION}/dep-linux-amd64 -o $GOPATH/bin/dep
+  - chmod +x $GOPATH/bin/dep
+  - docker swarm init
+  - travis_wait 10 docker pull ramrodpcp/interpreter-plugin:$TAG
+  - travis_wait 10 docker pull ramrodpcp/auxiliary-wrapper:$TAG
+  - travis_wait 10 docker pull ramrodpcp/auxiliary-services:$TAG
+  - travis_wait 10 docker pull ramrodpcp/database-brain:$TAG
+  - curl -L https://codeclimate.com/downloads/test-reporter/test-reporter-latest-linux-amd64 > ./cc-test-reporter
+  - chmod +x ./cc-test-reporter
+
+install:  
+  - dep ensure -v
+  - go vet
+  - go build -race
+  - ./codecoverage.sh # Runs all of the tests and uploads coverage results
+  - make
+
+before_script:
+  - docker network prune -f
+
+script:
+  - docker build -t ramrodpcp/backend-controller:test .
+  - docker network create --driver=overlay pcp
+  - docker service create --name rethinkdb --network pcp -p 28015:28015 -e "STAGE=DEV" -e "LOGLEVEL=DEBUG" ramrodpcp/database-brain:$TAG
+  - docker service create --name controller --network pcp -e "STAGE=DEV" -e "LOGLEVEL=DEBUG" -e "TAG=${TAG}" --mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock ramrodpcp/backend-controller:test
+  - sleep 10
+  - docker service ls
+  - docker service ps --no-trunc controller
+  - docker service logs controller
+  - docker service logs rethinkdb
+  - docker service rm controller rethinkdb
+  - sleep 10
+  - docker network prune -f
+  # integration tests
+  - go test -v -parallel 1 github.com/ramrod-project/backend-controller-go/test
+
+after_success:
+  - docker tag ramrodpcp/backend-controller:test ramrodpcp/backend-controller:$TAG
+  - if [[ "$TRAVIS_PULL_REQUEST" == "false" ]]; 
+    then echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin; fi
+  - if [[ "$TRAVIS_PULL_REQUEST" == "false"  ]]; 
+    then docker push ramrodpcp/backend-controller:$TAG; fi
+
+notifications:
+  slack: ramrod-project:GDF82rRYDg3KSekrT3GA24qO

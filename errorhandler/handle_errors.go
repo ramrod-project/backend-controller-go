@@ -1,10 +1,6 @@
 package errorhandler
 
-import (
-	"log"
-)
-
-func ErrorHandler(errorChans ...<-chan error) {
+func ErrorHandler(errorChans ...<-chan error) <-chan error {
 	collector := make(chan error)
 
 	for _, errChan := range errorChans {
@@ -15,9 +11,5 @@ func ErrorHandler(errorChans ...<-chan error) {
 		}(errChan)
 	}
 
-	for err := range collector {
-		if err != nil {
-			log.Printf("Error: %v\n", err)
-		}
-	}
+	return collector
 }
