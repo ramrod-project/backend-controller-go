@@ -256,7 +256,7 @@ func TestEventUpdate(t *testing.T) {
 		"Interface":     "192.168.1.2",
 		"ExternalPorts": []string{"2080/tcp"},
 		"InternalPorts": []string{"2080/tcp"},
-		"OS":            string(PluginOSAll),
+		"OS":            string(PluginOSWindows),
 	}).RunWrite(session)
 	if err != nil {
 		t.Errorf("%v", err)
