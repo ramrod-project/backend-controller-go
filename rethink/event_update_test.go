@@ -346,8 +346,6 @@ func TestEventUpdate(t *testing.T) {
 				for {
 					select {
 					case <-timeoutCtx.Done():
-						<-startDB
-						<-startDocker
 						break L
 					case v := <-startDocker:
 						if v {
@@ -470,10 +468,6 @@ func TestEventUpdate(t *testing.T) {
 				for {
 					select {
 					case <-timeoutCtx.Done():
-						<-updatingDB
-						<-updatedDB
-						<-updatingDocker
-						<-updatedDocker
 						break L
 					case v := <-updatingDocker:
 						if v {
@@ -636,8 +630,6 @@ func TestEventUpdate(t *testing.T) {
 				for {
 					select {
 					case <-timeoutCtx.Done():
-						<-stopDB
-						<-stopDocker
 						break L
 					case v := <-stopDocker:
 						if v {
@@ -741,8 +733,6 @@ func TestEventUpdate(t *testing.T) {
 				for {
 					select {
 					case <-timeoutCtx.Done():
-						<-startDB
-						<-startDocker
 						break L
 					case v := <-startDocker:
 						if v {
@@ -865,10 +855,6 @@ func TestEventUpdate(t *testing.T) {
 				for {
 					select {
 					case <-timeoutCtx.Done():
-						<-updatingDB
-						<-updatedDB
-						<-updatingDocker
-						<-updatedDocker
 						break L
 					case v := <-updatingDocker:
 						if v {
@@ -1038,8 +1024,6 @@ func TestEventUpdate(t *testing.T) {
 				for {
 					select {
 					case <-timeoutCtx.Done():
-						<-stopDB
-						<-stopDocker
 						break L
 					case v := <-stopDocker:
 						if v {
