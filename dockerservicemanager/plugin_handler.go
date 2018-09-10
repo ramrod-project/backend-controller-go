@@ -70,6 +70,7 @@ func pluginToConfig(plugin rethink.Plugin) (PluginServiceConfig, error) {
 		getEnvByKey("LOGLEVEL"),
 		envString("PORT", fmt.Sprintf("%v", intPort)),
 		envString("PLUGIN", plugin.Name),
+		envString("PLUGIN_NAME", plugin.ServiceName),
 	}
 	if len(plugin.Environment) > 0 {
 		environment = append(environment, plugin.Environment...)
