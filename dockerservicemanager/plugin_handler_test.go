@@ -151,6 +151,7 @@ func Test_pluginToConfig(t *testing.T) {
 					"LOGLEVEL=" + log,
 					"PORT=5000",
 					"PLUGIN=BasicPlugin",
+					"PLUGIN_NAME=BasicPluginService",
 				},
 				Address: "192.168.1.1",
 				Network: "pcp",
