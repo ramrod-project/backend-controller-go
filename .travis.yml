@@ -25,6 +25,7 @@ branches:
   - qa
 
 before_install:
+  - sudo apt-get -y install python3-pip python-dev
   - if [ "$TRAVIS_BRANCH" == "master" ]; 
     then export TAG=latest;
     else export TAG=$TRAVIS_BRANCH; fi
