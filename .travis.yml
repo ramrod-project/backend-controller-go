@@ -12,6 +12,8 @@ env:
 language: go
 go:
   - "1.10.3"
+python:
+  - "3.6"
 
 services:
   - docker
@@ -48,17 +50,6 @@ before_script:
 
 script:
   - docker build -t ramrodpcp/backend-controller:test .
-  - docker network create --driver=overlay pcp
-  - docker service create --name rethinkdb --network pcp -p 28015:28015 -e "STAGE=DEV" -e "LOGLEVEL=DEBUG" ramrodpcp/database-brain:$TAG
-  - docker service create --name controller --network pcp -e "STAGE=DEV" -e "LOGLEVEL=DEBUG" -e "TAG=${TAG}" --mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock ramrodpcp/backend-controller:test
-  - sleep 10
-  - docker service ls
-  - docker service ps --no-trunc controller
-  - docker service logs controller
-  - docker service logs rethinkdb
-  - docker service rm controller rethinkdb
-  - sleep 10
-  - docker network prune -f
   # integration tests
   - go test -v -parallel 1 github.com/ramrod-project/backend-controller-go/test
   # e2e tests
