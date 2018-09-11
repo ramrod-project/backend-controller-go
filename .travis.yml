@@ -55,6 +55,8 @@ script:
   # integration tests
   - go test -v -parallel 1 github.com/ramrod-project/backend-controller-go/test
   # e2e tests
+  - python3 -m venv env
+  - source env/bin/activate
   - bash <(curl -s https://raw.githubusercontent.com/ramrod-project/integration-stack/$TRAVIS_BRANCH/scripts/e2e.sh)
 
 after_success:
