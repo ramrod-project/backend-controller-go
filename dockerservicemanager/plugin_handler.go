@@ -45,12 +45,7 @@ func pluginToConfig(plugin rethink.Plugin) (PluginServiceConfig, error) {
 		environment []string
 	)
 
-	// Windows must use host networking
-	if plugin.OS == rethink.PluginOSWindows {
-		mode = swarm.PortConfigPublishModeHost
-	} else {
-		mode = swarm.PortConfigPublishModeIngress
-	}
+	mode = swarm.PortConfigPublishModeHost
 
 	// Right now only one port is passed
 	intPort, err := strconv.ParseUint(strings.Split(plugin.InternalPorts[0], "/")[0], 10, 32)
@@ -75,6 +70,7 @@ func pluginToConfig(plugin rethink.Plugin) (PluginServiceConfig, error) {
 		getEnvByKey("LOGLEVEL"),
 		envString("PORT", fmt.Sprintf("%v", intPort)),
 		envString("PLUGIN", plugin.Name),
+		envString("PLUGIN_NAME", plugin.ServiceName),
 	}
 	if len(plugin.Environment) > 0 {
 		environment = append(environment, plugin.Environment...)
