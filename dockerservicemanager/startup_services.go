@@ -19,6 +19,7 @@ var harnessConfig = PluginServiceConfig{
 		getEnvByKey("LOGLEVEL"),
 		envString("PORT", "5000"),
 		envString("PLUGIN", "Harness"),
+		envString("PLUGIN_NAME", "Harness-5000"),
 	},
 	Address: GetManagerIP(),
 	Network: "pcp",
