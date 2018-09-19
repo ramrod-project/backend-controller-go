@@ -33,7 +33,54 @@ var testServiceSpec = swarm.ServiceSpec{
 	},
 }
 
-func TestStartupServices(t *testing.T) {
+func setManagerIPTest(ctx *context.Context, dockerClient *client.Client) error {
+
+	nodes, err := dockerClient.NodeList(*ctx, types.NodeListOptions{})
+	if err != nil {
+		return err
+	}
+
+	for _, n := range nodes {
+
+		if !n.ManagerStatus.Leader {
+			continue
+		}
+		ip := n.Status.Addr
+		spec := n.Spec
+		spec.Annotations.Labels = map[string]string{
+			"os": "posix",
+			"ip": ip,
+		}
+		ctxTimeout, cancel := context.WithTimeout(*ctx, 5*time.Second)
+		defer cancel()
+
+		succ := func() <-chan struct{} {
+			res := make(chan struct{})
+
+			go func(out chan struct{}, node swarm.Node) {
+				for {
+					inspectNew, _, _ := dockerClient.NodeInspectWithRaw(*ctx, node.ID)
+					err = dockerClient.NodeUpdate(*ctx, node.ID, swarm.Version{Index: inspectNew.Meta.Version.Index}, spec)
+					if err == nil {
+						out <- struct{}{}
+					}
+					time.Sleep(500 * time.Millisecond)
+				}
+			}(res, n)
+
+			return res
+		}()
+		select {
+		case <-ctxTimeout.Done():
+			return fmt.Errorf("could not label node in 5 seconds timeout")
+		case <-succ:
+			return nil
+		}
+	}
+	return fmt.Errorf("manager node not labeled with IP")
+}
+
+func Test_StartupServices(t *testing.T) {
 	oldStage := os.Getenv("STAGE")
 	os.Setenv("STAGE", "TESTING")
 	oldHarness := os.Getenv("START_HARNESS")
@@ -54,6 +101,12 @@ func TestStartupServices(t *testing.T) {
 	}
 
 	netID, err := test.CheckCreateNet("pcp")
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+
+	err = setManagerIPTest(&ctx, dockerClient)
 	if err != nil {
 		t.Errorf("%v", err)
 		return

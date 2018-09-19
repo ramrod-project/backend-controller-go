@@ -691,7 +691,7 @@ func Test_Integration(t *testing.T) {
 									if inspect.Endpoint.Ports[0].TargetPort != uint32(5000) {
 										continue
 									}
-									if inspect.Endpoint.Ports[0].PublishMode != swarm.PortConfigPublishModeIngress {
+									if inspect.Endpoint.Ports[0].PublishMode != swarm.PortConfigPublishModeHost {
 										continue
 									}
 									if len(inspect.Spec.TaskTemplate.Networks) < 1 {
@@ -733,7 +733,7 @@ func Test_Integration(t *testing.T) {
 					t.Errorf("Docker start event not detected")
 				}
 				if !serviceVerify {
-					t.Errorf("Database start event not verified with params")
+					t.Errorf("Docker start event not verified with params")
 				}
 				if !dbUpdated {
 					t.Errorf("Docker start db not updated")
@@ -1241,7 +1241,7 @@ func Test_Integration(t *testing.T) {
 									if inspect.Endpoint.Ports[0].TargetPort != uint32(6000) {
 										continue
 									}
-									if inspect.Endpoint.Ports[0].PublishMode != swarm.PortConfigPublishModeIngress {
+									if inspect.Endpoint.Ports[0].PublishMode != swarm.PortConfigPublishModeHost {
 										continue
 									}
 									if len(inspect.Spec.TaskTemplate.Networks) < 1 {

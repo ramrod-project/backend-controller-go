@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"regexp"
 	"strconv"
 	"time"
 
@@ -16,6 +17,8 @@ import (
 	client "github.com/docker/docker/client"
 	rethink "github.com/ramrod-project/backend-controller-go/rethink"
 )
+
+var ipv4 = regexp.MustCompile(`^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$`)
 
 type dockerImageName struct {
 	Name string
@@ -63,6 +66,8 @@ func hostString(h string, i string) string {
 	return stringBuf.String()
 }
 
+// GetManagerIP returns the string version of the primary IPv4
+// address associated with the manager node in the swarm.
 func GetManagerIP() string {
 	ctx := context.Background()
 	dockerClient, err := client.NewEnvClient()
@@ -102,11 +107,15 @@ func generateServiceSpec(config *PluginServiceConfig) (*swarm.ServiceSpec, error
 
 	// Determine container image
 	if config.ServiceName == "AuxiliaryServices" {
+		annotations.Labels["os"] = "posix"
+		placementConfig.Constraints = []string{"node.labels.os==posix"}
 		imageName.Name = "ramrodpcp/auxiliary-wrapper"
 	} else if config.OS == rethink.PluginOSPosix || config.OS == rethink.PluginOSAll {
 		annotations.Labels["os"] = "posix"
 		imageName.Name = "ramrodpcp/interpreter-plugin"
 		placementConfig.Constraints = []string{"node.labels.os==posix"}
+		hosts = append(hosts, hostString("rethinkdb", GetManagerIP()))
+		config.Environment = append(config.Environment, "RETHINK_HOST="+GetManagerIP())
 	} else if config.OS == rethink.PluginOSWindows {
 		annotations.Labels["os"] = "nt"
 		imageName.Name = "ramrodpcp/interpreter-plugin-windows"
@@ -117,9 +126,14 @@ func generateServiceSpec(config *PluginServiceConfig) (*swarm.ServiceSpec, error
 		return &swarm.ServiceSpec{}, fmt.Errorf("invalid OS setting: %v", config.OS)
 	}
 
-	// Check if IP specified
-	if config.Address != "" {
-		placementConfig.Constraints = append(placementConfig.Constraints, "node.labels.ip=="+config.Address)
+	// Check if IP specified and valid
+	if v := config.Address; v != "" && ipv4.MatchString(v) {
+		var stringBuf bytes.Buffer
+		stringBuf.WriteString("node.labels.ip==")
+		stringBuf.WriteString(v)
+		placementConfig.Constraints = append(placementConfig.Constraints, stringBuf.String())
+	} else {
+		return &swarm.ServiceSpec{}, fmt.Errorf("must specify valid ip address, got: %v", config.Address)
 	}
 
 	serviceSpec := &swarm.ServiceSpec{

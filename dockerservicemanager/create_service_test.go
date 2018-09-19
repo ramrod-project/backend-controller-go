@@ -184,16 +184,6 @@ func Test_generateServiceSpec(t *testing.T) {
 		second      = time.Second
 	)
 
-	ctx := context.Background()
-	dockerClient, err := client.NewEnvClient()
-	if err != nil {
-		t.Errorf("%v", err)
-		return
-	}
-
-	nodeInspect, err := dockerClient.NodeList(ctx, types.NodeListOptions{})
-	nodeIP := nodeInspect[0].Status.Addr
-
 	tag := os.Getenv("TAG")
 	if tag == "" {
 		tag = "latest"
@@ -213,6 +203,7 @@ func Test_generateServiceSpec(t *testing.T) {
 			name: "Good config",
 			args: args{
 				config: &PluginServiceConfig{
+					Address: GetManagerIP(),
 					Environment: []string{
 						"STAGE=DEV",
 						"LOGLEVEL=DEBUG",
@@ -242,6 +233,7 @@ func Test_generateServiceSpec(t *testing.T) {
 							"LOGLEVEL=DEBUG",
 							"PORT=666",
 							"PLUGIN=GoodPlugin",
+							"RETHINK_HOST=" + GetManagerIP(),
 						},
 						Healthcheck: &container.HealthConfig{
 							Interval: time.Second,
@@ -256,7 +248,10 @@ func Test_generateServiceSpec(t *testing.T) {
 						MaxAttempts: &maxAttempts,
 					},
 					Placement: &swarm.Placement{
-						Constraints: []string{"node.labels.os==posix"},
+						Constraints: []string{
+							"node.labels.os==posix",
+							"node.labels.ip==" + GetManagerIP(),
+						},
 					},
 					Networks: []swarm.NetworkAttachmentConfig{
 						swarm.NetworkAttachmentConfig{
@@ -285,6 +280,7 @@ func Test_generateServiceSpec(t *testing.T) {
 			name: "Good config (win)",
 			args: args{
 				config: &PluginServiceConfig{
+					Address: GetManagerIP(),
 					Environment: []string{
 						"STAGE=PROD",
 						"LOGLEVEL=DEBUG",
@@ -314,7 +310,7 @@ func Test_generateServiceSpec(t *testing.T) {
 							"LOGLEVEL=DEBUG",
 							"PORT=777",
 							"PLUGIN=GoodPluginWin",
-							"RETHINK_HOST=" + nodeIP,
+							"RETHINK_HOST=" + GetManagerIP(),
 						},
 						Healthcheck: &container.HealthConfig{
 							Interval: time.Second,
@@ -323,14 +319,17 @@ func Test_generateServiceSpec(t *testing.T) {
 						},
 						Image:           "ramrodpcp/interpreter-plugin-windows:" + tag,
 						StopGracePeriod: &second,
-						Hosts:           []string{hostString("rethinkdb", nodeIP)},
+						Hosts:           []string{hostString("rethinkdb", GetManagerIP())},
 					},
 					RestartPolicy: &swarm.RestartPolicy{
 						Condition:   "on-failure",
 						MaxAttempts: &maxAttempts,
 					},
 					Placement: &swarm.Placement{
-						Constraints: []string{"node.labels.os==nt"},
+						Constraints: []string{
+							"node.labels.os==nt",
+							"node.labels.ip==" + GetManagerIP(),
+						},
 					},
 					Networks: []swarm.NetworkAttachmentConfig{
 						swarm.NetworkAttachmentConfig{
@@ -359,6 +358,7 @@ func Test_generateServiceSpec(t *testing.T) {
 			name: "Bad config OS",
 			args: args{
 				config: &PluginServiceConfig{
+					Address: GetManagerIP(),
 					Environment: []string{
 						"STAGE=DEV",
 						"LOGLEVEL=DEBUG",
