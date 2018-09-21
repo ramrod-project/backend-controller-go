@@ -1,11 +1,9 @@
 package rethink
 
 import (
-	"context"
 	"fmt"
 
 	events "github.com/docker/docker/api/types/events"
-	"github.com/docker/docker/client"
 	r "gopkg.in/gorethink/gorethink.v4"
 )
 
@@ -78,12 +76,14 @@ func handleService(event events.Message) (string, map[string]string, error) {
 	var (
 		serviceName string
 		update      = make(map[string]string)
+		doc         map[string]interface{}
 	)
 
-	ctx := context.Background()
-	dockerClient, err := client.NewEnvClient()
+	session, err := r.Connect(r.ConnectOpts{
+		Address: GetRethinkHost(),
+	})
 	if err != nil {
-		panic(err)
+		return "", update, err
 	}
 
 	if _, ok := event.Actor.Attributes["name"]; !ok {
@@ -91,13 +91,16 @@ func handleService(event events.Message) (string, map[string]string, error) {
 	}
 	serviceName = event.Actor.Attributes["name"]
 
-	insp, _, err := dockerClient.ServiceInspectWithRaw(ctx, event.Actor.ID)
+	cursor, err := r.DB("Controller").Table("Plugins").Filter(map[string]string{"ServiceName": serviceName, "ServiceID": event.Actor.ID}).Run(session)
+	if !cursor.Next(&doc) {
+		return "", update, fmt.Errorf("no plugin %v in database", serviceName)
+	}
 
-	if v, ok := insp.Spec.Annotations.Labels["os"]; ok && v == "nt" {
+	if v, ok := doc["OS"]; ok && v.(string) == "nt" {
 		err := handleWindowsService(event, &update)
 		return serviceName, update, err
 	} else if !ok {
-		return "", update, fmt.Errorf("service os unrecognized: %v", insp)
+		return "", update, fmt.Errorf("no service os in database")
 	}
 
 	if v, ok := event.Actor.Attributes["updatestate.new"]; ok && v == "updating" {
@@ -105,7 +108,7 @@ func handleService(event events.Message) (string, map[string]string, error) {
 		update["State"] = "Restarting"
 		return serviceName, update, nil
 	}
-	return "", update, fmt.Errorf("unhandled service event: %v", event.Action)
+	return "", update, nil
 }
 
 // EventUpdate consumes the event channel from the docker
@@ -136,6 +139,8 @@ func EventUpdate(in <-chan events.Message) <-chan error {
 			}
 			if err != nil {
 				outErr <- err
+				continue L
+			} else if serviceName == "" {
 				continue L
 			}
 			err = updatePluginStatus(serviceName, update)
