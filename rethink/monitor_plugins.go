@@ -20,6 +20,7 @@ type Plugin struct {
 	InternalPorts []string
 	OS            PluginOS
 	Environment   []string
+	Extra         bool
 }
 
 // PluginOS is the supported OS for the plugin
@@ -97,6 +98,7 @@ func newPlugin(change map[string]interface{}) (*Plugin, error) {
 		extports    []string
 		intports    []string
 		environment []string
+		extra       = false
 		os          PluginOS
 		state       PluginState
 	)
@@ -190,6 +192,10 @@ func newPlugin(change map[string]interface{}) (*Plugin, error) {
 		environment = []string{}
 	}
 
+	if v, ok := change["Extra"].(bool); ok && v {
+		extra = true
+	}
+
 	plugin := &Plugin{
 		Name:          name,
 		ServiceID:     serviceID,
@@ -201,6 +207,7 @@ func newPlugin(change map[string]interface{}) (*Plugin, error) {
 		InternalPorts: intports,
 		OS:            os,
 		Environment:   environment,
+		Extra:         extra,
 	}
 
 	return plugin, nil

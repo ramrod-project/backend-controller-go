@@ -40,6 +40,7 @@ func (d dockerImageName) String() string {
 // for a plugin service.
 type PluginServiceConfig struct {
 	Environment []string
+	Extra       bool
 	Address     string
 	Network     string
 	OS          rethink.PluginOS
