@@ -192,8 +192,8 @@ func newPlugin(change map[string]interface{}) (*Plugin, error) {
 		environment = []string{}
 	}
 
-	if v, ok := change["Extra"].(bool); ok && v {
-		extra = true
+	if v, ok := change["Extra"].(bool); ok {
+		extra = v
 	}
 
 	plugin := &Plugin{

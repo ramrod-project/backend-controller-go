@@ -113,7 +113,11 @@ func generateServiceSpec(config *PluginServiceConfig) (*swarm.ServiceSpec, error
 		imageName.Name = "ramrodpcp/auxiliary-wrapper"
 	} else if config.OS == rethink.PluginOSPosix || config.OS == rethink.PluginOSAll {
 		annotations.Labels["os"] = "posix"
-		imageName.Name = "ramrodpcp/interpreter-plugin"
+		if config.Extra {
+			imageName.Name = "ramrodpcp/interpreter-plugin-extra"
+		} else {
+			imageName.Name = "ramrodpcp/interpreter-plugin"
+		}
 		placementConfig.Constraints = []string{"node.labels.os==posix"}
 		hosts = append(hosts, hostString("rethinkdb", GetManagerIP()))
 		config.Environment = append(config.Environment, "RETHINK_HOST="+GetManagerIP())
