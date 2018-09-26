@@ -1070,7 +1070,7 @@ func Test_Integration(t *testing.T) {
 			timeout: 60 * time.Second,
 		},
 		{
-			name: "Create another service",
+			name: "Create another (extra) service",
 			run: func(t *testing.T) bool {
 				_, err := r.DB("Controller").Table("Plugins").Insert(map[string]interface{}{
 					"Name":          "Harness",
@@ -1083,6 +1083,7 @@ func Test_Integration(t *testing.T) {
 					"InternalPorts": []string{"6000/tcp"},
 					"OS":            string(rethink.PluginOSPosix),
 					"Environment":   []string{"WHATEVER=WHATEVER"},
+					"Extra":         true,
 				}).Run(session)
 				if err != nil {
 					t.Errorf("%v", err)
@@ -1176,6 +1177,7 @@ func Test_Integration(t *testing.T) {
 							if _, ok := d["new_val"]; !ok {
 								break
 							}
+							log.Printf("db change: %+v", d["new_val"])
 							if d["new_val"].(map[string]interface{})["ServiceName"].(string) != "Harness-6000tcp" {
 								break
 							}
@@ -1249,6 +1251,9 @@ func Test_Integration(t *testing.T) {
 										continue
 									}
 									if inspect.Spec.TaskTemplate.Networks[0].Target != netID {
+										continue
+									}
+									if inspect.Spec.TaskTemplate.ContainerSpec.Image != GetImage("ramrodpcp/interpreter-plugin-extra") {
 										continue
 									}
 									for _, env := range inspect.Spec.TaskTemplate.ContainerSpec.Env {
