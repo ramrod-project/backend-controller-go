@@ -303,7 +303,7 @@ func Test_CreatePluginService(t *testing.T) {
 
 			assert.Equal(t, tt.want.Spec.Annotations.Name, result.Spec.Annotations.Name)
 			assert.Equal(t, tt.want.Spec.TaskTemplate.ContainerSpec.Image, result.Spec.TaskTemplate.ContainerSpec.Image)
-			assert.Equal(t, tt.want.Spec.TaskTemplate.ContainerSpec.Env, result.Spec.TaskTemplate.ContainerSpec.Env)
+			assert.True(t, sliceEqual(&tt.want.Spec.TaskTemplate.ContainerSpec.Env, &result.Spec.TaskTemplate.ContainerSpec.Env))
 			assert.Equal(t, tt.want.Spec.TaskTemplate.Networks[0].Target, result.Spec.TaskTemplate.Networks[0].Target)
 			assert.Equal(t, tt.want.Spec.EndpointSpec, result.Spec.EndpointSpec)
 			generatedIDs[i] = got.ID
