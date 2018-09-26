@@ -50,6 +50,7 @@ func EventMonitor() (<-chan events.Message, <-chan error) {
 	containerFilter := filters.NewArgs()
 	containerFilter.Add("type", "container")
 	containerFilter.Add("image", "ramrodpcp/interpreter-plugin")
+	containerFilter.Add("image", "ramrodpcp/interpreter-plugin-extra")
 	containerFilter.Add("image", "ramrodpcp/interpreter-plugin-windows")
 	containerFilter.Add("image", "ramrodpcp/auxiliary-services")
 	containerFilter.Add("event", "die")

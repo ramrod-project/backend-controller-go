@@ -66,7 +66,7 @@ func Test_CreatePluginService(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    types.ServiceCreateResponse
+		want    swarm.Service
 		wantErr bool
 		err     error
 	}{
@@ -80,6 +80,7 @@ func Test_CreatePluginService(t *testing.T) {
 						"LOGLEVEL=DEBUG",
 						"PORT=5000",
 						"PLUGIN=Harness",
+						"PLUGIN_NAME=Harness-5000tcp",
 					},
 					Network: "test_create",
 					OS:      "posix",
@@ -87,13 +88,46 @@ func Test_CreatePluginService(t *testing.T) {
 						Protocol:      swarm.PortConfigProtocolTCP,
 						TargetPort:    5000,
 						PublishedPort: 5000,
-						PublishMode:   swarm.PortConfigPublishModeIngress,
+						PublishMode:   swarm.PortConfigPublishModeHost,
 					}},
-					ServiceName: "Harness",
+					ServiceName: "Harness-5000tcp",
 				},
 			},
-			want: types.ServiceCreateResponse{
-				ID: "",
+			want: swarm.Service{
+				Spec: swarm.ServiceSpec{
+					Annotations: swarm.Annotations{
+						Name: "Harness-5000tcp",
+					},
+					TaskTemplate: swarm.TaskSpec{
+						ContainerSpec: swarm.ContainerSpec{
+							Image: "ramrodpcp/interpreter-plugin:" + getTagFromEnv(),
+							Env: []string{
+								"STAGE=DEV",
+								"LOGLEVEL=DEBUG",
+								"PORT=5000",
+								"PLUGIN=Harness",
+								"PLUGIN_NAME=Harness-5000tcp",
+								"RETHINK_HOST=" + GetManagerIP(),
+							},
+						},
+						Networks: []swarm.NetworkAttachmentConfig{
+							swarm.NetworkAttachmentConfig{
+								Target: netID,
+							},
+						},
+					},
+					EndpointSpec: &swarm.EndpointSpec{
+						Mode: swarm.ResolutionModeVIP,
+						Ports: []swarm.PortConfig{
+							swarm.PortConfig{
+								Protocol:      swarm.PortConfigProtocolTCP,
+								TargetPort:    uint32(5000),
+								PublishedPort: uint32(5000),
+								PublishMode:   swarm.PortConfigPublishModeHost,
+							},
+						},
+					},
+				},
 			},
 		},
 		{
@@ -104,8 +138,9 @@ func Test_CreatePluginService(t *testing.T) {
 					Environment: []string{
 						"STAGE=DEV",
 						"LOGLEVEL=DEBUG",
-						"PORT=5000",
+						"PORT=6000",
 						"PLUGIN=Harness",
+						"PLUGIN_NAME=Harness-6000tcp",
 					},
 					Network: "blah",
 					OS:      "posix",
@@ -113,14 +148,12 @@ func Test_CreatePluginService(t *testing.T) {
 						Protocol:      swarm.PortConfigProtocolTCP,
 						TargetPort:    6000,
 						PublishedPort: 6000,
-						PublishMode:   swarm.PortConfigPublishModeIngress,
+						PublishMode:   swarm.PortConfigPublishModeHost,
 					}},
-					ServiceName: "Harnessnet",
+					ServiceName: "Harness-6000tcp",
 				},
 			},
-			want: types.ServiceCreateResponse{
-				ID: "",
-			},
+			want:    swarm.Service{},
 			wantErr: true,
 			err:     errors.New("Error response from daemon: network blah not found"),
 		},
@@ -134,6 +167,7 @@ func Test_CreatePluginService(t *testing.T) {
 						"LOGLEVEL=DEBUG",
 						"PORT=5000",
 						"PLUGIN=Harness",
+						"PLUGIN_NAME=Harness-5000tcp",
 					},
 					Network: "test_create",
 					OS:      "posix",
@@ -141,16 +175,75 @@ func Test_CreatePluginService(t *testing.T) {
 						Protocol:      swarm.PortConfigProtocolTCP,
 						TargetPort:    5001,
 						PublishedPort: 5001,
-						PublishMode:   swarm.PortConfigPublishModeIngress,
+						PublishMode:   swarm.PortConfigPublishModeHost,
 					}},
-					ServiceName: "Harness",
+					ServiceName: "Harness-5000tcp",
 				},
 			},
-			want: types.ServiceCreateResponse{
-				ID: "",
-			},
+			want:    swarm.Service{},
 			wantErr: true,
 			err:     errors.New("Error response from daemon: rpc error: code = Unknown desc = name conflicts with an existing object"),
+		},
+		{
+			name: "Test creating an 'extra' plugin service",
+			args: args{
+				config: PluginServiceConfig{
+					Address: GetManagerIP(),
+					Environment: []string{
+						"STAGE=DEV",
+						"LOGLEVEL=DEBUG",
+						"PORT=7000",
+						"PLUGIN=Harness",
+						"PLUGIN_NAME=Harness-7000tcp",
+					},
+					Extra:   true,
+					Network: "test_create",
+					OS:      "posix",
+					Ports: []swarm.PortConfig{swarm.PortConfig{
+						Protocol:      swarm.PortConfigProtocolTCP,
+						TargetPort:    7000,
+						PublishedPort: 7000,
+						PublishMode:   swarm.PortConfigPublishModeHost,
+					}},
+					ServiceName: "Harness-7000tcp",
+				},
+			},
+			want: swarm.Service{
+				Spec: swarm.ServiceSpec{
+					Annotations: swarm.Annotations{
+						Name: "Harness-7000tcp",
+					},
+					TaskTemplate: swarm.TaskSpec{
+						ContainerSpec: swarm.ContainerSpec{
+							Image: "ramrodpcp/interpreter-plugin-extra:" + getTagFromEnv(),
+							Env: []string{
+								"STAGE=DEV",
+								"LOGLEVEL=DEBUG",
+								"PORT=7000",
+								"PLUGIN=Harness",
+								"PLUGIN_NAME=Harness-7000tcp",
+								"RETHINK_HOST=" + GetManagerIP(),
+							},
+						},
+						Networks: []swarm.NetworkAttachmentConfig{
+							swarm.NetworkAttachmentConfig{
+								Target: netID,
+							},
+						},
+					},
+					EndpointSpec: &swarm.EndpointSpec{
+						Mode: swarm.ResolutionModeVIP,
+						Ports: []swarm.PortConfig{
+							swarm.PortConfig{
+								Protocol:      swarm.PortConfigProtocolTCP,
+								TargetPort:    uint32(7000),
+								PublishedPort: uint32(7000),
+								PublishMode:   swarm.PortConfigPublishModeHost,
+							},
+						},
+					},
+				},
+			},
 		},
 	}
 	generatedIDs := make([]string, len(tests))
@@ -162,8 +255,57 @@ func Test_CreatePluginService(t *testing.T) {
 				return
 			} else if tt.wantErr {
 				assert.Equal(t, tt.err, err)
+				return
 			}
-			assert.Equal(t, tt.want.Warnings, got.Warnings)
+
+			timeoutCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+			defer cancel()
+
+			res, errs := func(id string) (<-chan swarm.Service, <-chan error) {
+				ret := make(chan swarm.Service)
+				errs := make(chan error)
+				go func() {
+					defer close(ret)
+					defer close(errs)
+					for {
+						select {
+						case <-timeoutCtx.Done():
+							return
+						default:
+							break
+						}
+						insp, _, err := dockerClient.ServiceInspectWithRaw(ctx, id)
+						if err != nil {
+							errs <- err
+							return
+						}
+						if len(insp.Spec.TaskTemplate.Networks) > 0 {
+							ret <- insp
+							return
+						}
+						time.Sleep(1000 * time.Millisecond)
+					}
+				}()
+				return ret, errs
+			}(got.ID)
+
+			result := swarm.Service{}
+			select {
+			case <-timeoutCtx.Done():
+				t.Errorf("timeout context exceeded")
+				return
+			case <-errs:
+				t.Errorf("%v", err)
+				return
+			case r := <-res:
+				result = r
+			}
+
+			assert.Equal(t, tt.want.Spec.Annotations.Name, result.Spec.Annotations.Name)
+			assert.Equal(t, tt.want.Spec.TaskTemplate.ContainerSpec.Image, result.Spec.TaskTemplate.ContainerSpec.Image)
+			assert.True(t, sliceEqual(&tt.want.Spec.TaskTemplate.ContainerSpec.Env, &result.Spec.TaskTemplate.ContainerSpec.Env))
+			assert.Equal(t, tt.want.Spec.TaskTemplate.Networks[0].Target, result.Spec.TaskTemplate.Networks[0].Target)
+			assert.Equal(t, tt.want.Spec.EndpointSpec, result.Spec.EndpointSpec)
 			generatedIDs[i] = got.ID
 		})
 	}

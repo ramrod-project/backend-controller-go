@@ -374,8 +374,9 @@ func Test_advertisePlugins(t *testing.T) {
 			name: "One plugin",
 			manifest: []ManifestPlugin{
 				ManifestPlugin{
-					Name: "TestPlugin",
-					OS:   rethink.PluginOSAll,
+					Name:  "TestPlugin",
+					OS:    rethink.PluginOSAll,
+					Extra: true,
 				},
 			},
 			want: []map[string]interface{}{
@@ -390,6 +391,7 @@ func Test_advertisePlugins(t *testing.T) {
 					"InternalPorts": []string{},
 					"OS":            string(rethink.PluginOSAll),
 					"Environment":   []string{},
+					"Extra":         true,
 				},
 			},
 			wantErr: false,
@@ -402,8 +404,9 @@ func Test_advertisePlugins(t *testing.T) {
 					OS:   rethink.PluginOSPosix,
 				},
 				ManifestPlugin{
-					Name: "TestPlugin3",
-					OS:   rethink.PluginOSWindows,
+					Name:  "TestPlugin3",
+					OS:    rethink.PluginOSWindows,
+					Extra: false,
 				},
 			},
 			want: []map[string]interface{}{
@@ -418,6 +421,7 @@ func Test_advertisePlugins(t *testing.T) {
 					"InternalPorts": []string{},
 					"OS":            string(rethink.PluginOSPosix),
 					"Environment":   []string{},
+					"Extra":         false,
 				},
 				map[string]interface{}{
 					"Name":          "TestPlugin3",
@@ -430,6 +434,7 @@ func Test_advertisePlugins(t *testing.T) {
 					"InternalPorts": []string{},
 					"OS":            string(rethink.PluginOSWindows),
 					"Environment":   []string{},
+					"Extra":         false,
 				},
 			},
 			wantErr: false,
@@ -447,11 +452,13 @@ func Test_advertisePlugins(t *testing.T) {
 				"InternalPorts": []string{},
 				"OS":            string(rethink.PluginOSAll),
 				"Environment":   []string{},
+				"Extra":         true,
 			},
 			manifest: []ManifestPlugin{
 				ManifestPlugin{
-					Name: "ExistingPlugin",
-					OS:   rethink.PluginOSPosix,
+					Name:  "ExistingPlugin",
+					OS:    rethink.PluginOSPosix,
+					Extra: true,
 				},
 			},
 			want: []map[string]interface{}{
@@ -466,6 +473,7 @@ func Test_advertisePlugins(t *testing.T) {
 					"InternalPorts": []string{},
 					"OS":            string(rethink.PluginOSAll),
 					"Environment":   []string{},
+					"Extra":         true,
 				},
 			},
 			wantErr: false,

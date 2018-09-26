@@ -18,8 +18,9 @@ import (
 )
 
 type ManifestPlugin struct {
-	Name string           `json:"Name",omitempty`
-	OS   rethink.PluginOS `json:"OS",omitempty`
+	Name  string           `json:"Name",omitempty`
+	OS    rethink.PluginOS `json:"OS",omitempty`
+	Extra bool             `json:"Extra,omitempty"`
 }
 
 var osMap = map[string]rethink.PluginOS{
@@ -157,6 +158,7 @@ L:
 			"InternalPorts": []string{},
 			"OS":            string(plugin.OS),
 			"Environment":   []string{},
+			"Extra":         plugin.Extra,
 		}
 		cursor, err := r.DB("Controller").Table("Plugins").Run(session)
 		if err != nil {

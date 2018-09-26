@@ -469,7 +469,7 @@ func Test_Integration(t *testing.T) {
 				_, err := r.DB("Controller").Table("Plugins").Insert(map[string]interface{}{
 					"Name":          "Harness",
 					"ServiceID":     "",
-					"ServiceName":   "TestPlugin",
+					"ServiceName":   "Harness-5000tcp",
 					"DesiredState":  "Activate",
 					"State":         "Available",
 					"Interface":     dockerservicemanager.GetManagerIP(),
@@ -477,6 +477,7 @@ func Test_Integration(t *testing.T) {
 					"InternalPorts": []string{"5000/tcp"},
 					"OS":            string(rethink.PluginOSAll),
 					"Environment":   []string{},
+					"Extra":         false,
 				}).Run(session)
 				if err != nil {
 					t.Errorf("%v", err)
@@ -518,7 +519,7 @@ func Test_Integration(t *testing.T) {
 								break
 							}
 							if v, ok := e.Actor.Attributes["name"]; ok {
-								if v != "TestPlugin" {
+								if v != "Harness-5000tcp" {
 									break
 								}
 							} else {
@@ -570,7 +571,7 @@ func Test_Integration(t *testing.T) {
 							if _, ok := d["new_val"]; !ok {
 								break
 							}
-							if d["new_val"].(map[string]interface{})["ServiceName"].(string) != "TestPlugin" {
+							if d["new_val"].(map[string]interface{})["ServiceName"].(string) != "Harness-5000tcp" {
 								break
 							}
 							if d["new_val"].(map[string]interface{})["State"].(string) != "Active" {
@@ -750,7 +751,7 @@ func Test_Integration(t *testing.T) {
 		{
 			name: "Update service",
 			run: func(t *testing.T) bool {
-				_, err := r.DB("Controller").Table("Plugins").Filter(map[string]string{"ServiceName": "TestPlugin"}).Update(map[string]interface{}{
+				_, err := r.DB("Controller").Table("Plugins").Filter(map[string]string{"ServiceName": "Harness-5000tcp"}).Update(map[string]interface{}{
 					"DesiredState": "Restart", "Environment": []string{"TEST=TEST"}, "ExternalPorts": []string{"5005/tcp"},
 				}).Run(session)
 				if err != nil {
@@ -795,7 +796,7 @@ func Test_Integration(t *testing.T) {
 								break
 							}
 							if v, ok := e.Actor.Attributes["name"]; ok {
-								if v != "TestPlugin" {
+								if v != "Harness-5000tcp" {
 									break
 								}
 							} else {
@@ -850,7 +851,7 @@ func Test_Integration(t *testing.T) {
 							if _, ok := d["new_val"]; !ok {
 								break
 							}
-							if d["new_val"].(map[string]interface{})["ServiceName"].(string) != "TestPlugin" {
+							if d["new_val"].(map[string]interface{})["ServiceName"].(string) != "Harness-5000tcp" {
 								break
 							}
 							if d["new_val"].(map[string]interface{})["State"].(string) != "Restarting" {
@@ -938,7 +939,7 @@ func Test_Integration(t *testing.T) {
 								break
 							}
 							if v, ok := e.Actor.Attributes["com.docker.swarm.service.name"]; ok {
-								if v != "TestPlugin" {
+								if v != "Harness-5000tcp" {
 									break
 								}
 							} else {
@@ -1010,7 +1011,7 @@ func Test_Integration(t *testing.T) {
 										if _, ok := d["new_val"]; !ok {
 											break
 										}
-										if d["new_val"].(map[string]interface{})["ServiceName"].(string) != "TestPlugin" {
+										if d["new_val"].(map[string]interface{})["ServiceName"].(string) != "Harness-5000tcp" {
 											break
 										}
 										if d["new_val"].(map[string]interface{})["State"].(string) != "Active" {
@@ -1069,12 +1070,12 @@ func Test_Integration(t *testing.T) {
 			timeout: 60 * time.Second,
 		},
 		{
-			name: "Create another service",
+			name: "Create another (extra) service",
 			run: func(t *testing.T) bool {
 				_, err := r.DB("Controller").Table("Plugins").Insert(map[string]interface{}{
 					"Name":          "Harness",
 					"ServiceID":     "",
-					"ServiceName":   "TestPlugin2",
+					"ServiceName":   "Harness-6000tcp",
 					"DesiredState":  "Activate",
 					"State":         "Available",
 					"Interface":     dockerservicemanager.GetManagerIP(),
@@ -1082,6 +1083,7 @@ func Test_Integration(t *testing.T) {
 					"InternalPorts": []string{"6000/tcp"},
 					"OS":            string(rethink.PluginOSPosix),
 					"Environment":   []string{"WHATEVER=WHATEVER"},
+					"Extra":         true,
 				}).Run(session)
 				if err != nil {
 					t.Errorf("%v", err)
@@ -1123,7 +1125,7 @@ func Test_Integration(t *testing.T) {
 								break
 							}
 							if v, ok := e.Actor.Attributes["name"]; ok {
-								if v != "TestPlugin2" {
+								if v != "Harness-6000tcp" {
 									break
 								}
 							} else {
@@ -1175,7 +1177,8 @@ func Test_Integration(t *testing.T) {
 							if _, ok := d["new_val"]; !ok {
 								break
 							}
-							if d["new_val"].(map[string]interface{})["ServiceName"].(string) != "TestPlugin2" {
+							log.Printf("db change: %+v", d["new_val"])
+							if d["new_val"].(map[string]interface{})["ServiceName"].(string) != "Harness-6000tcp" {
 								break
 							}
 							if d["new_val"].(map[string]interface{})["State"].(string) != "Active" {
@@ -1250,6 +1253,9 @@ func Test_Integration(t *testing.T) {
 									if inspect.Spec.TaskTemplate.Networks[0].Target != netID {
 										continue
 									}
+									if inspect.Spec.TaskTemplate.ContainerSpec.Image != GetImage("ramrodpcp/interpreter-plugin-extra") {
+										continue
+									}
 									for _, env := range inspect.Spec.TaskTemplate.ContainerSpec.Env {
 										if env == "WHATEVER=WHATEVER" {
 											return true
@@ -1298,7 +1304,7 @@ func Test_Integration(t *testing.T) {
 			run: func(t *testing.T) bool {
 				filter := make(map[string]string)
 				update := make(map[string]string)
-				filter["ServiceName"] = "TestPlugin"
+				filter["ServiceName"] = "Harness-5000tcp"
 				update["DesiredState"] = "Stop"
 				_, err := r.DB("Controller").Table("Plugins").Filter(filter).Update(update).RunWrite(session)
 				if err != nil {
@@ -1339,7 +1345,7 @@ func Test_Integration(t *testing.T) {
 								break
 							}
 							if v, ok := e.Actor.Attributes["name"]; ok {
-								if v != "TestPlugin" {
+								if v != "Harness-5000tcp" {
 									break
 								}
 							} else {
@@ -1439,7 +1445,7 @@ func Test_Integration(t *testing.T) {
 							if _, ok := d["new_val"]; !ok {
 								break
 							}
-							if d["new_val"].(map[string]interface{})["ServiceName"].(string) != "TestPlugin" {
+							if d["new_val"].(map[string]interface{})["ServiceName"].(string) != "Harness-5000tcp" {
 								break
 							}
 							if d["new_val"].(map[string]interface{})["State"].(string) != "Stopped" {
