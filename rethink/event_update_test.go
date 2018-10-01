@@ -612,7 +612,6 @@ func TestEventUpdate(t *testing.T) {
 						} else {
 							c = v.(map[string]interface{})
 						}
-						log.Printf("change: %+v", c)
 						if c["ServiceName"].(string) != "Harness-1080tcp" {
 							return false
 						}
@@ -675,7 +674,6 @@ func TestEventUpdate(t *testing.T) {
 									} else {
 										c = v.(map[string]interface{})
 									}
-									log.Printf("change: %+v", c)
 									if c["ServiceName"].(string) != "Harness-1080tcp" {
 										return false
 									}
