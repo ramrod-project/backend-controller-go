@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -224,25 +223,103 @@ func Test_stackContainerIDs(t *testing.T) {
 }
 
 func TestNewLogMonitor(t *testing.T) {
-	type args struct {
-		ctx context.Context
+
+	tag := os.Getenv("TAG")
+	if tag == "" {
+		tag = "latest"
 	}
+
+	ctx := context.Background()
+	dockerClient, err := client.NewEnvClient()
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+
+	// Set up clean environment
+	if err := test.DockerCleanUp(ctx, dockerClient, ""); err != nil {
+		t.Errorf("setup error: %v", err)
+		return
+	}
+
+	netID, err := test.CheckCreateNet("testnet")
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+
+	test.BrainSpec.TaskTemplate.Networks = []swarm.NetworkAttachmentConfig{
+		swarm.NetworkAttachmentConfig{
+			Target:  netID,
+			Aliases: []string{"rethinkdb"},
+		},
+	}
+
+	test.GenericPluginConfig.TaskTemplate.Networks = []swarm.NetworkAttachmentConfig{
+		swarm.NetworkAttachmentConfig{
+			Target: netID,
+		},
+	}
+
 	tests := []struct {
-		name  string
-		args  args
-		want  <-chan string
-		want1 <-chan error
+		name    string
+		run     func(context.Context) ([]string, error)
+		timeout time.Duration
 	}{
-		// TODO: Add test cases.
+		{
+			name: "test one container",
+			run: func(ctx context.Context) ([]string, error) {
+				err := startContainers(ctx, 1)
+				if err != nil {
+					return []string{}, err
+				}
+
+				res, errs := checkContainers(ctx, 1)
+
+				select {
+				case <-ctx.Done():
+					return []string{}, fmt.Errorf("timeout context exceeded")
+				case err = <-errs:
+					return []string{}, fmt.Errorf("%v", err)
+				case r := <-res:
+					return r, nil
+				}
+			},
+			timeout: 10 * time.Second,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, got1 := NewLogMonitor(tt.args.ctx)
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("NewLogMonitor() got = %v, want %v", got, tt.want)
+			test.BrainSpec.EndpointSpec.Ports[0].PublishMode = swarm.PortConfigPublishModeHost
+
+			_, _, err := test.StartBrain(ctx, t, dockerClient, test.BrainSpec)
+			if err != nil {
+				t.Errorf("%v", err)
+				return
 			}
-			if !reflect.DeepEqual(got1, tt.want1) {
-				t.Errorf("NewLogMonitor() got1 = %v, want %v", got1, tt.want1)
+
+			timeoutCtx, cancel := context.WithTimeout(ctx, tt.timeout)
+			defer cancel()
+			defer test.DockerCleanUp(ctx, dockerClient, "")
+
+			cons, errs := NewLogMonitor(timeoutCtx)
+
+			res, err := tt.run(timeoutCtx)
+
+			for {
+				select {
+				case <-timeoutCtx.Done():
+					t.Errorf("timeout context exceeded")
+					return
+				case e := <-errs:
+					t.Errorf("%v", e)
+					return
+				case c := <-cons:
+					if c == res[0] {
+						assert.True(t, true)
+						return
+					}
+				}
 			}
 		})
 	}
