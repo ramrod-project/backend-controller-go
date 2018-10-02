@@ -3,6 +3,7 @@ package dockerservicemanager
 import (
 	"context"
 	"regexp"
+	"strings"
 
 	"github.com/docker/docker/api/types"
 	events "github.com/docker/docker/api/types/events"
@@ -73,7 +74,8 @@ func stackContainerIDs(ctx context.Context, dockerClient *client.Client) ([]stri
 
 	for _, container := range containers {
 		if imageRegex.Match([]byte(container.Image)) && !stoppedRegex.Match([]byte(container.State)) {
-			containerIDs = append(containerIDs, container.Names[0])
+			splitName := strings.Split(container.Names[0], "/")
+			containerIDs = append(containerIDs, splitName[len(splitName)-1])
 		}
 	}
 	return containerIDs, nil
@@ -115,7 +117,8 @@ func NewLogMonitor(ctx context.Context) (<-chan string, <-chan error) {
 				return
 			case n := <-in:
 				if v, ok := n.Actor.Attributes["name"]; ok {
-					ret <- v
+					splitName := strings.Split(v, "/")
+					ret <- splitName[len(splitName)-1]
 				}
 			}
 		}
