@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/docker/docker/api/types"
@@ -50,6 +51,8 @@ func newContainerLogger(ctx context.Context, dockerClient *client.Client, name s
 			return
 		}
 
+		log.Printf("attached to container: %v", name)
+
 		// Get weird docker log header
 		h := make([]byte, 8)
 		n, err := logOut.Reader.Read(h)
@@ -58,6 +61,8 @@ func newContainerLogger(ctx context.Context, dockerClient *client.Client, name s
 		} else if n == 0 {
 			errs <- fmt.Errorf("nothing read")
 		}
+
+		log.Printf("header read, scanning")
 
 		scanner := bufio.NewScanner(logOut.Reader)
 

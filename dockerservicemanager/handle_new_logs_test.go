@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/docker/docker/api/types"
+	swarm "github.com/docker/docker/api/types/swarm"
 	"github.com/docker/docker/client"
 	"github.com/ramrod-project/backend-controller-go/customtypes"
 	"github.com/ramrod-project/backend-controller-go/test"
@@ -63,6 +64,9 @@ func checkContainerIDs(ctx context.Context, number int) (<-chan []string, <-chan
 			}
 			if len(cons) == number+1 {
 				for i := range containerNames {
+					if rethinkRegex.Match([]byte(cons[i].Names[0])) {
+						continue
+					}
 					containerNames[i] = cons[i].ID
 				}
 				ret <- containerNames
@@ -94,6 +98,8 @@ func Test_newContainerLogger(t *testing.T) {
 		return
 	}
 
+	networkID := ""
+
 	tests := []struct {
 		name    string
 		run     func(context.Context) ([]string, error)
@@ -120,13 +126,64 @@ func Test_newContainerLogger(t *testing.T) {
 			},
 			timeout: 20 * time.Second,
 		},
+		{
+			name: "test actual",
+			run: func(ctx context.Context) ([]string, error) {
+				dockerClient, err := client.NewEnvClient()
+				if err != nil {
+					return []string{}, err
+				}
+
+				netID, err := test.CheckCreateNet("testnet")
+				if err != nil {
+					t.Errorf("%v", err)
+					return []string{}, err
+				}
+				networkID = netID
+
+				test.BrainSpec.Networks = []swarm.NetworkAttachmentConfig{
+					swarm.NetworkAttachmentConfig{
+						Target:  netID,
+						Aliases: []string{"rethinkdb"},
+					},
+				}
+
+				_, _, err = test.StartBrain(ctx, t, dockerClient, test.BrainSpec)
+				if err != nil {
+					t.Errorf("%v", err)
+					return []string{}, err
+				}
+
+				test.GenericPluginConfig.Networks = []swarm.NetworkAttachmentConfig{
+					swarm.NetworkAttachmentConfig{
+						Target: netID,
+					},
+				}
+
+				test.StartIntegrationTestService(ctx, dockerClient, test.GenericPluginConfig)
+
+				res, errs := checkContainerIDs(ctx, 1)
+
+				for {
+					select {
+					case <-ctx.Done():
+						return []string{}, fmt.Errorf("timeout context exceeded")
+					case err = <-errs:
+						return []string{}, fmt.Errorf("%v", err)
+					case r := <-res:
+						return r, nil
+					}
+				}
+			},
+			timeout: 20 * time.Second,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 
 			timeoutCtx, cancel := context.WithTimeout(ctx, tt.timeout)
 			defer cancel()
-			defer test.DockerCleanUp(ctx, dockerClient, "")
+			defer test.DockerCleanUp(ctx, dockerClient, networkID)
 
 			cons, err := tt.run(timeoutCtx)
 			if err != nil {
