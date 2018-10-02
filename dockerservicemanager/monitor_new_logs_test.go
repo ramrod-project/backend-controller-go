@@ -315,7 +315,7 @@ func TestNewLogMonitor(t *testing.T) {
 					t.Errorf("%v", e)
 					return
 				case c := <-cons:
-					if c == res[0] {
+					if c.Name == res[0] {
 						assert.True(t, true)
 						return
 					}

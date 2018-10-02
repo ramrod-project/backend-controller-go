@@ -3,7 +3,6 @@ package dockerservicemanager
 import (
 	"context"
 	"regexp"
-	"strings"
 
 	"github.com/docker/docker/api/types"
 	events "github.com/docker/docker/api/types/events"
@@ -63,29 +62,31 @@ func newLogFilter() filters.Args {
 	return logFilter
 }
 
-func stackContainerIDs(ctx context.Context, dockerClient *client.Client) ([]string, error) {
+func stackContainerIDs(ctx context.Context, dockerClient *client.Client) ([]types.ContainerJSON, error) {
 
 	containers, err := dockerClient.ContainerList(ctx, types.ContainerListOptions{})
 	if err != nil {
-		return []string{}, err
+		return []types.ContainerJSON{}, err
 	}
 
-	containerIDs := make([]string, 0, len(containers))
+	ret := make([]types.ContainerJSON, len(containers))
 
-	for _, container := range containers {
-		if imageRegex.Match([]byte(container.Image)) && !stoppedRegex.Match([]byte(container.State)) {
-			splitName := strings.Split(container.Names[0], "/")
-			containerIDs = append(containerIDs, splitName[len(splitName)-1])
+	for i, con := range containers {
+		insp, err := dockerClient.ContainerInspect(ctx, con.ID)
+		if err != nil {
+			return []types.ContainerJSON{}, err
 		}
+		ret[i] = insp
 	}
-	return containerIDs, nil
+
+	return ret, nil
 }
 
-// NewLogMonitor returns a channel of strings that
-// will container new container IDs of containers
-// that started.
-func NewLogMonitor(ctx context.Context) (<-chan string, <-chan error) {
-	ret := make(chan string)
+// NewLogMonitor returns a channel of container objects
+// for new containers that start.
+func NewLogMonitor(ctx context.Context) (<-chan types.ContainerJSON, <-chan error) {
+	ret := make(chan types.ContainerJSON)
+	errs := make(chan error)
 
 	dockerClient, err := client.NewEnvClient()
 	if err != nil {
@@ -101,6 +102,7 @@ func NewLogMonitor(ctx context.Context) (<-chan string, <-chan error) {
 
 	go func(in <-chan events.Message) {
 		defer close(ret)
+		defer close(errs)
 		// Get initial containers in stack
 		stackContainers, err := stackContainerIDs(ctx, dockerClient)
 		if err != nil {
@@ -115,11 +117,15 @@ func NewLogMonitor(ctx context.Context) (<-chan string, <-chan error) {
 			select {
 			case <-ctx.Done():
 				return
+			case e := <-errContainerStart:
+				errs <- e
 			case n := <-in:
-				if v, ok := n.Actor.Attributes["name"]; ok {
-					splitName := strings.Split(v, "/")
-					ret <- splitName[len(splitName)-1]
+				con, err := dockerClient.ContainerInspect(ctx, n.ID)
+				if err != nil {
+					errs <- err
+					break
 				}
+				ret <- con
 			}
 		}
 	}(containerStart)

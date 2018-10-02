@@ -1,9 +1,9 @@
 package dockerservicemanager
 
 import (
-	"bytes"
+	"bufio"
 	"context"
-	"io"
+	"fmt"
 	"time"
 
 	"github.com/docker/docker/api/types"
@@ -38,18 +38,29 @@ func newContainerLogger(ctx context.Context, dockerClient *client.Client, name s
 		defer close(logs)
 		defer close(errs)
 
-		logOut, err := dockerClient.ContainerLogs(ctx, name, types.ContainerLogsOptions{
-			ShowStdout: true,
-			ShowStderr: true,
-			Timestamps: true,
-			Follow:     true,
+		logOut, err := dockerClient.ContainerAttach(ctx, name, types.ContainerAttachOptions{
+			Stream: true,
+			Stderr: true,
+			Stdout: true,
+			Logs:   true,
 		})
+		defer logOut.Close()
 		if err != nil {
 			errs <- err
 			return
 		}
 
-		buf := new(bytes.Buffer)
+		// Get weird docker log header
+		h := make([]byte, 8)
+		n, err := logOut.Reader.Read(h)
+		if err != nil {
+			errs <- err
+		} else if n == 0 {
+			errs <- fmt.Errorf("nothing read")
+		}
+
+		scanner := bufio.NewScanner(logOut.Reader)
+
 		for {
 			select {
 			case <-ctx.Done():
@@ -58,25 +69,17 @@ func newContainerLogger(ctx context.Context, dockerClient *client.Client, name s
 				break
 			}
 
-			i, err := buf.ReadFrom(logOut)
-			if err != nil {
-				if err == io.EOF {
-					return
-				}
-				errs <- err
-				continue
-			} else if i == 0 {
-				time.Sleep(100 * time.Millisecond)
-				continue
+			new := scanner.Scan()
+			if !new {
+				time.Sleep(1000 * time.Millisecond)
 			}
 
 			logs <- customtypes.ContainerLog{
 				ContainerName: name,
-				Log:           buf.String(),
+				Log:           scanner.Text(),
+				LogTimestamp:  int32(time.Now().Unix()),
 			}
-			buf.Reset()
 		}
-
 	}()
 
 	return logs, errs
@@ -84,13 +87,13 @@ func newContainerLogger(ctx context.Context, dockerClient *client.Client, name s
 
 // NewLogHandler takes the IDs from the log monitor
 // and opens log readers for their corresponding containers
-func NewLogHandler(ctx context.Context, newNames <-chan string) (<-chan (<-chan customtypes.ContainerLog), <-chan error) {
+func NewLogHandler(ctx context.Context, newCons <-chan types.ContainerJSON) (<-chan (<-chan customtypes.ContainerLog), <-chan error) {
 	ret := make(chan (<-chan customtypes.ContainerLog))
 	errChans := make(chan (<-chan error))
 	errs := make(chan error)
 
 	// Log routine creator
-	go func(in <-chan string) {
+	go func(in <-chan types.ContainerJSON) {
 		defer close(ret)
 		dockerClient, err := client.NewEnvClient()
 		if err != nil {
@@ -103,13 +106,13 @@ func NewLogHandler(ctx context.Context, newNames <-chan string) (<-chan (<-chan 
 			select {
 			case <-ctx.Done():
 				return
-			case name := <-in:
-				logger, errChan := newContainerLogger(ctx, dockerClient, name)
+			case con := <-in:
+				logger, errChan := newContainerLogger(ctx, dockerClient, con.ID)
 				errChans <- errChan
 				ret <- logger
 			}
 		}
-	}(newNames)
+	}(newCons)
 
 	// Error aggregator
 	go func(in <-chan (<-chan error)) {
