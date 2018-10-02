@@ -8,6 +8,7 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
+	"github.com/ramrod-project/backend-controller-go/customtypes"
 )
 
 /*
@@ -29,15 +30,15 @@ returns: <-chan chan string (for the aggregator), <-chan errors
 	return channels
 */
 
-func newContainerLogger(ctx context.Context, dockerClient *client.Client, id string) (<-chan string, <-chan error) {
-	logs := make(chan string)
+func newContainerLogger(ctx context.Context, dockerClient *client.Client, name string) (<-chan customtypes.ContainerLog, <-chan error) {
+	logs := make(chan customtypes.ContainerLog)
 	errs := make(chan error)
 
 	go func() {
 		defer close(logs)
 		defer close(errs)
 
-		logOut, err := dockerClient.ContainerLogs(ctx, id, types.ContainerLogsOptions{
+		logOut, err := dockerClient.ContainerLogs(ctx, name, types.ContainerLogsOptions{
 			ShowStdout: true,
 			ShowStderr: true,
 			Timestamps: true,
@@ -69,7 +70,10 @@ func newContainerLogger(ctx context.Context, dockerClient *client.Client, id str
 				continue
 			}
 
-			logs <- buf.String()
+			logs <- customtypes.ContainerLog{
+				ContainerName: name,
+				Log:           buf.String(),
+			}
 			buf.Reset()
 		}
 
@@ -80,8 +84,8 @@ func newContainerLogger(ctx context.Context, dockerClient *client.Client, id str
 
 // NewLogHandler takes the IDs from the log monitor
 // and opens log readers for their corresponding containers
-func NewLogHandler(ctx context.Context, newIDs <-chan string) (<-chan (<-chan string), <-chan error) {
-	ret := make(chan (<-chan string))
+func NewLogHandler(ctx context.Context, newNames <-chan string) (<-chan (<-chan customtypes.ContainerLog), <-chan error) {
+	ret := make(chan (<-chan customtypes.ContainerLog))
 	errChans := make(chan (<-chan error))
 	errs := make(chan error)
 
@@ -99,13 +103,13 @@ func NewLogHandler(ctx context.Context, newIDs <-chan string) (<-chan (<-chan st
 			select {
 			case <-ctx.Done():
 				return
-			case id := <-in:
-				logger, errChan := newContainerLogger(ctx, dockerClient, id)
+			case name := <-in:
+				logger, errChan := newContainerLogger(ctx, dockerClient, name)
 				errChans <- errChan
 				ret <- logger
 			}
 		}
-	}(newIDs)
+	}(newNames)
 
 	// Error aggregator
 	go func(in <-chan (<-chan error)) {
@@ -118,18 +122,24 @@ func NewLogHandler(ctx context.Context, newIDs <-chan string) (<-chan (<-chan st
 			select {
 			case <-ctx.Done():
 				return
-			case c := <-in:
+			case c, ok := <-in:
+				if !ok {
+					return
+				}
 				chans = append(chans, c)
 			default:
 				break
 			}
 
-			for _, c := range chans {
-				select {
-				case e := <-c:
-					errs <- e
-				default:
-					break
+			for i, c := range chans {
+				if e, ok := <-c; !ok {
+					chans = append(chans[:i], chans[i+1:]...)
+					i--
+					continue
+				} else {
+					if e != nil {
+						errs <- e
+					}
 				}
 			}
 		}

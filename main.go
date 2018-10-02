@@ -64,6 +64,9 @@ func main() { // pragma: no cover
 	ctx := context.Background()
 
 	// Start log monitor, handler, and aggregator
+	logMonitor, logMonErrs := dockerservicemanager.NewLogMonitor(ctx)
+	logChans, logChanErrs := dockerservicemanager.NewLogHandler(ctx, logMonitor)
+	logAggErrs := rethink.AggregateLogs(ctx, logChans)
 
 	// Advertise nodes to database
 	err := dockerservicemanager.NodeAdvertise()
@@ -113,7 +116,9 @@ func main() { // pragma: no cover
 	log.Printf("success: plugin handler started...")
 
 	// Monitor all errors in the main loop
-	errChan := errorhandler.ErrorHandler(pluginErr, actionErr, eventErr, eventDBErr)
+	errChan := errorhandler.ErrorHandler(
+		pluginErr, actionErr, eventErr, eventDBErr, logMonErrs, logChanErrs, logAggErrs,
+	)
 
 	for err := range errChan {
 		if err != nil {

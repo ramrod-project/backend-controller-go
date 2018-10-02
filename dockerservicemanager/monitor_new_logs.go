@@ -73,7 +73,7 @@ func stackContainerIDs(ctx context.Context, dockerClient *client.Client) ([]stri
 
 	for _, container := range containers {
 		if imageRegex.Match([]byte(container.Image)) && !stoppedRegex.Match([]byte(container.State)) {
-			containerIDs = append(containerIDs, container.ID)
+			containerIDs = append(containerIDs, container.Names[0])
 		}
 	}
 	return containerIDs, nil
