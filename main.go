@@ -61,6 +61,10 @@ func main() { // pragma: no cover
 		log.Fatalf("fatal: %v", errors.New("database connection attempt timed out, exiting"))
 	}
 
+	ctx := context.Background()
+
+	// Start log monitor, handler, and aggregator
+
 	// Advertise nodes to database
 	err := dockerservicemanager.NodeAdvertise()
 	if err != nil {
