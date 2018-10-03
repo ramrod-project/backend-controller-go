@@ -7,7 +7,6 @@ import (
 	"os"
 	"regexp"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -40,10 +39,10 @@ func startContainers(ctx context.Context, number int) error {
 	return nil
 }
 
-func checkContainers(ctx context.Context, number int) (<-chan []string, <-chan error) {
-	ret := make(chan []string)
+func checkContainers(ctx context.Context, number int) (<-chan []types.ContainerJSON, <-chan error) {
+	ret := make(chan []types.ContainerJSON)
 	errs := make(chan error)
-	containerNames := make([]string, number+1)
+	containerNames := make([]types.ContainerJSON, number+1)
 
 	dockerClient, err := client.NewEnvClient()
 	if err != nil {
@@ -67,8 +66,12 @@ func checkContainers(ctx context.Context, number int) (<-chan []string, <-chan e
 			}
 			if len(cons) == number+1 {
 				for i := range containerNames {
-					splitName := strings.Split(cons[i].Names[0], "/")
-					containerNames[i] = splitName[len(splitName)-1]
+					con, err := dockerClient.ContainerInspect(ctx, cons[i].ID)
+					if err != nil {
+						errs <- err
+						return
+					}
+					containerNames[i] = con
 				}
 				ret <- containerNames
 				return
@@ -120,20 +123,20 @@ func Test_stackContainerIDs(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		run     func(context.Context) ([]string, error)
+		run     func(context.Context) ([]types.ContainerJSON, error)
 		timeout time.Duration
 		wantErr bool
 	}{
 		{
 			name: "get nothing",
-			run: func(ctx context.Context) ([]string, error) {
+			run: func(ctx context.Context) ([]types.ContainerJSON, error) {
 				res, errs := checkContainers(ctx, 0)
 
 				select {
 				case <-ctx.Done():
-					return []string{}, fmt.Errorf("timeout context exceeded")
+					return []types.ContainerJSON{}, fmt.Errorf("timeout context exceeded")
 				case err = <-errs:
-					return []string{}, fmt.Errorf("%v", err)
+					return []types.ContainerJSON{}, fmt.Errorf("%v", err)
 				case r := <-res:
 					return r, nil
 				}
@@ -142,20 +145,20 @@ func Test_stackContainerIDs(t *testing.T) {
 		},
 		{
 			name: "get one container ID",
-			run: func(ctx context.Context) ([]string, error) {
+			run: func(ctx context.Context) ([]types.ContainerJSON, error) {
 
 				err := startContainers(ctx, 1)
 				if err != nil {
-					return []string{}, err
+					return []types.ContainerJSON{}, err
 				}
 
 				res, errs := checkContainers(ctx, 1)
 
 				select {
 				case <-ctx.Done():
-					return []string{}, fmt.Errorf("timeout context exceeded")
+					return []types.ContainerJSON{}, fmt.Errorf("timeout context exceeded")
 				case err = <-errs:
-					return []string{}, fmt.Errorf("%v", err)
+					return []types.ContainerJSON{}, fmt.Errorf("%v", err)
 				case r := <-res:
 					return r, nil
 				}
@@ -164,20 +167,20 @@ func Test_stackContainerIDs(t *testing.T) {
 		},
 		{
 			name: "get several container IDs",
-			run: func(ctx context.Context) ([]string, error) {
+			run: func(ctx context.Context) ([]types.ContainerJSON, error) {
 
 				err := startContainers(ctx, 3)
 				if err != nil {
-					return []string{}, err
+					return []types.ContainerJSON{}, err
 				}
 
 				res, errs := checkContainers(ctx, 3)
 
 				select {
 				case <-ctx.Done():
-					return []string{}, fmt.Errorf("timeout context exceeded")
+					return []types.ContainerJSON{}, fmt.Errorf("timeout context exceeded")
 				case err = <-errs:
-					return []string{}, fmt.Errorf("%v", err)
+					return []types.ContainerJSON{}, fmt.Errorf("%v", err)
 				case r := <-res:
 					return r, nil
 				}
@@ -263,24 +266,24 @@ func TestNewLogMonitor(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		run     func(context.Context) ([]string, error)
+		run     func(context.Context) ([]types.ContainerJSON, error)
 		timeout time.Duration
 	}{
 		{
 			name: "test one container",
-			run: func(ctx context.Context) ([]string, error) {
+			run: func(ctx context.Context) ([]types.ContainerJSON, error) {
 				err := startContainers(ctx, 1)
 				if err != nil {
-					return []string{}, err
+					return []types.ContainerJSON{}, err
 				}
 
 				res, errs := checkContainers(ctx, 1)
 
 				select {
 				case <-ctx.Done():
-					return []string{}, fmt.Errorf("timeout context exceeded")
+					return []types.ContainerJSON{}, fmt.Errorf("timeout context exceeded")
 				case err = <-errs:
-					return []string{}, fmt.Errorf("%v", err)
+					return []types.ContainerJSON{}, fmt.Errorf("%v", err)
 				case r := <-res:
 					return r, nil
 				}
@@ -315,7 +318,7 @@ func TestNewLogMonitor(t *testing.T) {
 					t.Errorf("%v", e)
 					return
 				case c := <-cons:
-					if c.Name == res[0] {
+					if c.Name == res[0].Name {
 						assert.True(t, true)
 						return
 					}
