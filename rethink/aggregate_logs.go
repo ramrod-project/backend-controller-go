@@ -2,6 +2,7 @@ package rethink
 
 import (
 	"context"
+	"log"
 
 	"github.com/ramrod-project/backend-controller-go/customtypes"
 	r "gopkg.in/gorethink/gorethink.v4"
@@ -37,14 +38,15 @@ returns: <-chan error
 
 var dbLogQuery = r.DB("Brain").Table("Logs")
 
-func logSend(sess *r.Session, log customtypes.ContainerLog) error {
+func logSend(sess *r.Session, logEntry customtypes.ContainerLog) error {
 
-	if log == (customtypes.ContainerLog{}) {
+	if logEntry == (customtypes.ContainerLog{}) {
 		return nil
 	}
 
-	_, err := dbLogQuery.Update(log).RunWrite(sess)
+	res, err := dbLogQuery.Insert(logEntry).RunWrite(sess)
 	if err != nil {
+		log.Printf("error response from db: %+v", res)
 		return err
 	}
 	return nil
