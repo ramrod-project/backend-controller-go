@@ -211,7 +211,6 @@ func Test_newContainerLogger(t *testing.T) {
 					t.Errorf("%v", e)
 					return
 				case o := <-out:
-					log.Printf("%+v", o)
 					assert.True(t, nameMatch.Match([]byte(o.ServiceName)))
 					assert.Equal(t, strings.Split(cons[0].Name, "/")[1], o.ContainerName)
 					assert.Equal(t, cons[0].ID, o.ContainerID)
