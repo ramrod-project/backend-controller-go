@@ -1412,13 +1412,12 @@ func Test_Integration(t *testing.T) {
 						case e := <-errChan:
 							log.Println(fmt.Errorf("%v", e))
 							return false
-						case d := <-logChan:
-							log.Printf("%+v", d)
+						case <-logChan:
 							count++
 						default:
 							break
 						}
-						if count > 4 {
+						if count > 12 {
 							return true
 						}
 						time.Sleep(100 * time.Millisecond)
