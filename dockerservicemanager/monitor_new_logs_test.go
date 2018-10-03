@@ -25,11 +25,14 @@ func startContainers(ctx context.Context, number int) error {
 		panic(err)
 	}
 
+	newPluginSpec := &swarm.ServiceSpec{}
+	*newPluginSpec = test.GenericPluginConfig
+
 	for i := 0; i < number; i++ {
-		test.GenericPluginConfig.Name = "testservice" + strconv.Itoa(i)
-		test.GenericPluginConfig.EndpointSpec.Ports[0].TargetPort = test.GenericPluginConfig.EndpointSpec.Ports[0].TargetPort + 1
-		test.GenericPluginConfig.EndpointSpec.Ports[0].PublishedPort = test.GenericPluginConfig.EndpointSpec.Ports[0].PublishedPort + 1
-		_, err = dockerClient.ServiceCreate(ctx, test.GenericPluginConfig, types.ServiceCreateOptions{})
+		newPluginSpec.Name = "testservice" + strconv.Itoa(i)
+		newPluginSpec.EndpointSpec.Ports[0].TargetPort = newPluginSpec.EndpointSpec.Ports[0].TargetPort + 1
+		newPluginSpec.EndpointSpec.Ports[0].PublishedPort = newPluginSpec.EndpointSpec.Ports[0].PublishedPort + 1
+		_, err = dockerClient.ServiceCreate(ctx, *newPluginSpec, types.ServiceCreateOptions{})
 		if err != nil {
 			log.Printf("%v", err)
 		}
@@ -108,7 +111,10 @@ func Test_stackContainerIDs(t *testing.T) {
 		return
 	}
 
-	test.BrainSpec.TaskTemplate.Networks = []swarm.NetworkAttachmentConfig{
+	newSpec := &swarm.ServiceSpec{}
+	*newSpec = test.BrainSpec
+
+	newSpec.Networks = []swarm.NetworkAttachmentConfig{
 		swarm.NetworkAttachmentConfig{
 			Target:  netID,
 			Aliases: []string{"rethinkdb"},
@@ -191,9 +197,9 @@ func Test_stackContainerIDs(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 
-			test.BrainSpec.EndpointSpec.Ports[0].PublishMode = swarm.PortConfigPublishModeHost
+			newSpec.EndpointSpec.Ports[0].PublishMode = swarm.PortConfigPublishModeHost
 
-			_, _, err := test.StartBrain(ctx, t, dockerClient, test.BrainSpec)
+			_, _, err := test.StartBrain(ctx, t, dockerClient, *newSpec)
 			if err != nil {
 				t.Errorf("%v", err)
 				return
@@ -251,7 +257,10 @@ func TestNewLogMonitor(t *testing.T) {
 		return
 	}
 
-	test.BrainSpec.TaskTemplate.Networks = []swarm.NetworkAttachmentConfig{
+	newSpec := &swarm.ServiceSpec{}
+	*newSpec = test.BrainSpec
+
+	newSpec.Networks = []swarm.NetworkAttachmentConfig{
 		swarm.NetworkAttachmentConfig{
 			Target:  netID,
 			Aliases: []string{"rethinkdb"},
@@ -293,9 +302,9 @@ func TestNewLogMonitor(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			test.BrainSpec.EndpointSpec.Ports[0].PublishMode = swarm.PortConfigPublishModeHost
+			newSpec.EndpointSpec.Ports[0].PublishMode = swarm.PortConfigPublishModeHost
 
-			_, _, err := test.StartBrain(ctx, t, dockerClient, test.BrainSpec)
+			_, _, err := test.StartBrain(ctx, t, dockerClient, *newSpec)
 			if err != nil {
 				t.Errorf("%v", err)
 				return
