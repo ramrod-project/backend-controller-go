@@ -136,6 +136,10 @@ func Test_logSend(t *testing.T) {
 		})
 	}
 	test.KillService(ctx, dockerClient, brainID)
+	if err := test.DockerCleanUp(ctx, dockerClient, ""); err != nil {
+		t.Errorf("cleanup error: %v", err)
+		return
+	}
 }
 
 func TestAggregateLogs(t *testing.T) {
@@ -275,5 +279,9 @@ func TestAggregateLogs(t *testing.T) {
 	}
 
 	test.KillService(ctx, dockerClient, brainID)
+	if err := test.DockerCleanUp(ctx, dockerClient, ""); err != nil {
+		t.Errorf("cleanup error: %v", err)
+		return
+	}
 	os.Setenv("STAGE", oldStage)
 }

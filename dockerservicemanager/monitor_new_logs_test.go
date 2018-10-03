@@ -326,4 +326,8 @@ func TestNewLogMonitor(t *testing.T) {
 			}
 		})
 	}
+	if err := test.DockerCleanUp(ctx, dockerClient, ""); err != nil {
+		t.Errorf("cleanup error: %v", err)
+		return
+	}
 }

@@ -221,6 +221,10 @@ func Test_newContainerLogger(t *testing.T) {
 
 		})
 	}
+	if err := test.DockerCleanUp(ctx, dockerClient, networkID); err != nil {
+		t.Errorf("cleanup error: %v", err)
+		return
+	}
 }
 
 func TestNewLogHandler(t *testing.T) {
@@ -397,5 +401,9 @@ func TestNewLogHandler(t *testing.T) {
 			}
 
 		})
+	}
+	if err := test.DockerCleanUp(ctx, dockerClient, networkID); err != nil {
+		t.Errorf("cleanup error: %v", err)
+		return
 	}
 }
