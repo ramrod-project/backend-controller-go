@@ -1177,7 +1177,6 @@ func Test_Integration(t *testing.T) {
 							if _, ok := d["new_val"]; !ok {
 								break
 							}
-							log.Printf("db change: %+v", d["new_val"])
 							if d["new_val"].(map[string]interface{})["ServiceName"].(string) != "Harness-6000tcp" {
 								break
 							}
