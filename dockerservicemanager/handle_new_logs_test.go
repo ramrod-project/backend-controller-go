@@ -7,6 +7,7 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -199,6 +200,7 @@ func Test_newContainerLogger(t *testing.T) {
 			}
 
 			out, errs := newContainerLogger(timeoutCtx, dockerClient, cons[0])
+			nameMatch := regexp.MustCompile(strings.Split(strings.Split(cons[0].Name, "/")[1], ".")[0])
 
 			for {
 				select {
@@ -209,6 +211,10 @@ func Test_newContainerLogger(t *testing.T) {
 					t.Errorf("%v", e)
 					return
 				case o := <-out:
+					log.Printf("%+v", o)
+					assert.True(t, nameMatch.Match([]byte(o.ServiceName)))
+					assert.Equal(t, strings.Split(cons[0].Name, "/")[1], o.ContainerName)
+					assert.Equal(t, cons[0].ID, o.ContainerID)
 					assert.True(t, len(o.Log) > 0)
 					return
 				}

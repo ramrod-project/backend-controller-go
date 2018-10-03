@@ -6,20 +6,25 @@ import (
 	"testing"
 
 	"github.com/ramrod-project/backend-controller-go/customtypes"
-	r "gopkg.in/gorethink/gorethink.v4"
 )
 
 func Test_logSend(t *testing.T) {
-	type args struct {
-		sess *r.Session
-		log  customtypes.ContainerLog
-	}
+
 	tests := []struct {
 		name    string
-		args    args
+		log     customtypes.ContainerLog
 		wantErr bool
 	}{
-		// TODO: Add test cases.
+		{
+			name: "test log 1",
+			log: customtypes.ContainerLog{
+				ContainerID:   "284813vm8y13-13v8y9-713yv1",
+				ContainerName: "some-service-name.0whatever",
+				Log:           "[INFO] blahblahblahblhbq 39 4g0wo 43589pqhwpr8g4",
+				ServiceName:   "some-service-name",
+			},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

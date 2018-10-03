@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/docker/docker/api/types"
@@ -19,7 +21,34 @@ func newContainerLogger(ctx context.Context, dockerClient *client.Client, con ty
 		defer close(logs)
 		defer close(errs)
 
-		logOut, err := dockerClient.ContainerAttach(ctx, con.ID, types.ContainerAttachOptions{
+		var svcName = ""
+
+		// Set vars because this container's info
+		// won't change throughout its lifespan
+		conID := con.ID
+		conName := strings.Split(con.Name, "/")[1]
+
+		// Get the service that corresponds to this
+		// container (service will always match the
+		// string of the container name up until the
+		// first '.')
+		if conName == "aux-services" {
+			svcName = "AuxiliaryServices"
+		} else {
+			nameMatch := regexp.MustCompile(strings.Split(conName, ".")[0])
+			svcs, err := dockerClient.ServiceList(ctx, types.ServiceListOptions{})
+			if err != nil {
+				errs <- err
+				return
+			}
+			for _, svc := range svcs {
+				if nameMatch.Match([]byte(svc.Spec.Annotations.Name)) {
+					svcName = svc.Spec.Annotations.Name
+				}
+			}
+		}
+
+		logOut, err := dockerClient.ContainerAttach(ctx, conID, types.ContainerAttachOptions{
 			Stream: true,
 			Stderr: true,
 			Stdout: true,
@@ -55,17 +84,12 @@ func newContainerLogger(ctx context.Context, dockerClient *client.Client, con ty
 				time.Sleep(1000 * time.Millisecond)
 			}
 
-			con, err := dockerClient.ContainerInspect(ctx, con.ID)
-			if err != nil {
-				errs <- err
-				return
-			}
-
 			logs <- customtypes.ContainerLog{
-				ContainerID:   con.ID,
-				ContainerName: con.Name,
+				ContainerID:   conID,
+				ContainerName: conName,
 				Log:           scanner.Text(),
 				LogTimestamp:  int32(time.Now().Unix()),
+				ServiceName:   svcName,
 			}
 		}
 	}()
