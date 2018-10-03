@@ -83,15 +83,19 @@ func AggregateLogs(ctx context.Context, logChans <-chan (<-chan customtypes.Cont
 			}
 
 			for i, c := range logSlice {
-				if l, ok := <-c; !ok {
-					logSlice = append(logSlice[:i], logSlice[i+1:]...)
-					i--
-					continue
-				} else {
-					err = logSend(session, l)
-					if err != nil {
-						errs <- err
+				select {
+				case l, ok := <-c:
+					if !ok {
+						logSlice = append(logSlice[:i], logSlice[i+1:]...)
+						i--
+					} else {
+						err = logSend(session, l)
+						if err != nil {
+							errs <- err
+						}
 					}
+				default:
+					break
 				}
 			}
 		}

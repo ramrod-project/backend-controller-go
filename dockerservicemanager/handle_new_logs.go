@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/docker/docker/api/types"
@@ -12,26 +11,7 @@ import (
 	"github.com/ramrod-project/backend-controller-go/customtypes"
 )
 
-/*
-Pseudocode:
-
-NewLogHandler
-takes: <-chan string (from log monitor)
-returns: <-chan chan string (for the aggregator), <-chan errors
-	create channels
-	(goroutine)
-		receive new ID
-		create chan string
-		spawn goroutine
-		(goroutine)
-			create log reader for the container
-			read from log forever
-			send log strings back over channel
-		chan chan string <- chan string
-	return channels
-*/
-
-func newContainerLogger(ctx context.Context, dockerClient *client.Client, name string) (<-chan customtypes.ContainerLog, <-chan error) {
+func newContainerLogger(ctx context.Context, dockerClient *client.Client, con types.ContainerJSON) (<-chan customtypes.ContainerLog, <-chan error) {
 	logs := make(chan customtypes.ContainerLog)
 	errs := make(chan error)
 
@@ -39,7 +19,7 @@ func newContainerLogger(ctx context.Context, dockerClient *client.Client, name s
 		defer close(logs)
 		defer close(errs)
 
-		logOut, err := dockerClient.ContainerAttach(ctx, name, types.ContainerAttachOptions{
+		logOut, err := dockerClient.ContainerAttach(ctx, con.ID, types.ContainerAttachOptions{
 			Stream: true,
 			Stderr: true,
 			Stdout: true,
@@ -51,8 +31,6 @@ func newContainerLogger(ctx context.Context, dockerClient *client.Client, name s
 			return
 		}
 
-		log.Printf("attached to container: %v", name)
-
 		// Get weird docker log header
 		h := make([]byte, 8)
 		n, err := logOut.Reader.Read(h)
@@ -61,8 +39,6 @@ func newContainerLogger(ctx context.Context, dockerClient *client.Client, name s
 		} else if n == 0 {
 			errs <- fmt.Errorf("nothing read")
 		}
-
-		log.Printf("header read, scanning")
 
 		scanner := bufio.NewScanner(logOut.Reader)
 
@@ -79,8 +55,15 @@ func newContainerLogger(ctx context.Context, dockerClient *client.Client, name s
 				time.Sleep(1000 * time.Millisecond)
 			}
 
+			con, err := dockerClient.ContainerInspect(ctx, con.ID)
+			if err != nil {
+				errs <- err
+				return
+			}
+
 			logs <- customtypes.ContainerLog{
-				ContainerName: name,
+				ContainerID:   con.ID,
+				ContainerName: con.Name,
 				Log:           scanner.Text(),
 				LogTimestamp:  int32(time.Now().Unix()),
 			}
@@ -111,8 +94,13 @@ func NewLogHandler(ctx context.Context, newCons <-chan types.ContainerJSON) (<-c
 			select {
 			case <-ctx.Done():
 				return
-			case con := <-in:
-				logger, errChan := newContainerLogger(ctx, dockerClient, con.ID)
+			case con, ok := <-in:
+				if !ok {
+					errs <- err
+					close(errs)
+					return
+				}
+				logger, errChan := newContainerLogger(ctx, dockerClient, con)
 				errChans <- errChan
 				ret <- logger
 			}
@@ -140,14 +128,16 @@ func NewLogHandler(ctx context.Context, newCons <-chan types.ContainerJSON) (<-c
 			}
 
 			for i, c := range chans {
-				if e, ok := <-c; !ok {
-					chans = append(chans[:i], chans[i+1:]...)
-					i--
-					continue
-				} else {
-					if e != nil {
+				select {
+				case e, ok := <-c:
+					if !ok {
+						chans = append(chans[:i], chans[i+1:]...)
+						i--
+					} else if e != nil {
 						errs <- e
 					}
+				default:
+					break
 				}
 			}
 		}
