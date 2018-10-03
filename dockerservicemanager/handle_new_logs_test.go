@@ -248,6 +248,7 @@ func TestNewLogHandler(t *testing.T) {
 	}
 
 	networkID := ""
+	brainServiceID := ""
 
 	tests := []struct {
 		name    string
@@ -290,11 +291,12 @@ func TestNewLogHandler(t *testing.T) {
 						},
 					}
 
-					_, _, err = test.StartBrain(ctx, t, dockerClient, test.BrainSpec)
+					_, brainID, err := test.StartBrain(ctx, t, dockerClient, test.BrainSpec)
 					if err != nil {
 						errs <- fmt.Errorf("%v", err)
 						return
 					}
+					brainServiceID = brainID
 
 					services := make([]*regexp.Regexp, number)
 					for i := 0; i < number; i++ {
@@ -402,6 +404,7 @@ func TestNewLogHandler(t *testing.T) {
 
 		})
 	}
+	test.KillService(ctx, dockerClient, brainServiceID)
 	if err := test.DockerCleanUp(ctx, dockerClient, networkID); err != nil {
 		t.Errorf("cleanup error: %v", err)
 		return
