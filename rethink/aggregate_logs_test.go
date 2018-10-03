@@ -4,7 +4,6 @@ import (
 	"context"
 	"log"
 	"os"
-	"reflect"
 	"testing"
 	"time"
 
@@ -47,7 +46,7 @@ func Test_logSend(t *testing.T) {
 				ContainerName: "some-service-name.0whatever",
 				Log:           "[INFO] blahblahblahblhbq 39 4g0wo 43589pqhwpr8g4",
 				ServiceName:   "some-service-name",
-				LogTimestamp:  int32(time.Now().Unix()),
+				LogTimestamp:  float64(time.Now().UnixNano()) / 1000000000,
 			},
 			wantErr: false,
 		},
@@ -89,13 +88,12 @@ func Test_logSend(t *testing.T) {
 						}
 						log.Printf("checking cursor")
 						if c.Next(&doc) {
-							log.Printf("%+v", doc)
-							if v, ok := doc["containerID"]; ok {
+							if v, ok := doc["ContainerID"]; ok {
 								assert.Equal(t, tt.log.ContainerID, v.(string))
 							} else {
 								continue L
 							}
-							if v, ok := doc["containerName"]; ok {
+							if v, ok := doc["ContainerName"]; ok {
 								assert.Equal(t, tt.log.ContainerName, v.(string))
 							} else {
 								continue L
@@ -111,8 +109,8 @@ func Test_logSend(t *testing.T) {
 								continue L
 							}
 							if v, ok := doc["rt"]; ok {
-								now := int32(time.Now().Unix())
-								assert.True(t, (int32(v.(float64)) >= now-10))
+								now := float64(time.Now().UnixNano()) / 1000000000
+								assert.True(t, (v.(float64) >= now-10))
 							} else {
 								continue L
 							}
@@ -140,22 +138,21 @@ func Test_logSend(t *testing.T) {
 }
 
 func TestAggregateLogs(t *testing.T) {
-	type args struct {
-		ctx      context.Context
-		logChans <-chan (<-chan customtypes.ContainerLog)
-	}
+
 	tests := []struct {
 		name string
-		args args
-		want <-chan error
+		run  func(context.Context) (<-chan (<-chan customtypes.ContainerLog), <-chan error)
+		wait func(context.Context) (<-chan struct{}, <-chan error)
 	}{
-		// TODO: Add test cases.
+		{
+			name: "test",
+			/*run:  func(context.Context) (<-chan (<-chan customtypes.ContainerLog), <-chan error) {},
+			wait: func(context.Context) (<-chan struct{}, <-chan error) {},*/
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := AggregateLogs(tt.args.ctx, tt.args.logChans); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("AggregateLogs() = %v, want %v", got, tt.want)
-			}
+
 		})
 	}
 }

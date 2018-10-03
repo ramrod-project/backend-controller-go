@@ -63,7 +63,7 @@ func AggregateLogs(ctx context.Context, logChans <-chan (<-chan customtypes.Cont
 
 		logSlice := []<-chan customtypes.ContainerLog{}
 
-		r.SetTags("rethinkdb", "json")
+		r.SetTags("json")
 
 		session, err := r.Connect(r.ConnectOpts{
 			Address: GetRethinkHost(),

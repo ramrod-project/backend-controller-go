@@ -81,14 +81,14 @@ func newContainerLogger(ctx context.Context, dockerClient *client.Client, con ty
 
 			new := scanner.Scan()
 			if !new {
-				time.Sleep(1000 * time.Millisecond)
+				time.Sleep(100 * time.Millisecond)
 			}
 
 			logs <- customtypes.ContainerLog{
 				ContainerID:   conID,
 				ContainerName: conName,
 				Log:           scanner.Text(),
-				LogTimestamp:  int32(time.Now().Unix()),
+				LogTimestamp:  float64(time.Now().Unix()) / 1000000000,
 				ServiceName:   svcName,
 			}
 		}
