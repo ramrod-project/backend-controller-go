@@ -7,7 +7,6 @@ import (
 	"os"
 	"regexp"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -42,10 +41,10 @@ func startTestContainers(ctx context.Context, number int) error {
 	return nil
 }
 
-func checkContainerIDs(ctx context.Context, number int) (<-chan []types.ContainerJSON, <-chan error) {
-	ret := make(chan []types.ContainerJSON)
+func checkServices(ctx context.Context, number int) (<-chan []swarm.Service, <-chan error) {
+	ret := make(chan []swarm.Service)
 	errs := make(chan error)
-	containerNames := make([]types.ContainerJSON, number+1)
+	services := make([]swarm.Service, number+1)
 
 	dockerClient, err := client.NewEnvClient()
 	if err != nil {
@@ -62,24 +61,24 @@ func checkContainerIDs(ctx context.Context, number int) (<-chan []types.Containe
 			default:
 				break
 			}
-			cons, err := dockerClient.ContainerList(ctx, types.ContainerListOptions{})
+			svcs, err := dockerClient.ServiceList(ctx, types.ServiceListOptions{})
 			if err != nil {
 				errs <- err
 				return
 			}
-			if len(cons) == number+1 {
-				for i := range containerNames {
-					if rethinkRegex.Match([]byte(cons[i].Names[0])) {
+			if len(svcs) == number+1 {
+				for i := range services {
+					if rethinkRegex.Match([]byte(svcs[i].Spec.Annotations.Name)) {
 						continue
 					}
-					con, err := dockerClient.ContainerInspect(ctx, cons[i].ID)
+					svc, _, err := dockerClient.ServiceInspectWithRaw(ctx, svcs[i].ID)
 					if err != nil {
 						errs <- err
 						return
 					}
-					containerNames[i] = con
+					services[i] = svc
 				}
-				ret <- containerNames
+				ret <- services
 				return
 			}
 			time.Sleep(1000 * time.Millisecond)
@@ -88,7 +87,7 @@ func checkContainerIDs(ctx context.Context, number int) (<-chan []types.Containe
 	return ret, errs
 }
 
-func Test_newContainerLogger(t *testing.T) {
+func Test_newLogger(t *testing.T) {
 
 	tag := os.Getenv("TAG")
 	if tag == "" {
@@ -112,24 +111,24 @@ func Test_newContainerLogger(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		run     func(context.Context) ([]types.ContainerJSON, error)
+		run     func(context.Context) ([]swarm.Service, error)
 		timeout time.Duration
 	}{
 		{
 			name: "test 1",
-			run: func(ctx context.Context) ([]types.ContainerJSON, error) {
+			run: func(ctx context.Context) ([]swarm.Service, error) {
 				err := startTestContainers(ctx, 1)
 				if err != nil {
-					return []types.ContainerJSON{}, err
+					return []swarm.Service{}, err
 				}
 
-				res, errs := checkContainerIDs(ctx, 0)
+				res, errs := checkServices(ctx, 0)
 
 				select {
 				case <-ctx.Done():
-					return []types.ContainerJSON{}, fmt.Errorf("timeout context exceeded")
+					return []swarm.Service{}, fmt.Errorf("timeout context exceeded")
 				case err = <-errs:
-					return []types.ContainerJSON{}, fmt.Errorf("%v", err)
+					return []swarm.Service{}, fmt.Errorf("%v", err)
 				case r := <-res:
 					return r, nil
 				}
@@ -138,16 +137,16 @@ func Test_newContainerLogger(t *testing.T) {
 		},
 		{
 			name: "test actual",
-			run: func(ctx context.Context) ([]types.ContainerJSON, error) {
+			run: func(ctx context.Context) ([]swarm.Service, error) {
 				dockerClient, err := client.NewEnvClient()
 				if err != nil {
-					return []types.ContainerJSON{}, err
+					return []swarm.Service{}, err
 				}
 
 				netID, err := test.CheckCreateNet("testnet")
 				if err != nil {
 					t.Errorf("%v", err)
-					return []types.ContainerJSON{}, err
+					return []swarm.Service{}, err
 				}
 				networkID = netID
 
@@ -164,7 +163,7 @@ func Test_newContainerLogger(t *testing.T) {
 				_, _, err = test.StartBrain(ctx, t, dockerClient, *newSpec)
 				if err != nil {
 					t.Errorf("%v", err)
-					return []types.ContainerJSON{}, err
+					return []swarm.Service{}, err
 				}
 
 				newPluginSpec := &swarm.ServiceSpec{}
@@ -178,14 +177,14 @@ func Test_newContainerLogger(t *testing.T) {
 
 				test.StartIntegrationTestService(ctx, dockerClient, *newPluginSpec)
 
-				res, errs := checkContainerIDs(ctx, 1)
+				res, errs := checkServices(ctx, 1)
 
 				for {
 					select {
 					case <-ctx.Done():
-						return []types.ContainerJSON{}, fmt.Errorf("timeout context exceeded")
+						return []swarm.Service{}, fmt.Errorf("timeout context exceeded")
 					case err = <-errs:
-						return []types.ContainerJSON{}, fmt.Errorf("%v", err)
+						return []swarm.Service{}, fmt.Errorf("%v", err)
 					case r := <-res:
 						return r, nil
 					}
@@ -201,14 +200,14 @@ func Test_newContainerLogger(t *testing.T) {
 			defer cancel()
 			defer test.DockerCleanUp(ctx, dockerClient, networkID)
 
-			cons, err := tt.run(timeoutCtx)
+			svcs, err := tt.run(timeoutCtx)
 			if err != nil {
 				t.Errorf("%v", err)
 				return
 			}
 
-			out, errs := newContainerLogger(timeoutCtx, dockerClient, cons[0])
-			nameMatch := regexp.MustCompile(strings.Split(strings.Split(cons[0].Name, "/")[1], ".")[0])
+			out, errs := newLogger(timeoutCtx, dockerClient, svcs[0])
+			nameMatch := regexp.MustCompile(svcs[0].Spec.Annotations.Name)
 
 			for {
 				select {
@@ -220,8 +219,6 @@ func Test_newContainerLogger(t *testing.T) {
 					return
 				case o := <-out:
 					assert.True(t, nameMatch.Match([]byte(o.ServiceName)))
-					assert.Equal(t, strings.Split(cons[0].Name, "/")[1], o.ContainerName)
-					assert.Equal(t, cons[0].ID, o.ContainerID)
 					assert.True(t, len(o.Log) > 0)
 					return
 				}
@@ -260,14 +257,14 @@ func TestNewLogHandler(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		feed    func(context.Context, int) (<-chan types.ContainerJSON, <-chan error)
+		feed    func(context.Context, int) (<-chan swarm.Service, <-chan error)
 		n       int
 		timeout time.Duration
 	}{
 		{
 			name: "test a few plugins",
-			feed: func(ctx context.Context, number int) (<-chan types.ContainerJSON, <-chan error) {
-				ret := make(chan types.ContainerJSON)
+			feed: func(ctx context.Context, number int) (<-chan swarm.Service, <-chan error) {
+				ret := make(chan swarm.Service)
 				errs := make(chan error)
 				go func() {
 					defer close(ret)
@@ -312,7 +309,6 @@ func TestNewLogHandler(t *testing.T) {
 					}
 					brainServiceID = brainID
 
-					services := make([]*regexp.Regexp, number)
 					for i := 0; i < number; i++ {
 						newPluginSpec.Annotations.Name = newPluginSpec.Annotations.Name + strconv.Itoa(i)
 						newPluginSpec.EndpointSpec.Ports[0].PublishedPort++
@@ -321,46 +317,13 @@ func TestNewLogHandler(t *testing.T) {
 							errs <- err
 							return
 						}
+						time.Sleep(500 * time.Millisecond)
 						insp, _, err := dockerClient.ServiceInspectWithRaw(ctx, svc.ID)
 						if err != nil {
 							errs <- err
 							return
 						}
-						services[i] = regexp.MustCompile(insp.Spec.Annotations.Name)
-						time.Sleep(500 * time.Millisecond)
-					}
-
-					cons := []types.Container{}
-					for {
-						select {
-						case <-ctx.Done():
-							errs <- fmt.Errorf("timeout context exceeded")
-							return
-						default:
-							break
-						}
-						cons, err = dockerClient.ContainerList(ctx, types.ContainerListOptions{})
-						if err != nil {
-							errs <- err
-							return
-						}
-						if len(cons) == number+1 {
-							break
-						}
-						time.Sleep(1000 * time.Millisecond)
-					}
-
-					for _, c := range cons {
-						for _, r := range services {
-							if r.Match([]byte(c.Names[0])) {
-								res, err := dockerClient.ContainerInspect(ctx, c.ID)
-								if err != nil {
-									errs <- err
-									return
-								}
-								ret <- res
-							}
-						}
+						ret <- insp
 					}
 				}()
 				return ret, errs
@@ -381,14 +344,17 @@ func TestNewLogHandler(t *testing.T) {
 			chanChan, logErrs := NewLogHandler(timeoutCtx, feedChan)
 
 			// We should have n log chans total by the end
-			chans := []<-chan customtypes.ContainerLog{}
+			chans := []<-chan customtypes.Log{}
 		L:
 			for {
 				select {
 				case <-timeoutCtx.Done():
 					t.Errorf("timeout context exceeded")
 					return
-				case e := <-feedErrs:
+				case e, ok := <-feedErrs:
+					if !ok {
+						break
+					}
 					t.Errorf("%v", e)
 					return
 				case e := <-logErrs:
@@ -404,12 +370,13 @@ func TestNewLogHandler(t *testing.T) {
 
 			for _, ch := range chans {
 				count := 0
-				for count < 3 {
+				for count < 4 {
 					select {
 					case <-timeoutCtx.Done():
 						t.Errorf("timeout context exceeded")
 						return
 					case out := <-ch:
+						log.Printf("log: %+v", out)
 						assert.True(t, (len(out.Log) > 0))
 						count++
 					}

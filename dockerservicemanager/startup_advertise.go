@@ -49,6 +49,9 @@ func getLeaderHostname() (string, error) {
 	}
 
 	for _, n := range nodes {
+		if n.Spec.Role == swarm.NodeRoleWorker {
+			continue
+		}
 		if n.ManagerStatus.Leader {
 			return n.Description.Hostname, nil
 		}

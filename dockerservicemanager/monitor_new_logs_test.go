@@ -19,7 +19,7 @@ import (
 
 var rethinkRegex = regexp.MustCompile(`rethinkdb`)
 
-func startContainers(ctx context.Context, number int) error {
+func startServices(ctx context.Context, number int) error {
 	dockerClient, err := client.NewEnvClient()
 	if err != nil {
 		panic(err)
@@ -42,50 +42,7 @@ func startContainers(ctx context.Context, number int) error {
 	return nil
 }
 
-func checkContainers(ctx context.Context, number int) (<-chan []types.ContainerJSON, <-chan error) {
-	ret := make(chan []types.ContainerJSON)
-	errs := make(chan error)
-	containerNames := make([]types.ContainerJSON, number+1)
-
-	dockerClient, err := client.NewEnvClient()
-	if err != nil {
-		panic(err)
-	}
-
-	go func() {
-		defer close(ret)
-		defer close(errs)
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-				break
-			}
-			cons, err := dockerClient.ContainerList(ctx, types.ContainerListOptions{})
-			if err != nil {
-				errs <- err
-				return
-			}
-			if len(cons) == number+1 {
-				for i := range containerNames {
-					con, err := dockerClient.ContainerInspect(ctx, cons[i].ID)
-					if err != nil {
-						errs <- err
-						return
-					}
-					containerNames[i] = con
-				}
-				ret <- containerNames
-				return
-			}
-			time.Sleep(1000 * time.Millisecond)
-		}
-	}()
-	return ret, errs
-}
-
-func Test_stackContainerIDs(t *testing.T) {
+func Test_stackServices(t *testing.T) {
 
 	tag := os.Getenv("TAG")
 	if tag == "" {
@@ -129,20 +86,20 @@ func Test_stackContainerIDs(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		run     func(context.Context) ([]types.ContainerJSON, error)
+		run     func(context.Context) ([]swarm.Service, error)
 		timeout time.Duration
 		wantErr bool
 	}{
 		{
 			name: "get nothing",
-			run: func(ctx context.Context) ([]types.ContainerJSON, error) {
-				res, errs := checkContainers(ctx, 0)
+			run: func(ctx context.Context) ([]swarm.Service, error) {
+				res, errs := checkServices(ctx, 0)
 
 				select {
 				case <-ctx.Done():
-					return []types.ContainerJSON{}, fmt.Errorf("timeout context exceeded")
+					return []swarm.Service{}, fmt.Errorf("timeout context exceeded")
 				case err = <-errs:
-					return []types.ContainerJSON{}, fmt.Errorf("%v", err)
+					return []swarm.Service{}, fmt.Errorf("%v", err)
 				case r := <-res:
 					return r, nil
 				}
@@ -150,21 +107,21 @@ func Test_stackContainerIDs(t *testing.T) {
 			timeout: 5 * time.Second,
 		},
 		{
-			name: "get one container ID",
-			run: func(ctx context.Context) ([]types.ContainerJSON, error) {
+			name: "get one service",
+			run: func(ctx context.Context) ([]swarm.Service, error) {
 
-				err := startContainers(ctx, 1)
+				err := startServices(ctx, 1)
 				if err != nil {
-					return []types.ContainerJSON{}, err
+					return []swarm.Service{}, err
 				}
 
-				res, errs := checkContainers(ctx, 1)
+				res, errs := checkServices(ctx, 1)
 
 				select {
 				case <-ctx.Done():
-					return []types.ContainerJSON{}, fmt.Errorf("timeout context exceeded")
+					return []swarm.Service{}, fmt.Errorf("timeout context exceeded")
 				case err = <-errs:
-					return []types.ContainerJSON{}, fmt.Errorf("%v", err)
+					return []swarm.Service{}, fmt.Errorf("%v", err)
 				case r := <-res:
 					return r, nil
 				}
@@ -172,21 +129,21 @@ func Test_stackContainerIDs(t *testing.T) {
 			timeout: 10 * time.Second,
 		},
 		{
-			name: "get several container IDs",
-			run: func(ctx context.Context) ([]types.ContainerJSON, error) {
+			name: "get several services",
+			run: func(ctx context.Context) ([]swarm.Service, error) {
 
-				err := startContainers(ctx, 3)
+				err := startServices(ctx, 3)
 				if err != nil {
-					return []types.ContainerJSON{}, err
+					return []swarm.Service{}, err
 				}
 
-				res, errs := checkContainers(ctx, 3)
+				res, errs := checkServices(ctx, 3)
 
 				select {
 				case <-ctx.Done():
-					return []types.ContainerJSON{}, fmt.Errorf("timeout context exceeded")
+					return []swarm.Service{}, fmt.Errorf("timeout context exceeded")
 				case err = <-errs:
-					return []types.ContainerJSON{}, fmt.Errorf("%v", err)
+					return []swarm.Service{}, fmt.Errorf("%v", err)
 				case r := <-res:
 					return r, nil
 				}
@@ -215,14 +172,13 @@ func Test_stackContainerIDs(t *testing.T) {
 				return
 			}
 
-			got, err := stackContainerIDs(ctx, dockerClient)
+			got, err := stackServices(ctx, dockerClient)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("stackContainerIDs() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("stackServices() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 
 			assert.Equal(t, len(names), len(got))
-			assert.Equal(t, names, got)
 		})
 	}
 	if err := test.DockerCleanUp(ctx, dockerClient, ""); err != nil {
@@ -275,24 +231,24 @@ func TestNewLogMonitor(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		run     func(context.Context) ([]types.ContainerJSON, error)
+		run     func(context.Context) ([]swarm.Service, error)
 		timeout time.Duration
 	}{
 		{
-			name: "test one container",
-			run: func(ctx context.Context) ([]types.ContainerJSON, error) {
-				err := startContainers(ctx, 1)
+			name: "test one service",
+			run: func(ctx context.Context) ([]swarm.Service, error) {
+				err := startServices(ctx, 1)
 				if err != nil {
-					return []types.ContainerJSON{}, err
+					return []swarm.Service{}, err
 				}
 
-				res, errs := checkContainers(ctx, 1)
+				res, errs := checkServices(ctx, 1)
 
 				select {
 				case <-ctx.Done():
-					return []types.ContainerJSON{}, fmt.Errorf("timeout context exceeded")
+					return []swarm.Service{}, fmt.Errorf("timeout context exceeded")
 				case err = <-errs:
-					return []types.ContainerJSON{}, fmt.Errorf("%v", err)
+					return []swarm.Service{}, fmt.Errorf("%v", err)
 				case r := <-res:
 					return r, nil
 				}
@@ -314,7 +270,7 @@ func TestNewLogMonitor(t *testing.T) {
 			defer cancel()
 			defer test.DockerCleanUp(ctx, dockerClient, "")
 
-			cons, errs := NewLogMonitor(timeoutCtx)
+			svcs, errs := NewLogMonitor(timeoutCtx)
 
 			res, err := tt.run(timeoutCtx)
 
@@ -326,10 +282,12 @@ func TestNewLogMonitor(t *testing.T) {
 				case e := <-errs:
 					t.Errorf("%v", e)
 					return
-				case c := <-cons:
-					if c.Name == res[0].Name {
-						assert.True(t, true)
-						return
+				case s := <-svcs:
+					for _, svc := range res {
+						if s.Spec.Annotations.Name == svc.Spec.Annotations.Name {
+							assert.True(t, true)
+							return
+						}
 					}
 				}
 			}

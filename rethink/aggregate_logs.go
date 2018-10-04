@@ -16,17 +16,17 @@ dbLogQuery
 	a query for the db logs table
 
 logSend
-takes: rethink connection, customtypes.ContainerLog
+takes: rethink connection, customtypes.Log
 returns: error
 	insert document into database
 
 AggregateLogs
-takes: context, <-chan <-chan customtypes.ContainerLog
+takes: context, <-chan <-chan customtypes.Log
 returns: <-chan error
 	make error chan
 	(goroutine)
 		defer close error chan
-		make <-chan customtypes.ContainerLog list
+		make <-chan customtypes.Log list
 		rethink SetTags("rethinkdb", "json")
 		connect to db
 		while forever
@@ -39,9 +39,9 @@ returns: <-chan error
 
 var dbLogQuery = r.DB("Brain").Table("Logs")
 
-func logSend(sess *r.Session, logEntry customtypes.ContainerLog) error {
+func logSend(sess *r.Session, logEntry customtypes.Log) error {
 
-	if logEntry == (customtypes.ContainerLog{}) {
+	if logEntry == (customtypes.Log{}) {
 		return nil
 	}
 
@@ -56,13 +56,13 @@ func logSend(sess *r.Session, logEntry customtypes.ContainerLog) error {
 // AggregateLogs takes a dynamic number of log
 // channels and aggregates the output to send to
 // the logs database.
-func AggregateLogs(ctx context.Context, logChans <-chan (<-chan customtypes.ContainerLog)) <-chan error {
+func AggregateLogs(ctx context.Context, logChans <-chan (<-chan customtypes.Log)) <-chan error {
 	errs := make(chan error)
 
 	go func() {
 		defer close(errs)
 
-		logSlice := []<-chan customtypes.ContainerLog{}
+		logSlice := []<-chan customtypes.Log{}
 
 		r.SetTags("json")
 

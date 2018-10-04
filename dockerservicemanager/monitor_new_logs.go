@@ -7,6 +7,7 @@ import (
 	"github.com/docker/docker/api/types"
 	events "github.com/docker/docker/api/types/events"
 	"github.com/docker/docker/api/types/filters"
+	swarm "github.com/docker/docker/api/types/swarm"
 	client "github.com/docker/docker/client"
 )
 
@@ -16,32 +17,25 @@ var stoppedRegex = regexp.MustCompile(`(stopped|dead)`)
 func newLogFilter() filters.Args {
 	// Filter plugin containers (start events)
 	logFilter := filters.NewArgs()
-	logFilter.Add("type", "container")
-	logFilter.Add("image", "ramrodpcp/interpreter-plugin")
-	logFilter.Add("image", "ramrodpcp/interpreter-plugin-extra")
-	logFilter.Add("image", "ramrodpcp/auxiliary-services")
-	logFilter.Add("image", "ramrodpcp/auxiliary-wrapper")
-	logFilter.Add("image", "ramrodpcp/database-brain")
-	logFilter.Add("image", "ramrodpcp/backend-controller")
-	logFilter.Add("image", "ramrodpcp/frontend-ui")
-	logFilter.Add("event", "start")
+	logFilter.Add("type", "service")
+	logFilter.Add("event", "create")
 
 	return logFilter
 }
 
-func stackContainerIDs(ctx context.Context, dockerClient *client.Client) ([]types.ContainerJSON, error) {
+func stackServices(ctx context.Context, dockerClient *client.Client) ([]swarm.Service, error) {
 
-	containers, err := dockerClient.ContainerList(ctx, types.ContainerListOptions{})
+	services, err := dockerClient.ServiceList(ctx, types.ServiceListOptions{})
 	if err != nil {
-		return []types.ContainerJSON{}, err
+		return []swarm.Service{}, err
 	}
 
-	ret := make([]types.ContainerJSON, len(containers))
+	ret := make([]swarm.Service, len(services))
 
-	for i, con := range containers {
-		insp, err := dockerClient.ContainerInspect(ctx, con.ID)
+	for i, svc := range services {
+		insp, _, err := dockerClient.ServiceInspectWithRaw(ctx, svc.ID)
 		if err != nil {
-			return []types.ContainerJSON{}, err
+			return []swarm.Service{}, err
 		}
 		ret[i] = insp
 	}
@@ -51,8 +45,8 @@ func stackContainerIDs(ctx context.Context, dockerClient *client.Client) ([]type
 
 // NewLogMonitor returns a channel of container objects
 // for new containers that start.
-func NewLogMonitor(ctx context.Context) (<-chan types.ContainerJSON, <-chan error) {
-	ret := make(chan types.ContainerJSON)
+func NewLogMonitor(ctx context.Context) (<-chan swarm.Service, <-chan error) {
+	ret := make(chan swarm.Service)
 	errs := make(chan error)
 
 	dockerClient, err := client.NewEnvClient()
@@ -63,7 +57,7 @@ func NewLogMonitor(ctx context.Context) (<-chan types.ContainerJSON, <-chan erro
 	// Filter plugin containers (start events)
 	logFilter := newLogFilter()
 
-	containerStart, errContainerStart := dockerClient.Events(ctx, types.EventsOptions{
+	svcStart, errSvcStart := dockerClient.Events(ctx, types.EventsOptions{
 		Filters: logFilter,
 	})
 
@@ -71,31 +65,31 @@ func NewLogMonitor(ctx context.Context) (<-chan types.ContainerJSON, <-chan erro
 		defer close(ret)
 		defer close(errs)
 		// Get initial containers in stack
-		stackContainers, err := stackContainerIDs(ctx, dockerClient)
+		stackSvcs, err := stackServices(ctx, dockerClient)
 		if err != nil {
 			panic(err)
 		}
 
-		for _, id := range stackContainers {
-			ret <- id
+		for _, svc := range stackSvcs {
+			ret <- svc
 		}
 
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case e := <-errContainerStart:
+			case e := <-errSvcStart:
 				errs <- e
 			case n := <-in:
-				con, err := dockerClient.ContainerInspect(ctx, n.ID)
+				svc, _, err := dockerClient.ServiceInspectWithRaw(ctx, n.Actor.ID)
 				if err != nil {
 					errs <- err
 					break
 				}
-				ret <- con
+				ret <- svc
 			}
 		}
-	}(containerStart)
+	}(svcStart)
 
-	return ret, errContainerStart
+	return ret, errSvcStart
 }
