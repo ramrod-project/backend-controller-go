@@ -10,39 +10,6 @@ import (
 	client "github.com/docker/docker/client"
 )
 
-/*
-Pseudocode:
-
-NewLogFilter
-filterArgs for: container start event of stack/plugin/aux images
-
-stackContainerIDs
-takes: nil
-returns: []string (list of stack container IDs)
-
-	query docker for list of services
-	filter by stack members (com.whatever.something.stackid)
-	return list of container IDs
-
-NewLogMonitor
-takes: context
-returns: <-chan string (container IDs), <-chan error
-
-	create channel for container IDs
-
-	(goroutine)
-		query docker for stack member logs
-		push out stack member container IDs over channel
-		get docker events channel (using NewLogFilter)
-		while forever
-			receive event
-			parse contianer ID
-			chan <- ID
-
-	return channel
-
-*/
-
 var imageRegex = regexp.MustCompile(`^ramrodpcp.*?`)
 var stoppedRegex = regexp.MustCompile(`(stopped|dead)`)
 

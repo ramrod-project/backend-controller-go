@@ -3,6 +3,7 @@ package rethink
 import (
 	"context"
 	"log"
+	"time"
 
 	"github.com/ramrod-project/backend-controller-go/customtypes"
 	r "gopkg.in/gorethink/gorethink.v4"
@@ -102,6 +103,7 @@ func AggregateLogs(ctx context.Context, logChans <-chan (<-chan customtypes.Cont
 					break
 				}
 			}
+			time.Sleep(100 * time.Millisecond)
 		}
 	}()
 
