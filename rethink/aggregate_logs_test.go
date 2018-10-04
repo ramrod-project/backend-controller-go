@@ -37,12 +37,12 @@ func Test_logSend(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		log     customtypes.ContainerLog
+		log     customtypes.Log
 		wantErr bool
 	}{
 		{
 			name: "test log 1",
-			log: customtypes.ContainerLog{
+			log: customtypes.Log{
 				ContainerID:   "284813vm8y13-13v8y9-713yv1",
 				ContainerName: "some-service-name.0whatever",
 				Log:           "[INFO] blahblahblahblhbq 39 4g0wo 43589pqhwpr8g4",
@@ -167,21 +167,21 @@ func TestAggregateLogs(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		run     func(context.Context, int) <-chan (<-chan customtypes.ContainerLog)
+		run     func(context.Context, int) <-chan (<-chan customtypes.Log)
 		n       int
 		timeout time.Duration
 		wait    func(context.Context, int) (<-chan struct{}, <-chan error)
 	}{
 		{
 			name: "test",
-			run: func(ctx context.Context, number int) <-chan (<-chan customtypes.ContainerLog) {
-				ret := make(chan (<-chan customtypes.ContainerLog))
+			run: func(ctx context.Context, number int) <-chan (<-chan customtypes.Log) {
+				ret := make(chan (<-chan customtypes.Log))
 
 				go func() {
 					i := 0
 					for i < number {
-						newChan := func() <-chan customtypes.ContainerLog {
-							c := make(chan customtypes.ContainerLog)
+						newChan := func() <-chan customtypes.Log {
+							c := make(chan customtypes.Log)
 							logs := []string{fmt.Sprintf("%vtest1", i), fmt.Sprintf("%vtest2", i), fmt.Sprintf("%vtest3", i)}
 							sName := fmt.Sprintf("TestService%v", i)
 							cName := sName + ".0.somerandomstring12345"
@@ -190,7 +190,7 @@ func TestAggregateLogs(t *testing.T) {
 							go func() {
 								defer close(c)
 								for _, log := range logs {
-									c <- customtypes.ContainerLog{
+									c <- customtypes.Log{
 										ContainerID:   cID,
 										ContainerName: cName,
 										Log:           log,

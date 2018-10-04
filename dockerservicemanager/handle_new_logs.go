@@ -4,55 +4,31 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"regexp"
-	"strings"
 	"time"
 
 	"github.com/docker/docker/api/types"
+	swarm "github.com/docker/docker/api/types/swarm"
 	"github.com/docker/docker/client"
 	"github.com/ramrod-project/backend-controller-go/customtypes"
 )
 
-func newContainerLogger(ctx context.Context, dockerClient *client.Client, con types.ContainerJSON) (<-chan customtypes.ContainerLog, <-chan error) {
-	logs := make(chan customtypes.ContainerLog)
+func newLogger(ctx context.Context, dockerClient *client.Client, svc swarm.Service) (<-chan customtypes.Log, <-chan error) {
+	logs := make(chan customtypes.Log)
 	errs := make(chan error)
 
 	go func() {
 		defer close(logs)
 		defer close(errs)
 
-		var svcName = ""
-
 		// Set vars because this container's info
 		// won't change throughout its lifespan
-		conID := con.ID
-		conName := strings.Split(con.Name, "/")[1]
+		svcID := svc.ID
+		svcName := svc.Spec.Annotations.Name
 
-		// Get the service that corresponds to this
-		// container (service will always match the
-		// string of the container name up until the
-		// first '.')
-		if conName == "aux-services" {
-			svcName = "AuxiliaryServices"
-		} else {
-			nameMatch := regexp.MustCompile(strings.Split(conName, ".")[0])
-			svcs, err := dockerClient.ServiceList(ctx, types.ServiceListOptions{})
-			if err != nil {
-				errs <- err
-				return
-			}
-			for _, svc := range svcs {
-				if nameMatch.Match([]byte(svc.Spec.Annotations.Name)) {
-					svcName = svc.Spec.Annotations.Name
-				}
-			}
-		}
-
-		logOut, err := dockerClient.ContainerAttach(ctx, conID, types.ContainerAttachOptions{
-			Stream: true,
-			Stderr: true,
-			Stdout: true,
-			Logs:   true,
+		logOut, err := dockerClient.ServiceLogs(ctx, svcID, types.ContainerLogsOptions{
+			ShowStdout: true,
+			ShowStderr: true,
+			Follow:     true,
 		})
 		defer logOut.Close()
 		if err != nil {
@@ -62,14 +38,14 @@ func newContainerLogger(ctx context.Context, dockerClient *client.Client, con ty
 
 		// Get weird docker log header
 		h := make([]byte, 8)
-		n, err := logOut.Reader.Read(h)
+		n, err := logOut.Read(h)
 		if err != nil {
 			errs <- err
 		} else if n == 0 {
 			errs <- fmt.Errorf("nothing read")
 		}
 
-		scanner := bufio.NewScanner(logOut.Reader)
+		scanner := bufio.NewScanner(logOut)
 
 		for {
 			select {
@@ -81,12 +57,10 @@ func newContainerLogger(ctx context.Context, dockerClient *client.Client, con ty
 
 			new := scanner.Scan()
 			if new {
-				logs <- customtypes.ContainerLog{
-					ContainerID:   conID,
-					ContainerName: conName,
-					Log:           scanner.Text(),
-					LogTimestamp:  float64(time.Now().Unix()) / 1000000000,
-					ServiceName:   svcName,
+				logs <- customtypes.Log{
+					Log:          scanner.Text(),
+					LogTimestamp: float64(time.Now().Unix()) / 1000000000,
+					ServiceName:  svcName,
 				}
 				continue
 			}
@@ -100,13 +74,13 @@ func newContainerLogger(ctx context.Context, dockerClient *client.Client, con ty
 
 // NewLogHandler takes the IDs from the log monitor
 // and opens log readers for their corresponding containers
-func NewLogHandler(ctx context.Context, newCons <-chan types.ContainerJSON) (<-chan (<-chan customtypes.ContainerLog), <-chan error) {
-	ret := make(chan (<-chan customtypes.ContainerLog))
+func NewLogHandler(ctx context.Context, newSvcs <-chan swarm.Service) (<-chan (<-chan customtypes.Log), <-chan error) {
+	ret := make(chan (<-chan customtypes.Log))
 	errChans := make(chan (<-chan error))
 	errs := make(chan error)
 
 	// Log routine creator
-	go func(in <-chan types.ContainerJSON) {
+	go func(in <-chan swarm.Service) {
 		defer close(ret)
 		dockerClient, err := client.NewEnvClient()
 		if err != nil {
@@ -125,12 +99,12 @@ func NewLogHandler(ctx context.Context, newCons <-chan types.ContainerJSON) (<-c
 					close(errs)
 					return
 				}
-				logger, errChan := newContainerLogger(ctx, dockerClient, con)
+				logger, errChan := newLogger(ctx, dockerClient, con)
 				errChans <- errChan
 				ret <- logger
 			}
 		}
-	}(newCons)
+	}(newSvcs)
 
 	// Error aggregator
 	go func(in <-chan (<-chan error)) {
