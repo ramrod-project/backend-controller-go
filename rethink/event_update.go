@@ -49,22 +49,22 @@ func handleContainer(event events.Message) (string, map[string]string, error) {
 	return "", update, fmt.Errorf("unhandled container event: %v", event.Action)
 }
 
-func handleWindowsService(event events.Message, update *map[string]string) error {
+func handleServiceAction(event events.Message, update *map[string]string) error {
 
-	if event.Action == "create" { // Special Windows case: Active
+	if event.Action == "create" { // case: Active
 		(*update)["DesiredState"] = ""
 		(*update)["ServiceID"] = event.Actor.ID
 		(*update)["State"] = "Active"
 		return nil
-	} else if event.Action == "remove" { // Special Windows case: Stopped
+	} else if event.Action == "remove" { // case: Stopped
 		(*update)["DesiredState"] = ""
 		(*update)["State"] = "Stopped"
 		return nil
-	} else if v, ok := event.Actor.Attributes["updatestate.new"]; ok && v == "updating" { // Special Windows case: Restarting
+	} else if v, ok := event.Actor.Attributes["updatestate.new"]; ok && v == "updating" { // case: Restarting
 		(*update)["DesiredState"] = ""
 		(*update)["State"] = "Restarting"
 		return nil
-	} else if v, ok := event.Actor.Attributes["updatestate.new"]; ok && v == "completed" { // Special Windows case: Restarted
+	} else if v, ok := event.Actor.Attributes["updatestate.new"]; ok && v == "completed" { // case: Restarted
 		(*update)["DesiredState"] = ""
 		(*update)["State"] = "Active"
 		return nil
@@ -91,24 +91,13 @@ func handleService(event events.Message) (string, map[string]string, error) {
 	}
 	serviceName = event.Actor.Attributes["name"]
 
-	cursor, err := r.DB("Controller").Table("Plugins").Filter(map[string]string{"ServiceName": serviceName, "ServiceID": event.Actor.ID}).Run(session)
+	cursor, err := r.DB("Controller").Table("Plugins").Filter(map[string]string{"ServiceName": serviceName}).Run(session)
 	if !cursor.Next(&doc) {
 		return "", update, fmt.Errorf("no plugin %v in database", serviceName)
 	}
 
-	if v, ok := doc["OS"]; ok && v.(string) == "nt" {
-		err := handleWindowsService(event, &update)
-		return serviceName, update, err
-	} else if !ok {
-		return "", update, fmt.Errorf("no service os in database")
-	}
-
-	if v, ok := event.Actor.Attributes["updatestate.new"]; ok && v == "updating" {
-		update["DesiredState"] = ""
-		update["State"] = "Restarting"
-		return serviceName, update, nil
-	}
-	return "", update, nil
+	err = handleServiceAction(event, &update)
+	return serviceName, update, err
 }
 
 // EventUpdate consumes the event channel from the docker
