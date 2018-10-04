@@ -78,14 +78,15 @@ func NewLogHandler(ctx context.Context, newSvcs <-chan swarm.Service) (<-chan (<
 	ret := make(chan (<-chan customtypes.Log))
 	errChans := make(chan (<-chan error))
 	errs := make(chan error)
+	logErrs := make(chan error)
 
 	// Log routine creator
 	go func(in <-chan swarm.Service) {
 		defer close(ret)
+		defer close(logErrs)
 		dockerClient, err := client.NewEnvClient()
 		if err != nil {
-			errs <- err
-			close(errs)
+			logErrs <- err
 			return
 		}
 
@@ -95,8 +96,7 @@ func NewLogHandler(ctx context.Context, newSvcs <-chan swarm.Service) (<-chan (<
 				return
 			case con, ok := <-in:
 				if !ok {
-					errs <- err
-					close(errs)
+					logErrs <- err
 					return
 				}
 				logger, errChan := newLogger(ctx, dockerClient, con)
@@ -110,7 +110,7 @@ func NewLogHandler(ctx context.Context, newSvcs <-chan swarm.Service) (<-chan (<
 	go func(in <-chan (<-chan error)) {
 		defer close(errs)
 
-		chans := []<-chan error{}
+		chans := []<-chan error{logErrs}
 
 		for {
 

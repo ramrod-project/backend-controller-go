@@ -309,7 +309,6 @@ func TestNewLogHandler(t *testing.T) {
 					}
 					brainServiceID = brainID
 
-					services := make([]swarm.Service, number)
 					for i := 0; i < number; i++ {
 						newPluginSpec.Annotations.Name = newPluginSpec.Annotations.Name + strconv.Itoa(i)
 						newPluginSpec.EndpointSpec.Ports[0].PublishedPort++
@@ -318,17 +317,13 @@ func TestNewLogHandler(t *testing.T) {
 							errs <- err
 							return
 						}
+						time.Sleep(500 * time.Millisecond)
 						insp, _, err := dockerClient.ServiceInspectWithRaw(ctx, svc.ID)
 						if err != nil {
 							errs <- err
 							return
 						}
-						services[i] = insp
-						time.Sleep(500 * time.Millisecond)
-					}
-
-					for _, svc := range services {
-						ret <- svc
+						ret <- insp
 					}
 				}()
 				return ret, errs
@@ -356,7 +351,10 @@ func TestNewLogHandler(t *testing.T) {
 				case <-timeoutCtx.Done():
 					t.Errorf("timeout context exceeded")
 					return
-				case e := <-feedErrs:
+				case e, ok := <-feedErrs:
+					if !ok {
+						break
+					}
 					t.Errorf("%v", e)
 					return
 				case e := <-logErrs:
@@ -372,12 +370,13 @@ func TestNewLogHandler(t *testing.T) {
 
 			for _, ch := range chans {
 				count := 0
-				for count < 3 {
+				for count < 4 {
 					select {
 					case <-timeoutCtx.Done():
 						t.Errorf("timeout context exceeded")
 						return
 					case out := <-ch:
+						log.Printf("log: %+v", out)
 						assert.True(t, (len(out.Log) > 0))
 						count++
 					}
