@@ -15,6 +15,17 @@ import (
 	r "gopkg.in/gorethink/gorethink.v4"
 )
 
+func sliceEqual(slice1 *[]string, slice2 *[]string) bool {
+	for _, e := range *slice1 {
+		for _, a := range *slice2 {
+			if a == e {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func TestUpdatePluginService(t *testing.T) {
 	env := os.Getenv("STAGE")
 	os.Setenv("STAGE", "TESTING")
@@ -40,6 +51,7 @@ func TestUpdatePluginService(t *testing.T) {
 	// Set up clean environment
 	if err := test.DockerCleanUp(ctx, dockerClient, ""); err != nil {
 		t.Errorf("setup error: %v", err)
+		return
 	}
 
 	session, brainID, err := test.StartBrain(ctx, t, dockerClient, test.BrainSpec)
@@ -79,6 +91,7 @@ func TestUpdatePluginService(t *testing.T) {
 					"LOGLEVEL=DEBUG",
 					"PORT=666",
 					"PLUGIN=Harness",
+					"RETHINK_HOST=" + GetManagerIP(),
 				},
 				Healthcheck: &container.HealthConfig{
 					Interval: time.Second,
@@ -110,7 +123,56 @@ func TestUpdatePluginService(t *testing.T) {
 				Protocol:      swarm.PortConfigProtocolTCP,
 				TargetPort:    666,
 				PublishedPort: 666,
-				PublishMode:   swarm.PortConfigPublishModeIngress,
+				PublishMode:   swarm.PortConfigPublishModeHost,
+			}},
+		},
+	}
+
+	serviceExtraSpec := &swarm.ServiceSpec{
+		Annotations: swarm.Annotations{
+			Name: "GoodServiceExtra",
+		},
+		TaskTemplate: swarm.TaskSpec{
+			ContainerSpec: swarm.ContainerSpec{
+				DNSConfig: &swarm.DNSConfig{},
+				Env: []string{
+					"STAGE=DEV",
+					"LOGLEVEL=DEBUG",
+					"PORT=667",
+					"PLUGIN=Harness",
+					"RETHINK_HOST=" + GetManagerIP(),
+				},
+				Healthcheck: &container.HealthConfig{
+					Interval: time.Second,
+					Timeout:  time.Second * 3,
+					Retries:  3,
+				},
+				Image:           "ramrodpcp/interpreter-plugin-extra:" + tag,
+				StopGracePeriod: &second,
+			},
+			RestartPolicy: &swarm.RestartPolicy{
+				Condition:   "on-failure",
+				MaxAttempts: &maxAttempts,
+			},
+			Placement: placementConfig,
+			Networks: []swarm.NetworkAttachmentConfig{
+				swarm.NetworkAttachmentConfig{
+					Target: "test_update",
+				},
+			},
+		},
+		Mode: swarm.ServiceMode{
+			Replicated: &swarm.ReplicatedService{
+				Replicas: &replicas,
+			},
+		},
+		EndpointSpec: &swarm.EndpointSpec{
+			Mode: swarm.ResolutionModeVIP,
+			Ports: []swarm.PortConfig{swarm.PortConfig{
+				Protocol:      swarm.PortConfigProtocolUDP,
+				TargetPort:    667,
+				PublishedPort: 667,
+				PublishMode:   swarm.PortConfigPublishModeHost,
 			}},
 		},
 	}
@@ -121,6 +183,13 @@ func TestUpdatePluginService(t *testing.T) {
 		return
 	}
 	id := resp.ID
+
+	respExtra, err := dockerClient.ServiceCreate(ctx, *serviceExtraSpec, types.ServiceCreateOptions{})
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+	extraID := respExtra.ID
 
 	type args struct {
 		config *PluginServiceConfig
@@ -140,9 +209,10 @@ func TestUpdatePluginService(t *testing.T) {
 					Environment: []string{
 						"STAGE=DEV",
 						"LOGLEVEL=DEBUG",
-						"PORT=5000",
+						"PORT=666",
 						"PLUGIN=Harness",
 						"TEST=TEST",
+						"PLUGIN_NAME=GoodService",
 					},
 					Network: "test_update",
 					OS:      "posix",
@@ -150,12 +220,117 @@ func TestUpdatePluginService(t *testing.T) {
 						Protocol:      swarm.PortConfigProtocolTCP,
 						TargetPort:    666,
 						PublishedPort: 666,
-						PublishMode:   swarm.PortConfigPublishModeIngress,
+						PublishMode:   swarm.PortConfigPublishModeHost,
 					}},
 					ServiceName: "GoodService",
 					Address:     GetManagerIP(),
 				},
 				id: id,
+			},
+			inspectRes: swarm.Service{
+				Spec: swarm.ServiceSpec{
+					Annotations: swarm.Annotations{
+						Name: "GoodService",
+					},
+					TaskTemplate: swarm.TaskSpec{
+						ContainerSpec: swarm.ContainerSpec{
+							Image: "ramrodpcp/interpreter-plugin:" + getTagFromEnv(),
+							Env: []string{
+								"STAGE=DEV",
+								"LOGLEVEL=DEBUG",
+								"PORT=666",
+								"PLUGIN=Harness",
+								"PLUGIN_NAME=GoodService",
+								"RETHINK_HOST=" + GetManagerIP(),
+								"TEST=TEST",
+							},
+						},
+						Networks: []swarm.NetworkAttachmentConfig{
+							swarm.NetworkAttachmentConfig{
+								Target: netID,
+							},
+						},
+					},
+					EndpointSpec: &swarm.EndpointSpec{
+						Mode: swarm.ResolutionModeVIP,
+						Ports: []swarm.PortConfig{
+							swarm.PortConfig{
+								Protocol:      swarm.PortConfigProtocolTCP,
+								TargetPort:    uint32(666),
+								PublishedPort: uint32(666),
+								PublishMode:   swarm.PortConfigPublishModeHost,
+							},
+						},
+					},
+				},
+			},
+			want: types.ServiceUpdateResponse{
+				Warnings: nil,
+			},
+			wantErr: false,
+		},
+		{
+			name: "Valid service update (extra)",
+			args: args{
+				config: &PluginServiceConfig{
+					Environment: []string{
+						"STAGE=DEV",
+						"LOGLEVEL=DEBUG",
+						"PORT=667",
+						"PLUGIN=Harness",
+						"PLUGIN_NAME=GoodServiceExtra",
+						"TEST=TEST",
+					},
+					Network: "test_update",
+					OS:      "posix",
+					Ports: []swarm.PortConfig{swarm.PortConfig{
+						Protocol:      swarm.PortConfigProtocolUDP,
+						TargetPort:    667,
+						PublishedPort: 667,
+						PublishMode:   swarm.PortConfigPublishModeHost,
+					}},
+					ServiceName: "GoodServiceExtra",
+					Address:     GetManagerIP(),
+					Extra:       true,
+				},
+				id: extraID,
+			},
+			inspectRes: swarm.Service{
+				Spec: swarm.ServiceSpec{
+					Annotations: swarm.Annotations{
+						Name: "GoodServiceExtra",
+					},
+					TaskTemplate: swarm.TaskSpec{
+						ContainerSpec: swarm.ContainerSpec{
+							Image: "ramrodpcp/interpreter-plugin-extra:" + getTagFromEnv(),
+							Env: []string{
+								"STAGE=DEV",
+								"LOGLEVEL=DEBUG",
+								"PORT=667",
+								"PLUGIN=Harness",
+								"PLUGIN_NAME=GoodServiceExtra",
+								"RETHINK_HOST=" + GetManagerIP(),
+								"TEST=TEST",
+							},
+						},
+						Networks: []swarm.NetworkAttachmentConfig{
+							swarm.NetworkAttachmentConfig{
+								Target: netID,
+							},
+						},
+					},
+					EndpointSpec: &swarm.EndpointSpec{
+						Mode: swarm.ResolutionModeVIP,
+						Ports: []swarm.PortConfig{
+							swarm.PortConfig{
+								Protocol:      swarm.PortConfigProtocolUDP,
+								TargetPort:    uint32(667),
+								PublishedPort: uint32(667),
+								PublishMode:   swarm.PortConfigPublishModeHost,
+							},
+						},
+					},
+				},
 			},
 			want: types.ServiceUpdateResponse{
 				Warnings: nil,
@@ -231,14 +406,57 @@ func TestUpdatePluginService(t *testing.T) {
 			} else if tt.wantErr {
 				return
 			}
-			_, _, err = dockerClient.ServiceInspectWithRaw(ctx, tt.args.id)
-			if err != nil {
+
+			assert.Equal(t, tt.want, got)
+
+			timeoutCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+			defer cancel()
+
+			res, errs := func(checkID string) (<-chan swarm.Service, <-chan error) {
+				ret := make(chan swarm.Service)
+				errs := make(chan error)
+				go func() {
+					defer close(ret)
+					defer close(errs)
+					for {
+						select {
+						case <-timeoutCtx.Done():
+							return
+						default:
+							break
+						}
+						insp, _, err := dockerClient.ServiceInspectWithRaw(ctx, checkID)
+						if err != nil {
+							errs <- err
+							return
+						}
+						if *insp.Spec.Mode.Replicated.Replicas > 0 {
+							ret <- insp
+							return
+						}
+						time.Sleep(1000 * time.Millisecond)
+					}
+				}()
+				return ret, errs
+			}(tt.args.id)
+
+			result := swarm.Service{}
+			select {
+			case <-timeoutCtx.Done():
+				t.Errorf("timeout context exceeded")
+				return
+			case <-errs:
 				t.Errorf("%v", err)
 				return
-			} else {
-				time.Sleep(time.Second)
+			case r := <-res:
+				result = r
 			}
-			assert.Equal(t, tt.want, got)
+
+			assert.Equal(t, tt.inspectRes.Spec.Annotations.Name, result.Spec.Annotations.Name)
+			assert.Equal(t, tt.inspectRes.Spec.TaskTemplate.ContainerSpec.Image, result.Spec.TaskTemplate.ContainerSpec.Image)
+			assert.True(t, sliceEqual(&tt.inspectRes.Spec.TaskTemplate.ContainerSpec.Env, &result.Spec.TaskTemplate.ContainerSpec.Env))
+			assert.Equal(t, tt.inspectRes.Spec.TaskTemplate.Networks[0].Target, result.Spec.TaskTemplate.Networks[0].Target)
+			assert.Equal(t, tt.inspectRes.Spec.EndpointSpec, result.Spec.EndpointSpec)
 		})
 	}
 

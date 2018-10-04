@@ -43,6 +43,7 @@ func pluginToConfig(plugin rethink.Plugin) (PluginServiceConfig, error) {
 		proto       swarm.PortConfigProtocol
 		mode        swarm.PortConfigPublishMode
 		environment []string
+		extra       = false
 	)
 
 	mode = swarm.PortConfigPublishModeHost
@@ -55,6 +56,10 @@ func pluginToConfig(plugin rethink.Plugin) (PluginServiceConfig, error) {
 	extPort, err := strconv.ParseUint(strings.Split(plugin.ExternalPorts[0], "/")[0], 10, 32)
 	if err != nil {
 		return PluginServiceConfig{}, fmt.Errorf("Unable to parse port %v", plugin.ExternalPorts[0])
+	}
+
+	if plugin.Extra {
+		extra = true
 	}
 
 	// Parse to check protocol
@@ -77,6 +82,7 @@ func pluginToConfig(plugin rethink.Plugin) (PluginServiceConfig, error) {
 	}
 
 	return PluginServiceConfig{
+		Extra:       extra,
 		Environment: environment,
 		Address:     plugin.Address,
 		Network:     "pcp",

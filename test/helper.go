@@ -16,6 +16,45 @@ import (
 	r "gopkg.in/gorethink/gorethink.v4"
 )
 
+var GenericPluginConfig = swarm.ServiceSpec{
+	Annotations: swarm.Annotations{
+		Name: "Harness-5000tcp",
+		Labels: map[string]string{
+			"os": "posix",
+		},
+	},
+	TaskTemplate: swarm.TaskSpec{
+		ContainerSpec: swarm.ContainerSpec{
+			Env: []string{
+				"PLUGIN=Harness",
+				"PORT=5000",
+				"LOGLEVEL=DEBUG",
+				"STAGE=DEV",
+				"PLUGIN_NAME=Harness-5000tcp",
+			},
+			Image: "ramrodpcp/interpreter-plugin:" + getTagFromEnv(),
+		},
+		RestartPolicy: &swarm.RestartPolicy{
+			Condition: "on-failure",
+		},
+	},
+	UpdateConfig: &swarm.UpdateConfig{
+		Parallelism: 0,
+		Delay:       0,
+	},
+	EndpointSpec: &swarm.EndpointSpec{
+		Mode: swarm.ResolutionModeVIP,
+		Ports: []swarm.PortConfig{
+			swarm.PortConfig{
+				Protocol:      swarm.PortConfigProtocolTCP,
+				PublishedPort: 5000,
+				TargetPort:    5000,
+				PublishMode:   swarm.PortConfigPublishModeHost,
+			},
+		},
+	},
+}
+
 func getTagFromEnv() string {
 	temp := os.Getenv("TAG")
 	if temp == "" {

@@ -19,7 +19,7 @@ var harnessConfig = PluginServiceConfig{
 		getEnvByKey("LOGLEVEL"),
 		envString("PORT", "5000"),
 		envString("PLUGIN", "Harness"),
-		envString("PLUGIN_NAME", "Harness-5000"),
+		envString("PLUGIN_NAME", "Harness-5000tcp"),
 	},
 	Address: GetManagerIP(),
 	Network: "pcp",
@@ -32,7 +32,7 @@ var harnessConfig = PluginServiceConfig{
 			PublishMode:   swarm.PortConfigPublishModeIngress,
 		},
 	},
-	ServiceName: "Harness-5000",
+	ServiceName: "Harness-5000tcp",
 }
 
 var auxConfig = PluginServiceConfig{

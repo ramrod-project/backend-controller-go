@@ -22,7 +22,7 @@ import (
 
 var testPluginService = swarm.ServiceSpec{
 	Annotations: swarm.Annotations{
-		Name: "TestService",
+		Name: "Harness-1080tcp",
 		Labels: map[string]string{
 			"os": "posix",
 		},
@@ -34,6 +34,7 @@ var testPluginService = swarm.ServiceSpec{
 				"PORT=1080",
 				"LOGLEVEL=DEBUG",
 				"STAGE=DEV",
+				"PLUGIN_NAME=Harness-1080tcp",
 			},
 			Image: "ramrodpcp/interpreter-plugin:" + getTagFromEnv(),
 		},
@@ -57,6 +58,7 @@ var testPluginService = swarm.ServiceSpec{
 				Protocol:      swarm.PortConfigProtocolTCP,
 				PublishedPort: 1080,
 				TargetPort:    1080,
+				PublishMode:   swarm.PortConfigPublishModeHost,
 			},
 		},
 	},
@@ -64,7 +66,7 @@ var testPluginService = swarm.ServiceSpec{
 
 var testPluginServiceWin = swarm.ServiceSpec{
 	Annotations: swarm.Annotations{
-		Name: "TestServiceWin",
+		Name: "Harness-2080tcp",
 		Labels: map[string]string{
 			"os": "nt",
 		},
@@ -76,6 +78,7 @@ var testPluginServiceWin = swarm.ServiceSpec{
 				"PORT=2080",
 				"LOGLEVEL=DEBUG",
 				"STAGE=DEV",
+				"PLUGIN_NAME=Harness-2080tcp",
 			},
 			Image: "ramrodpcp/interpreter-plugin:" + getTagFromEnv(),
 		},
@@ -99,6 +102,51 @@ var testPluginServiceWin = swarm.ServiceSpec{
 				Protocol:      swarm.PortConfigProtocolTCP,
 				PublishedPort: 2080,
 				TargetPort:    2080,
+				PublishMode:   swarm.PortConfigPublishModeHost,
+			},
+		},
+	},
+}
+
+var testPluginServiceExtra = swarm.ServiceSpec{
+	Annotations: swarm.Annotations{
+		Name: "Harness-3080udp",
+		Labels: map[string]string{
+			"os": "posix",
+		},
+	},
+	TaskTemplate: swarm.TaskSpec{
+		ContainerSpec: swarm.ContainerSpec{
+			Env: []string{
+				"PLUGIN=Harness",
+				"PORT=3080",
+				"LOGLEVEL=DEBUG",
+				"STAGE=DEV",
+				"PLUGIN_NAME=Harness-3080udp",
+			},
+			Image: "ramrodpcp/interpreter-plugin-extra:" + getTagFromEnv(),
+		},
+		RestartPolicy: &swarm.RestartPolicy{
+			Condition: "on-failure",
+		},
+		Networks: []swarm.NetworkAttachmentConfig{
+			swarm.NetworkAttachmentConfig{
+				Target: "pcp",
+			},
+		},
+	},
+	UpdateConfig: &swarm.UpdateConfig{
+		Parallelism: 0,
+		Delay:       0,
+	},
+	EndpointSpec: &swarm.EndpointSpec{
+		Mode: swarm.ResolutionModeVIP,
+		Ports: []swarm.PortConfig{
+			swarm.PortConfig{
+				Protocol:      swarm.PortConfigProtocolUDP,
+				PublishedPort: 3080,
+				TargetPort:    3080,
+				PublishMode:   swarm.PortConfigPublishModeHost,
 			},
 		},
 	},
@@ -232,9 +280,9 @@ func TestEventUpdate(t *testing.T) {
 	}
 
 	_, err = r.DB("Controller").Table("Plugins").Insert(map[string]interface{}{
-		"Name":          "TestPlugin",
+		"Name":          "Harness",
 		"ServiceID":     "",
-		"ServiceName":   "TestService",
+		"ServiceName":   "Harness-1080tcp",
 		"DesiredState":  "Activate",
 		"State":         "Available",
 		"Interface":     "192.168.1.1",
@@ -248,15 +296,32 @@ func TestEventUpdate(t *testing.T) {
 	}
 
 	_, err = r.DB("Controller").Table("Plugins").Insert(map[string]interface{}{
-		"Name":          "TestPluginWin",
+		"Name":          "Harness",
 		"ServiceID":     "",
-		"ServiceName":   "TestServiceWin",
+		"ServiceName":   "Harness-2080tcp",
 		"DesiredState":  "Activate",
 		"State":         "Available",
 		"Interface":     "192.168.1.2",
 		"ExternalPorts": []string{"2080/tcp"},
 		"InternalPorts": []string{"2080/tcp"},
 		"OS":            string(PluginOSWindows),
+	}).RunWrite(session)
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+
+	_, err = r.DB("Controller").Table("Plugins").Insert(map[string]interface{}{
+		"Name":          "Harness",
+		"ServiceID":     "",
+		"ServiceName":   "Harness-3080udp",
+		"DesiredState":  "Activate",
+		"State":         "Available",
+		"Interface":     "192.168.1.2",
+		"ExternalPorts": []string{"3080/udp"},
+		"InternalPorts": []string{"3080/udp"},
+		"OS":            string(PluginOSPosix),
+		"Extra":         true,
 	}).RunWrite(session)
 	if err != nil {
 		t.Errorf("%v", err)
@@ -303,7 +368,7 @@ func TestEventUpdate(t *testing.T) {
 							return false
 						}
 						if v, ok := e.Actor.Attributes["com.docker.swarm.service.name"]; ok {
-							if v != "TestService" {
+							if v != "Harness-1080tcp" {
 								return false
 							}
 						} else {
@@ -322,7 +387,110 @@ func TestEventUpdate(t *testing.T) {
 						} else {
 							c = v.(map[string]interface{})
 						}
-						if c["ServiceName"].(string) != "TestService" {
+						if c["ServiceName"].(string) != "Harness-1080tcp" {
+							return false
+						}
+						if c["DesiredState"].(string) != "" {
+							return false
+						}
+						if c["State"].(string) != "Active" {
+							return false
+						}
+						if c["ServiceID"].(string) == "" {
+							return false
+						}
+						return true
+					},
+				}, dbMonitor)
+
+				defer cancel()
+
+				// for loop that iterates until context <-Done()
+				// once <-Done() then get return from all goroutines
+			L:
+				for {
+					select {
+					case <-timeoutCtx.Done():
+						break L
+					case v := <-startDocker:
+						if v {
+							log.Printf("Setting startedService to %v", v)
+							startedService = v
+						}
+					case v := <-startDB:
+						if v {
+							log.Printf("Setting dbUpdated to %v", v)
+							dbUpdated = v
+						}
+					default:
+						break
+					}
+					if startedService && dbUpdated {
+						break L
+					}
+					time.Sleep(100 * time.Millisecond)
+				}
+
+				if !startedService {
+					t.Errorf("Service start not detected in Docker")
+				}
+				if !dbUpdated {
+					t.Errorf("DB not updated with service start info.")
+				}
+
+				return startedService && dbUpdated
+			},
+			timeout: 30 * time.Second,
+		},
+		{
+			name: "service start extra",
+			run: func(t *testing.T) bool {
+				_, err = test.StartIntegrationTestService(ctx, dockerClient, testPluginServiceExtra)
+				if err != nil {
+					t.Errorf("%v", err)
+					return false
+				}
+				return true
+			},
+			wait: func(t *testing.T, timeout time.Duration) bool {
+				var (
+					startedService = false
+					dbUpdated      = false
+				)
+
+				// Initialize parent context (with timeout)
+				timeoutCtx, cancel := context.WithTimeout(context.Background(), timeout)
+
+				startDocker := helper.TimeoutTester(timeoutCtx, []interface{}{
+					timeoutCtx,
+					func(e events.Message) bool {
+						if e.Type != "container" {
+							return false
+						}
+						if e.Action != "health_status: healthy" && e.Status != "health_status: healthy" {
+							return false
+						}
+						if v, ok := e.Actor.Attributes["com.docker.swarm.service.name"]; ok {
+							if v != "Harness-3080udp" {
+								return false
+							}
+						} else {
+							return false
+						}
+						return true
+					},
+				}, dockerMonitor)
+
+				startDB := helper.TimeoutTester(timeoutCtx, []interface{}{
+					timeoutCtx,
+					func(d map[string]interface{}) bool {
+						var c map[string]interface{}
+						if v, ok := d["new_val"]; !ok {
+							return false
+						} else {
+							c = v.(map[string]interface{})
+						}
+						if c["ServiceName"].(string) != "Harness-3080udp" {
 							return false
 						}
 						if c["DesiredState"].(string) != "" {
@@ -418,7 +586,7 @@ func TestEventUpdate(t *testing.T) {
 							return false
 						}
 						if v, ok := e.Actor.Attributes["name"]; ok {
-							if v != "TestService" {
+							if v != "Harness-1080tcp" {
 								return false
 							}
 						} else {
@@ -444,7 +612,7 @@ func TestEventUpdate(t *testing.T) {
 						} else {
 							c = v.(map[string]interface{})
 						}
-						if c["ServiceName"].(string) != "TestService" {
+						if c["ServiceName"].(string) != "Harness-1080tcp" {
 							return false
 						}
 						if c["DesiredState"].(string) != "" {
@@ -483,7 +651,7 @@ func TestEventUpdate(t *testing.T) {
 										return false
 									}
 									if v, ok := e.Actor.Attributes["com.docker.swarm.service.name"]; ok {
-										if v != "TestService" {
+										if v != "Harness-1080tcp" {
 											return false
 										}
 									} else {
@@ -506,7 +674,7 @@ func TestEventUpdate(t *testing.T) {
 									} else {
 										c = v.(map[string]interface{})
 									}
-									if c["ServiceName"].(string) != "TestService" {
+									if c["ServiceName"].(string) != "Harness-1080tcp" {
 										return false
 									}
 									if c["DesiredState"].(string) != "" {
@@ -587,7 +755,7 @@ func TestEventUpdate(t *testing.T) {
 							return false
 						}
 						if v, ok := e.Actor.Attributes["com.docker.swarm.service.name"]; ok {
-							if v != "TestService" {
+							if v != "Harness-1080tcp" {
 								return false
 							}
 						} else {
@@ -606,7 +774,7 @@ func TestEventUpdate(t *testing.T) {
 						} else {
 							c = v.(map[string]interface{})
 						}
-						if c["ServiceName"].(string) != "TestService" {
+						if c["ServiceName"].(string) != "Harness-1080tcp" {
 							return false
 						}
 						if c["DesiredState"].(string) != "" {
@@ -690,7 +858,7 @@ func TestEventUpdate(t *testing.T) {
 							return false
 						}
 						if v, ok := e.Actor.Attributes["name"]; ok {
-							if v != "TestServiceWin" {
+							if v != "Harness-2080tcp" {
 								return false
 							}
 						} else {
@@ -709,7 +877,7 @@ func TestEventUpdate(t *testing.T) {
 						} else {
 							c = v.(map[string]interface{})
 						}
-						if c["ServiceName"].(string) != "TestServiceWin" {
+						if c["ServiceName"].(string) != "Harness-2080tcp" {
 							return false
 						}
 						if c["DesiredState"].(string) != "" {
@@ -805,7 +973,7 @@ func TestEventUpdate(t *testing.T) {
 							return false
 						}
 						if v, ok := e.Actor.Attributes["name"]; ok {
-							if v != "TestServiceWin" {
+							if v != "Harness-2080tcp" {
 								return false
 							}
 						} else {
@@ -831,7 +999,7 @@ func TestEventUpdate(t *testing.T) {
 						} else {
 							c = v.(map[string]interface{})
 						}
-						if c["ServiceName"].(string) != "TestServiceWin" {
+						if c["ServiceName"].(string) != "Harness-2080tcp" {
 							return false
 						}
 						if c["DesiredState"].(string) != "" {
@@ -870,7 +1038,7 @@ func TestEventUpdate(t *testing.T) {
 										return false
 									}
 									if v, ok := e.Actor.Attributes["name"]; ok {
-										if v != "TestServiceWin" {
+										if v != "Harness-2080tcp" {
 											return false
 										}
 									} else {
@@ -900,7 +1068,7 @@ func TestEventUpdate(t *testing.T) {
 									} else {
 										c = v.(map[string]interface{})
 									}
-									if c["ServiceName"].(string) != "TestServiceWin" {
+									if c["ServiceName"].(string) != "Harness-2080tcp" {
 										return false
 									}
 									if c["DesiredState"].(string) != "" {
@@ -981,7 +1149,7 @@ func TestEventUpdate(t *testing.T) {
 							return false
 						}
 						if v, ok := e.Actor.Attributes["name"]; ok {
-							if v != "TestServiceWin" {
+							if v != "Harness-2080tcp" {
 								return false
 							}
 						} else {
@@ -1000,7 +1168,7 @@ func TestEventUpdate(t *testing.T) {
 						} else {
 							c = v.(map[string]interface{})
 						}
-						if c["ServiceName"].(string) != "TestServiceWin" {
+						if c["ServiceName"].(string) != "Harness-2080tcp" {
 							return false
 						}
 						if c["DesiredState"].(string) != "" {
