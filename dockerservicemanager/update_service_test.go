@@ -51,6 +51,7 @@ func TestUpdatePluginService(t *testing.T) {
 	// Set up clean environment
 	if err := test.DockerCleanUp(ctx, dockerClient, ""); err != nil {
 		t.Errorf("setup error: %v", err)
+		return
 	}
 
 	session, brainID, err := test.StartBrain(ctx, t, dockerClient, test.BrainSpec)

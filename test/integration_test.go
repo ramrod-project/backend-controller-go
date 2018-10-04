@@ -285,6 +285,8 @@ func Test_Integration(t *testing.T) {
 						changes := make(chan map[string]interface{})
 						errs := make(chan error)
 						go func() {
+							defer close(changes)
+							defer close(errs)
 							cursor, err := r.DB("Controller").Table("Ports").Run(s)
 							if err != nil {
 								log.Println(fmt.Errorf("%v", err))
@@ -292,6 +294,12 @@ func Test_Integration(t *testing.T) {
 							}
 							var doc map[string]interface{}
 							for cursor.Next(&doc) {
+								select {
+								case <-cntxt.Done():
+									return
+								default:
+									break
+								}
 								changes <- doc
 							}
 						}()
@@ -377,6 +385,8 @@ func Test_Integration(t *testing.T) {
 						changes := make(chan map[string]interface{})
 						errs := make(chan error)
 						go func() {
+							defer close(changes)
+							defer close(errs)
 							cursor, err := r.DB("Controller").Table("Plugins").Run(s)
 							if err != nil {
 								log.Println(fmt.Errorf("%v", err))
@@ -384,6 +394,12 @@ func Test_Integration(t *testing.T) {
 							}
 							var doc map[string]interface{}
 							for cursor.Next(&doc) {
+								select {
+								case <-cntxt.Done():
+									return
+								default:
+									break
+								}
 								changes <- doc
 							}
 						}()
@@ -547,6 +563,8 @@ func Test_Integration(t *testing.T) {
 						changes := make(chan map[string]interface{})
 						errs := make(chan error)
 						go func() {
+							defer close(changes)
+							defer close(errs)
 							cursor, err := r.DB("Controller").Table("Plugins").Changes().Run(s)
 							if err != nil {
 								log.Println(fmt.Errorf("%v", err))
@@ -554,6 +572,12 @@ func Test_Integration(t *testing.T) {
 							}
 							var doc map[string]interface{}
 							for cursor.Next(&doc) {
+								select {
+								case <-cntxt.Done():
+									return
+								default:
+									break
+								}
 								changes <- doc
 							}
 						}()
@@ -598,6 +622,8 @@ func Test_Integration(t *testing.T) {
 						changes := make(chan map[string]interface{})
 						errs := make(chan error)
 						go func() {
+							defer close(changes)
+							defer close(errs)
 							cursor, err := r.DB("Controller").Table("Ports").Changes().Run(s)
 							if err != nil {
 								log.Println(fmt.Errorf("%v", err))
@@ -605,6 +631,12 @@ func Test_Integration(t *testing.T) {
 							}
 							var doc map[string]interface{}
 							for cursor.Next(&doc) {
+								select {
+								case <-cntxt.Done():
+									return
+								default:
+									break
+								}
 								changes <- doc
 							}
 						}()
@@ -827,6 +859,8 @@ func Test_Integration(t *testing.T) {
 						changes := make(chan map[string]interface{})
 						errs := make(chan error)
 						go func() {
+							defer close(changes)
+							defer close(errs)
 							cursor, err := r.DB("Controller").Table("Plugins").Changes().Run(s)
 							if err != nil {
 								log.Println(fmt.Errorf("%v", err))
@@ -834,6 +868,12 @@ func Test_Integration(t *testing.T) {
 							}
 							var doc map[string]interface{}
 							for cursor.Next(&doc) {
+								select {
+								case <-cntxt.Done():
+									return
+								default:
+									break
+								}
 								changes <- doc
 							}
 						}()
@@ -878,6 +918,8 @@ func Test_Integration(t *testing.T) {
 						changes := make(chan map[string]interface{})
 						errs := make(chan error)
 						go func() {
+							defer close(changes)
+							defer close(errs)
 							cursor, err := r.DB("Controller").Table("Ports").Changes().Run(s)
 							if err != nil {
 								log.Println(fmt.Errorf("%v", err))
@@ -885,6 +927,12 @@ func Test_Integration(t *testing.T) {
 							}
 							var doc map[string]interface{}
 							for cursor.Next(&doc) {
+								select {
+								case <-cntxt.Done():
+									return
+								default:
+									break
+								}
 								changes <- doc
 							}
 						}()
@@ -987,6 +1035,8 @@ func Test_Integration(t *testing.T) {
 									changes := make(chan map[string]interface{})
 									errs := make(chan error)
 									go func() {
+										defer close(changes)
+										defer close(errs)
 										cursor, err := r.DB("Controller").Table("Plugins").Changes().Run(s)
 										if err != nil {
 											log.Println(fmt.Errorf("%v", err))
@@ -994,6 +1044,12 @@ func Test_Integration(t *testing.T) {
 										}
 										var doc map[string]interface{}
 										for cursor.Next(&doc) {
+											select {
+											case <-cntxt.Done():
+												return
+											default:
+												break
+											}
 											changes <- doc
 										}
 									}()
@@ -1153,6 +1209,8 @@ func Test_Integration(t *testing.T) {
 						changes := make(chan map[string]interface{})
 						errs := make(chan error)
 						go func() {
+							defer close(changes)
+							defer close(errs)
 							cursor, err := r.DB("Controller").Table("Plugins").Changes().Run(s)
 							if err != nil {
 								log.Println(fmt.Errorf("%v", err))
@@ -1160,6 +1218,12 @@ func Test_Integration(t *testing.T) {
 							}
 							var doc map[string]interface{}
 							for cursor.Next(&doc) {
+								select {
+								case <-cntxt.Done():
+									return
+								default:
+									break
+								}
 								changes <- doc
 							}
 						}()
@@ -1177,7 +1241,6 @@ func Test_Integration(t *testing.T) {
 							if _, ok := d["new_val"]; !ok {
 								break
 							}
-							log.Printf("db change: %+v", d["new_val"])
 							if d["new_val"].(map[string]interface{})["ServiceName"].(string) != "Harness-6000tcp" {
 								break
 							}
@@ -1300,6 +1363,97 @@ func Test_Integration(t *testing.T) {
 			timeout: 60 * time.Second,
 		},
 		{
+			name: "Check for logs",
+			run: func(t *testing.T) bool {
+				return true
+			},
+			wait: func(t *testing.T, timeout time.Duration) bool {
+				var (
+					dbLogs = false
+				)
+
+				// Initialize parent context (with timeout)
+				timeoutCtx, cancel := context.WithTimeout(context.Background(), timeout)
+				defer cancel()
+
+				logCheck := helper.TimeoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
+					sessionTest, err := r.Connect(r.ConnectOpts{
+						Address: "127.0.0.1",
+					})
+					if err != nil {
+						t.Errorf("%v", err)
+						return false
+					}
+					cntxt := args[0].(context.Context)
+					logChan, errChan := func(s *r.Session) (<-chan map[string]interface{}, <-chan error) {
+						logs := make(chan map[string]interface{})
+						errs := make(chan error)
+						go func() {
+							defer close(logs)
+							defer close(errs)
+							cursor, err := r.DB("Brain").Table("Logs").Run(s)
+							if err != nil {
+								log.Println(fmt.Errorf("%v", err))
+								errs <- err
+							}
+							var doc map[string]interface{}
+							for cursor.Next(&doc) {
+								logs <- doc
+							}
+						}()
+						return logs, errs
+					}(sessionTest)
+
+					count := 0
+					for {
+						select {
+						case <-cntxt.Done():
+							return false
+						case e := <-errChan:
+							log.Println(fmt.Errorf("%v", e))
+							return false
+						case <-logChan:
+							count++
+						default:
+							break
+						}
+						if count > 12 {
+							return true
+						}
+						time.Sleep(100 * time.Millisecond)
+					}
+				})
+
+				// for loop that iterates until context <-Done()
+				// once <-Done() then get return from all goroutines
+			L:
+				for {
+					select {
+					case <-timeoutCtx.Done():
+						break L
+					case v := <-logCheck:
+						if v {
+							log.Printf("Setting dbLogs to %v", v)
+							dbLogs = v
+						}
+					default:
+						break
+					}
+					if dbLogs {
+						break L
+					}
+					time.Sleep(100 * time.Millisecond)
+				}
+
+				if !dbLogs {
+					t.Errorf("Docker logs not detected")
+				}
+
+				return dbLogs
+			},
+			timeout: 60 * time.Second,
+		},
+		{
 			name: "Stop services",
 			run: func(t *testing.T) bool {
 				filter := make(map[string]string)
@@ -1370,6 +1524,8 @@ func Test_Integration(t *testing.T) {
 						changes := make(chan map[string]interface{})
 						errs := make(chan error)
 						go func() {
+							defer close(changes)
+							defer close(errs)
 							cursor, err := r.DB("Controller").Table("Ports").Changes().Run(s)
 							if err != nil {
 								log.Println(fmt.Errorf("%v", err))
@@ -1377,6 +1533,12 @@ func Test_Integration(t *testing.T) {
 							}
 							var doc map[string]interface{}
 							for cursor.Next(&doc) {
+								select {
+								case <-cntxt.Done():
+									return
+								default:
+									break
+								}
 								changes <- doc
 							}
 						}()
@@ -1421,6 +1583,8 @@ func Test_Integration(t *testing.T) {
 						changes := make(chan map[string]interface{})
 						errs := make(chan error)
 						go func() {
+							defer close(changes)
+							defer close(errs)
 							cursor, err := r.DB("Controller").Table("Plugins").Changes().Run(s)
 							if err != nil {
 								log.Println(fmt.Errorf("%v", err))
@@ -1428,6 +1592,12 @@ func Test_Integration(t *testing.T) {
 							}
 							var doc map[string]interface{}
 							for cursor.Next(&doc) {
+								select {
+								case <-cntxt.Done():
+									return
+								default:
+									break
+								}
 								changes <- doc
 							}
 						}()
