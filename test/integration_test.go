@@ -285,6 +285,8 @@ func Test_Integration(t *testing.T) {
 						changes := make(chan map[string]interface{})
 						errs := make(chan error)
 						go func() {
+							defer close(changes)
+							defer close(errs)
 							cursor, err := r.DB("Controller").Table("Ports").Run(s)
 							if err != nil {
 								log.Println(fmt.Errorf("%v", err))
@@ -292,6 +294,12 @@ func Test_Integration(t *testing.T) {
 							}
 							var doc map[string]interface{}
 							for cursor.Next(&doc) {
+								select {
+								case <-cntxt.Done():
+									return
+								default:
+									break
+								}
 								changes <- doc
 							}
 						}()
@@ -377,6 +385,8 @@ func Test_Integration(t *testing.T) {
 						changes := make(chan map[string]interface{})
 						errs := make(chan error)
 						go func() {
+							defer close(changes)
+							defer close(errs)
 							cursor, err := r.DB("Controller").Table("Plugins").Run(s)
 							if err != nil {
 								log.Println(fmt.Errorf("%v", err))
@@ -384,6 +394,12 @@ func Test_Integration(t *testing.T) {
 							}
 							var doc map[string]interface{}
 							for cursor.Next(&doc) {
+								select {
+								case <-cntxt.Done():
+									return
+								default:
+									break
+								}
 								changes <- doc
 							}
 						}()
@@ -469,7 +485,7 @@ func Test_Integration(t *testing.T) {
 				_, err := r.DB("Controller").Table("Plugins").Insert(map[string]interface{}{
 					"Name":          "Harness",
 					"ServiceID":     "",
-					"ServiceName":   "TestPlugin",
+					"ServiceName":   "Harness-5000tcp",
 					"DesiredState":  "Activate",
 					"State":         "Available",
 					"Interface":     dockerservicemanager.GetManagerIP(),
@@ -477,6 +493,7 @@ func Test_Integration(t *testing.T) {
 					"InternalPorts": []string{"5000/tcp"},
 					"OS":            string(rethink.PluginOSAll),
 					"Environment":   []string{},
+					"Extra":         false,
 				}).Run(session)
 				if err != nil {
 					t.Errorf("%v", err)
@@ -518,7 +535,7 @@ func Test_Integration(t *testing.T) {
 								break
 							}
 							if v, ok := e.Actor.Attributes["name"]; ok {
-								if v != "TestPlugin" {
+								if v != "Harness-5000tcp" {
 									break
 								}
 							} else {
@@ -546,6 +563,8 @@ func Test_Integration(t *testing.T) {
 						changes := make(chan map[string]interface{})
 						errs := make(chan error)
 						go func() {
+							defer close(changes)
+							defer close(errs)
 							cursor, err := r.DB("Controller").Table("Plugins").Changes().Run(s)
 							if err != nil {
 								log.Println(fmt.Errorf("%v", err))
@@ -553,6 +572,12 @@ func Test_Integration(t *testing.T) {
 							}
 							var doc map[string]interface{}
 							for cursor.Next(&doc) {
+								select {
+								case <-cntxt.Done():
+									return
+								default:
+									break
+								}
 								changes <- doc
 							}
 						}()
@@ -570,7 +595,7 @@ func Test_Integration(t *testing.T) {
 							if _, ok := d["new_val"]; !ok {
 								break
 							}
-							if d["new_val"].(map[string]interface{})["ServiceName"].(string) != "TestPlugin" {
+							if d["new_val"].(map[string]interface{})["ServiceName"].(string) != "Harness-5000tcp" {
 								break
 							}
 							if d["new_val"].(map[string]interface{})["State"].(string) != "Active" {
@@ -597,6 +622,8 @@ func Test_Integration(t *testing.T) {
 						changes := make(chan map[string]interface{})
 						errs := make(chan error)
 						go func() {
+							defer close(changes)
+							defer close(errs)
 							cursor, err := r.DB("Controller").Table("Ports").Changes().Run(s)
 							if err != nil {
 								log.Println(fmt.Errorf("%v", err))
@@ -604,6 +631,12 @@ func Test_Integration(t *testing.T) {
 							}
 							var doc map[string]interface{}
 							for cursor.Next(&doc) {
+								select {
+								case <-cntxt.Done():
+									return
+								default:
+									break
+								}
 								changes <- doc
 							}
 						}()
@@ -750,7 +783,7 @@ func Test_Integration(t *testing.T) {
 		{
 			name: "Update service",
 			run: func(t *testing.T) bool {
-				_, err := r.DB("Controller").Table("Plugins").Filter(map[string]string{"ServiceName": "TestPlugin"}).Update(map[string]interface{}{
+				_, err := r.DB("Controller").Table("Plugins").Filter(map[string]string{"ServiceName": "Harness-5000tcp"}).Update(map[string]interface{}{
 					"DesiredState": "Restart", "Environment": []string{"TEST=TEST"}, "ExternalPorts": []string{"5005/tcp"},
 				}).Run(session)
 				if err != nil {
@@ -795,7 +828,7 @@ func Test_Integration(t *testing.T) {
 								break
 							}
 							if v, ok := e.Actor.Attributes["name"]; ok {
-								if v != "TestPlugin" {
+								if v != "Harness-5000tcp" {
 									break
 								}
 							} else {
@@ -826,6 +859,8 @@ func Test_Integration(t *testing.T) {
 						changes := make(chan map[string]interface{})
 						errs := make(chan error)
 						go func() {
+							defer close(changes)
+							defer close(errs)
 							cursor, err := r.DB("Controller").Table("Plugins").Changes().Run(s)
 							if err != nil {
 								log.Println(fmt.Errorf("%v", err))
@@ -833,6 +868,12 @@ func Test_Integration(t *testing.T) {
 							}
 							var doc map[string]interface{}
 							for cursor.Next(&doc) {
+								select {
+								case <-cntxt.Done():
+									return
+								default:
+									break
+								}
 								changes <- doc
 							}
 						}()
@@ -850,7 +891,7 @@ func Test_Integration(t *testing.T) {
 							if _, ok := d["new_val"]; !ok {
 								break
 							}
-							if d["new_val"].(map[string]interface{})["ServiceName"].(string) != "TestPlugin" {
+							if d["new_val"].(map[string]interface{})["ServiceName"].(string) != "Harness-5000tcp" {
 								break
 							}
 							if d["new_val"].(map[string]interface{})["State"].(string) != "Restarting" {
@@ -877,6 +918,8 @@ func Test_Integration(t *testing.T) {
 						changes := make(chan map[string]interface{})
 						errs := make(chan error)
 						go func() {
+							defer close(changes)
+							defer close(errs)
 							cursor, err := r.DB("Controller").Table("Ports").Changes().Run(s)
 							if err != nil {
 								log.Println(fmt.Errorf("%v", err))
@@ -884,6 +927,12 @@ func Test_Integration(t *testing.T) {
 							}
 							var doc map[string]interface{}
 							for cursor.Next(&doc) {
+								select {
+								case <-cntxt.Done():
+									return
+								default:
+									break
+								}
 								changes <- doc
 							}
 						}()
@@ -938,7 +987,7 @@ func Test_Integration(t *testing.T) {
 								break
 							}
 							if v, ok := e.Actor.Attributes["com.docker.swarm.service.name"]; ok {
-								if v != "TestPlugin" {
+								if v != "Harness-5000tcp" {
 									break
 								}
 							} else {
@@ -986,6 +1035,8 @@ func Test_Integration(t *testing.T) {
 									changes := make(chan map[string]interface{})
 									errs := make(chan error)
 									go func() {
+										defer close(changes)
+										defer close(errs)
 										cursor, err := r.DB("Controller").Table("Plugins").Changes().Run(s)
 										if err != nil {
 											log.Println(fmt.Errorf("%v", err))
@@ -993,6 +1044,12 @@ func Test_Integration(t *testing.T) {
 										}
 										var doc map[string]interface{}
 										for cursor.Next(&doc) {
+											select {
+											case <-cntxt.Done():
+												return
+											default:
+												break
+											}
 											changes <- doc
 										}
 									}()
@@ -1010,7 +1067,7 @@ func Test_Integration(t *testing.T) {
 										if _, ok := d["new_val"]; !ok {
 											break
 										}
-										if d["new_val"].(map[string]interface{})["ServiceName"].(string) != "TestPlugin" {
+										if d["new_val"].(map[string]interface{})["ServiceName"].(string) != "Harness-5000tcp" {
 											break
 										}
 										if d["new_val"].(map[string]interface{})["State"].(string) != "Active" {
@@ -1069,12 +1126,12 @@ func Test_Integration(t *testing.T) {
 			timeout: 60 * time.Second,
 		},
 		{
-			name: "Create another service",
+			name: "Create another (extra) service",
 			run: func(t *testing.T) bool {
 				_, err := r.DB("Controller").Table("Plugins").Insert(map[string]interface{}{
 					"Name":          "Harness",
 					"ServiceID":     "",
-					"ServiceName":   "TestPlugin2",
+					"ServiceName":   "Harness-6000tcp",
 					"DesiredState":  "Activate",
 					"State":         "Available",
 					"Interface":     dockerservicemanager.GetManagerIP(),
@@ -1082,6 +1139,7 @@ func Test_Integration(t *testing.T) {
 					"InternalPorts": []string{"6000/tcp"},
 					"OS":            string(rethink.PluginOSPosix),
 					"Environment":   []string{"WHATEVER=WHATEVER"},
+					"Extra":         true,
 				}).Run(session)
 				if err != nil {
 					t.Errorf("%v", err)
@@ -1123,7 +1181,7 @@ func Test_Integration(t *testing.T) {
 								break
 							}
 							if v, ok := e.Actor.Attributes["name"]; ok {
-								if v != "TestPlugin2" {
+								if v != "Harness-6000tcp" {
 									break
 								}
 							} else {
@@ -1151,6 +1209,8 @@ func Test_Integration(t *testing.T) {
 						changes := make(chan map[string]interface{})
 						errs := make(chan error)
 						go func() {
+							defer close(changes)
+							defer close(errs)
 							cursor, err := r.DB("Controller").Table("Plugins").Changes().Run(s)
 							if err != nil {
 								log.Println(fmt.Errorf("%v", err))
@@ -1158,6 +1218,12 @@ func Test_Integration(t *testing.T) {
 							}
 							var doc map[string]interface{}
 							for cursor.Next(&doc) {
+								select {
+								case <-cntxt.Done():
+									return
+								default:
+									break
+								}
 								changes <- doc
 							}
 						}()
@@ -1175,7 +1241,7 @@ func Test_Integration(t *testing.T) {
 							if _, ok := d["new_val"]; !ok {
 								break
 							}
-							if d["new_val"].(map[string]interface{})["ServiceName"].(string) != "TestPlugin2" {
+							if d["new_val"].(map[string]interface{})["ServiceName"].(string) != "Harness-6000tcp" {
 								break
 							}
 							if d["new_val"].(map[string]interface{})["State"].(string) != "Active" {
@@ -1250,6 +1316,9 @@ func Test_Integration(t *testing.T) {
 									if inspect.Spec.TaskTemplate.Networks[0].Target != netID {
 										continue
 									}
+									if inspect.Spec.TaskTemplate.ContainerSpec.Image != GetImage("ramrodpcp/interpreter-plugin-extra") {
+										continue
+									}
 									for _, env := range inspect.Spec.TaskTemplate.ContainerSpec.Env {
 										if env == "WHATEVER=WHATEVER" {
 											return true
@@ -1294,11 +1363,102 @@ func Test_Integration(t *testing.T) {
 			timeout: 60 * time.Second,
 		},
 		{
+			name: "Check for logs",
+			run: func(t *testing.T) bool {
+				return true
+			},
+			wait: func(t *testing.T, timeout time.Duration) bool {
+				var (
+					dbLogs = false
+				)
+
+				// Initialize parent context (with timeout)
+				timeoutCtx, cancel := context.WithTimeout(context.Background(), timeout)
+				defer cancel()
+
+				logCheck := helper.TimeoutTester(timeoutCtx, []interface{}{timeoutCtx}, func(args ...interface{}) bool {
+					sessionTest, err := r.Connect(r.ConnectOpts{
+						Address: "127.0.0.1",
+					})
+					if err != nil {
+						t.Errorf("%v", err)
+						return false
+					}
+					cntxt := args[0].(context.Context)
+					logChan, errChan := func(s *r.Session) (<-chan map[string]interface{}, <-chan error) {
+						logs := make(chan map[string]interface{})
+						errs := make(chan error)
+						go func() {
+							defer close(logs)
+							defer close(errs)
+							cursor, err := r.DB("Brain").Table("Logs").Run(s)
+							if err != nil {
+								log.Println(fmt.Errorf("%v", err))
+								errs <- err
+							}
+							var doc map[string]interface{}
+							for cursor.Next(&doc) {
+								logs <- doc
+							}
+						}()
+						return logs, errs
+					}(sessionTest)
+
+					count := 0
+					for {
+						select {
+						case <-cntxt.Done():
+							return false
+						case e := <-errChan:
+							log.Println(fmt.Errorf("%v", e))
+							return false
+						case <-logChan:
+							count++
+						default:
+							break
+						}
+						if count > 12 {
+							return true
+						}
+						time.Sleep(100 * time.Millisecond)
+					}
+				})
+
+				// for loop that iterates until context <-Done()
+				// once <-Done() then get return from all goroutines
+			L:
+				for {
+					select {
+					case <-timeoutCtx.Done():
+						break L
+					case v := <-logCheck:
+						if v {
+							log.Printf("Setting dbLogs to %v", v)
+							dbLogs = v
+						}
+					default:
+						break
+					}
+					if dbLogs {
+						break L
+					}
+					time.Sleep(100 * time.Millisecond)
+				}
+
+				if !dbLogs {
+					t.Errorf("Docker logs not detected")
+				}
+
+				return dbLogs
+			},
+			timeout: 60 * time.Second,
+		},
+		{
 			name: "Stop services",
 			run: func(t *testing.T) bool {
 				filter := make(map[string]string)
 				update := make(map[string]string)
-				filter["ServiceName"] = "TestPlugin"
+				filter["ServiceName"] = "Harness-5000tcp"
 				update["DesiredState"] = "Stop"
 				_, err := r.DB("Controller").Table("Plugins").Filter(filter).Update(update).RunWrite(session)
 				if err != nil {
@@ -1339,7 +1499,7 @@ func Test_Integration(t *testing.T) {
 								break
 							}
 							if v, ok := e.Actor.Attributes["name"]; ok {
-								if v != "TestPlugin" {
+								if v != "Harness-5000tcp" {
 									break
 								}
 							} else {
@@ -1364,6 +1524,8 @@ func Test_Integration(t *testing.T) {
 						changes := make(chan map[string]interface{})
 						errs := make(chan error)
 						go func() {
+							defer close(changes)
+							defer close(errs)
 							cursor, err := r.DB("Controller").Table("Ports").Changes().Run(s)
 							if err != nil {
 								log.Println(fmt.Errorf("%v", err))
@@ -1371,6 +1533,12 @@ func Test_Integration(t *testing.T) {
 							}
 							var doc map[string]interface{}
 							for cursor.Next(&doc) {
+								select {
+								case <-cntxt.Done():
+									return
+								default:
+									break
+								}
 								changes <- doc
 							}
 						}()
@@ -1415,6 +1583,8 @@ func Test_Integration(t *testing.T) {
 						changes := make(chan map[string]interface{})
 						errs := make(chan error)
 						go func() {
+							defer close(changes)
+							defer close(errs)
 							cursor, err := r.DB("Controller").Table("Plugins").Changes().Run(s)
 							if err != nil {
 								log.Println(fmt.Errorf("%v", err))
@@ -1422,6 +1592,12 @@ func Test_Integration(t *testing.T) {
 							}
 							var doc map[string]interface{}
 							for cursor.Next(&doc) {
+								select {
+								case <-cntxt.Done():
+									return
+								default:
+									break
+								}
 								changes <- doc
 							}
 						}()
@@ -1439,7 +1615,7 @@ func Test_Integration(t *testing.T) {
 							if _, ok := d["new_val"]; !ok {
 								break
 							}
-							if d["new_val"].(map[string]interface{})["ServiceName"].(string) != "TestPlugin" {
+							if d["new_val"].(map[string]interface{})["ServiceName"].(string) != "Harness-5000tcp" {
 								break
 							}
 							if d["new_val"].(map[string]interface{})["State"].(string) != "Stopped" {

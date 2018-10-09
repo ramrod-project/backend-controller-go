@@ -19,7 +19,7 @@ var harnessConfig = PluginServiceConfig{
 		getEnvByKey("LOGLEVEL"),
 		envString("PORT", "5000"),
 		envString("PLUGIN", "Harness"),
-		envString("PLUGIN_NAME", "Harness-5000"),
+		envString("PLUGIN_NAME", "Harness-5000tcp"),
 	},
 	Address: GetManagerIP(),
 	Network: "pcp",
@@ -32,7 +32,7 @@ var harnessConfig = PluginServiceConfig{
 			PublishMode:   swarm.PortConfigPublishModeIngress,
 		},
 	},
-	ServiceName: "Harness-5000",
+	ServiceName: "Harness-5000tcp",
 }
 
 var auxConfig = PluginServiceConfig{
@@ -77,7 +77,7 @@ func checkService(service string) bool {
 // and AUX_START environment variables are set to YES.
 func StartupServices() error {
 
-	if os.Getenv("START_HARNESS") == "YES" && !checkService("Harness-5000") {
+	if os.Getenv("START_HARNESS") == "YES" && !checkService(harnessConfig.ServiceName) {
 		res, err := CreatePluginService(&harnessConfig)
 		if err != nil {
 			return err
@@ -99,7 +99,7 @@ func StartupServices() error {
 		}
 	}
 
-	if os.Getenv("START_AUX") == "YES" && !checkService("AuxiliaryServices") {
+	if os.Getenv("START_AUX") == "YES" && !checkService(auxConfig.ServiceName) {
 		res, err := CreatePluginService(&auxConfig)
 		if err != nil {
 			return err

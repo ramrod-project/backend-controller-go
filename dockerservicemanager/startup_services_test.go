@@ -224,7 +224,7 @@ func Test_StartupServices(t *testing.T) {
 								break
 							}
 							if v, ok := e.Actor.Attributes["com.docker.swarm.service.name"]; ok {
-								if v != "Harness-5000" {
+								if v != "Harness-5000tcp" {
 									break
 								}
 							} else {

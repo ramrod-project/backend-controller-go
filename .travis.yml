@@ -34,6 +34,7 @@ before_install:
   - chmod +x $GOPATH/bin/dep
   - docker swarm init
   - travis_wait 10 docker pull ramrodpcp/interpreter-plugin:$TAG
+  - travis_wait 10 docker pull ramrodpcp/interpreter-plugin-extra:$TAG
   - travis_wait 10 docker pull ramrodpcp/auxiliary-wrapper:$TAG
   - travis_wait 10 docker pull ramrodpcp/auxiliary-services:$TAG
   - travis_wait 10 docker pull ramrodpcp/database-brain:$TAG

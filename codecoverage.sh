@@ -5,6 +5,8 @@ for pkg in $(go list ./... | grep -v main); do
     if [[ $pkg == "github.com/ramrod-project/backend-controller-go/test" ]]; then
         continue
     fi
+    docker ps -a | grep -v CONTAINER | awk '{print $1}' | xargs docker rm -f
+    docker network prune -f
     go test -v -parallel 1 -coverprofile=$(echo $pkg | tr / -).cover $pkg
     if ! [[ $? == 0 ]]; then
         exit 1
