@@ -59,7 +59,7 @@ func newLogger(ctx context.Context, dockerClient *client.Client, svc swarm.Servi
 			if new {
 				logs <- customtypes.Log{
 					Log:          scanner.Text(),
-					LogTimestamp: float64(time.Now().Unix()) / 1000000000,
+					LogTimestamp: int64(time.Now().UnixNano() / 1000000),
 					ServiceName:  svcName,
 				}
 				continue
