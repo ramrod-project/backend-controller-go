@@ -30,12 +30,12 @@ func newLogger(ctx context.Context, dockerClient *client.Client, svc swarm.Servi
 			ShowStderr: true,
 			Follow:     true,
 		})
-		defer logOut.Close()  // before
+		//defer logOut.Close()  // before
 		if err != nil {
 			errs <- err
 			return
 		}
-
+		defer logOut.Close()
 		// Get weird docker log header
 		h := make([]byte, 8)
 		n, err := logOut.Read(h)
@@ -44,8 +44,6 @@ func newLogger(ctx context.Context, dockerClient *client.Client, svc swarm.Servi
 		} else if n == 0 {
 			errs <- fmt.Errorf("nothing read")
 		}
-
-		//defer logOut.Close()
 
 		scanner := bufio.NewScanner(logOut)
 
