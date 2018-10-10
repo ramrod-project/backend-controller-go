@@ -113,8 +113,10 @@ func Test_logSend(t *testing.T) {
 							if v, ok := doc["rt"]; ok {
 								//now := int64(time.Now().UnixNano()) /1000000
 								//assert.True(t, (v.(int64) >= now-10))
-								now := uint64(time.Now().UnixNano() / (int64(time.Millisecond) / int64(time.Nanosecond)))
-								assert.True(t, (uint64(v) >= now-1000000))
+								now := float64(time.Now().UnixNano() / (int64(time.Millisecond) / int64(time.Nanosecond)))
+								fmt.Printf("%v\n", v)
+								fmt.Printf("%v\n", t)
+								assert.True(t, (v.(float64) >= now-1000000))
 							} else {
 								continue L
 							}
