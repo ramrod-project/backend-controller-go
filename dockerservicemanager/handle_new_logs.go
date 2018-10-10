@@ -30,7 +30,7 @@ func newLogger(ctx context.Context, dockerClient *client.Client, svc swarm.Servi
 			ShowStderr: true,
 			Follow:     true,
 		})
-		//defer logOut.Close()  // before
+
 		if err != nil {
 			errs <- err
 			return
@@ -59,7 +59,6 @@ func newLogger(ctx context.Context, dockerClient *client.Client, svc swarm.Servi
 			if new {
 				logs <- customtypes.Log{
 					Log:          scanner.Text(),
-					//LogTimestamp: float64(time.Now().Unix()) / 1000000000, //before
 					LogTimestamp: uint64(time.Now().UnixNano() / (int64(time.Millisecond) / int64(time.Nanosecond))),
 					ServiceName:  svcName,
 				}
