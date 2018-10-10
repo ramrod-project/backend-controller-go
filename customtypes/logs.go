@@ -7,5 +7,6 @@ type Log struct {
 	ContainerName string  `json:"ContainerName,omitempty"`
 	Log           string  `json:"msg"`
 	ServiceName   string  `json:"sourceServiceName"`
-	LogTimestamp  float64 `json:"rt"`
+	LogTimestamp  uint64  `json:"rt"`
+	//LogTimestamp  int64   `json:"rt"`
 }
