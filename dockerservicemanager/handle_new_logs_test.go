@@ -135,7 +135,7 @@ func Test_newLogger(t *testing.T) {
 			},
 			timeout: 20 * time.Second,
 		},
-		/*{
+		{
 			name: "test actual",
 			run: func(ctx context.Context) ([]swarm.Service, error) {
 				dockerClient, err := client.NewEnvClient()
@@ -191,7 +191,7 @@ func Test_newLogger(t *testing.T) {
 				}
 			},
 			timeout: 20 * time.Second,
-		},*/
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
