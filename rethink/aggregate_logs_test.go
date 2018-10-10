@@ -110,7 +110,7 @@ func Test_logSend(t *testing.T) {
 								continue L
 							}
 							if v, ok := doc["rt"]; ok {
-								now := LogTimestamp: uint64(time.Now().UnixNano() / (int64(time.Millisecond) / int64(time.Nanosecond))),
+								now := uint64(time.Now().UnixNano() / (int64(time.Millisecond) / int64(time.Nanosecond))),
 								assert.True(t, (v.(uint64) >= now-10))
 							} else {
 								continue L
