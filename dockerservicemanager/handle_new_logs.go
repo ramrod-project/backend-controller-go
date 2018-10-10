@@ -30,7 +30,7 @@ func newLogger(ctx context.Context, dockerClient *client.Client, svc swarm.Servi
 			ShowStderr: true,
 			Follow:     true,
 		})
-		//defer logOut.Close()  // before
+		defer logOut.Close()  // before
 		if err != nil {
 			errs <- err
 			return
@@ -45,7 +45,7 @@ func newLogger(ctx context.Context, dockerClient *client.Client, svc swarm.Servi
 			errs <- fmt.Errorf("nothing read")
 		}
 
-		defer logOut.Close()
+		//defer logOut.Close()
 
 		scanner := bufio.NewScanner(logOut)
 
