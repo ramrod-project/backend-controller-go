@@ -138,45 +138,46 @@ func Test_newLogger(t *testing.T) {
 		{
 			name: "test actual",
 			run: func(ctx context.Context) ([]swarm.Service, error) {
+				time.Sleep(500 * time.Millisecond)
 				dockerClient, err := client.NewEnvClient()
 				if err != nil {
 					return []swarm.Service{}, err
 				}
-
+				time.Sleep(500 * time.Millisecond)
 				netID, err := test.CheckCreateNet("testnet")
 				if err != nil {
 					t.Errorf("%v", err)
 					return []swarm.Service{}, err
 				}
 				networkID = netID
-
+				time.Sleep(500 * time.Millisecond)
 				newSpec := &swarm.ServiceSpec{}
 				*newSpec = test.BrainSpec
-
+				time.Sleep(500 * time.Millisecond)
 				newSpec.Networks = []swarm.NetworkAttachmentConfig{
 					swarm.NetworkAttachmentConfig{
 						Target:  netID,
 						Aliases: []string{"rethinkdb"},
 					},
 				}
-
+				time.Sleep(500 * time.Millisecond)
 				_, _, err = test.StartBrain(ctx, t, dockerClient, *newSpec)
 				if err != nil {
 					t.Errorf("%v", err)
 					return []swarm.Service{}, err
 				}
-
+				time.Sleep(500 * time.Millisecond)
 				newPluginSpec := &swarm.ServiceSpec{}
 				*newPluginSpec = test.GenericPluginConfig
-
+				time.Sleep(500 * time.Millisecond)
 				newPluginSpec.Networks = []swarm.NetworkAttachmentConfig{
 					swarm.NetworkAttachmentConfig{
 						Target: netID,
 					},
 				}
-
+				time.Sleep(500 * time.Millisecond)
 				test.StartIntegrationTestService(ctx, dockerClient, *newPluginSpec)
-
+				time.Sleep(500 * time.Millisecond)
 				res, errs := checkServices(ctx, 1)
 
 				for {
