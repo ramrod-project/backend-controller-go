@@ -114,7 +114,7 @@ func Test_logSend(t *testing.T) {
 								//now := int64(time.Now().UnixNano()) /1000000
 								//assert.True(t, (v.(int64) >= now-10))
 								now := uint64(time.Now().UnixNano() / (int64(time.Millisecond) / int64(time.Nanosecond)))
-								assert.True(t, (v.(uint64) >= now-10))
+								assert.True(t, (uint64(v) >= now-1000000))
 							} else {
 								continue L
 							}
