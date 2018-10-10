@@ -81,7 +81,6 @@ func setManagerIPTest(ctx *context.Context, dockerClient *client.Client) error {
 }
 
 func Test_StartupServices(t *testing.T) {
-	// HERE
 	oldStage := os.Getenv("STAGE")
 	os.Setenv("STAGE", "TESTING")
 	oldHarness := os.Getenv("START_HARNESS")
