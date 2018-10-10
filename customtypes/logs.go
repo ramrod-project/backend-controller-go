@@ -8,4 +8,5 @@ type Log struct {
 	Log           string  `json:"msg"`
 	ServiceName   string  `json:"sourceServiceName"`
 	LogTimestamp  uint64  `json:"rt"`
+	//LogTimestamp  int64   `json:"rt"`
 }
