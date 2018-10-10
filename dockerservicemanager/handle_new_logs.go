@@ -30,7 +30,7 @@ func newLogger(ctx context.Context, dockerClient *client.Client, svc swarm.Servi
 			ShowStderr: true,
 			Follow:     true,
 		})
-		defer logOut.Close()
+		//defer logOut.Close()
 		if err != nil {
 			errs <- err
 			return
