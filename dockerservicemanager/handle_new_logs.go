@@ -30,12 +30,11 @@ func newLogger(ctx context.Context, dockerClient *client.Client, svc swarm.Servi
 			ShowStderr: true,
 			Follow:     true,
 		})
-		defer logOut.Close()
 		if err != nil {
 			errs <- err
 			return
 		}
-
+		defer logOut.Close()
 		// Get weird docker log header
 		h := make([]byte, 8)
 		n, err := logOut.Read(h)
