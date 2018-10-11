@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"regexp"
 	"strconv"
 	"testing"
 	"time"
@@ -16,8 +15,6 @@ import (
 	"github.com/ramrod-project/backend-controller-go/test"
 	"github.com/stretchr/testify/assert"
 )
-
-var rethinkRegex = regexp.MustCompile(`rethinkdb`)
 
 func startServices(ctx context.Context, number int) error {
 	dockerClient, err := client.NewEnvClient()
