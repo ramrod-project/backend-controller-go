@@ -19,6 +19,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var rethinkRegex = regexp.MustCompile(`rethinkdb`)
+
 func startTestContainers(ctx context.Context, number int) error {
 	dockerClient, err := client.NewEnvClient()
 	if err != nil {
@@ -61,22 +63,43 @@ func checkServices(ctx context.Context, number int) (<-chan []swarm.Service, <-c
 			default:
 				break
 			}
-			svcs, err := dockerClient.ServiceList(ctx, types.ServiceListOptions{})
-			if err != nil {
-				errs <- err
-				return
+			svcs := []swarm.Service{}
+		M:
+			for i := 0; i < 5; i++ {
+				time.Sleep(500 * time.Millisecond)
+				svcs, err = dockerClient.ServiceList(ctx, types.ServiceListOptions{})
+				if err != nil || len(svcs) != len(services) {
+					continue M
+				}
+				for _, s := range svcs {
+					if len(s.ID) < 5 {
+						continue M
+					}
+				}
 			}
 			if len(svcs) == number+1 {
-				for i := range services {
-					if rethinkRegex.Match([]byte(svcs[i].Spec.Annotations.Name)) {
+				for i := 0; i < len(services); i++ {
+					if svcs[i].Spec.Annotations.Name == "rethinkdb" {
 						continue
 					}
-					svc, _, err := dockerClient.ServiceInspectWithRaw(ctx, svcs[i].ID)
-					if err != nil {
-						errs <- err
+					svc := swarm.Service{}
+				L:
+					for i := 0; i < 3; i++ {
+						time.Sleep(300 * time.Millisecond)
+						svc, _, err = dockerClient.ServiceInspectWithRaw(ctx, svcs[i].ID)
+						if err != nil {
+							continue L
+						}
+						if svc.ID != svcs[i].ID {
+							continue L
+						}
+						break
+					}
+					if len(svc.ID) == 0 {
+						errs <- fmt.Errorf("couldn't inspect service %v", svcs[i].ID)
 						return
 					}
-					services[i] = svc
+					services[0] = svc
 				}
 				ret <- services
 				return
