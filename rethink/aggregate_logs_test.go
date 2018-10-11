@@ -47,7 +47,7 @@ func Test_logSend(t *testing.T) {
 				ContainerName: "some-service-name.0whatever",
 				Log:           "[INFO] blahblahblahblhbq 39 4g0wo 43589pqhwpr8g4",
 				ServiceName:   "some-service-name",
-				LogTimestamp: uint64(time.Now().UnixNano() / (int64(time.Millisecond) / int64(time.Nanosecond))),
+				LogTimestamp:  uint64(time.Now().UnixNano() / (int64(time.Millisecond) / int64(time.Nanosecond))),
 			},
 			wantErr: false,
 		},
@@ -80,7 +80,7 @@ func Test_logSend(t *testing.T) {
 						default:
 							break
 						}
-						time.Sleep(1000 * time.Millisecond)
+						time.Sleep(100 * time.Millisecond)
 
 						c, err := r.DB("Brain").Table("Logs").Run(session)
 						if err != nil {
@@ -195,7 +195,7 @@ func TestAggregateLogs(t *testing.T) {
 										ContainerName: cName,
 										Log:           log,
 										ServiceName:   sName,
-										LogTimestamp: uint64(time.Now().UnixNano() / (int64(time.Millisecond) / int64(time.Nanosecond))),
+										LogTimestamp:  uint64(time.Now().UnixNano() / (int64(time.Millisecond) / int64(time.Nanosecond))),
 									}
 								}
 								select {
@@ -228,7 +228,7 @@ func TestAggregateLogs(t *testing.T) {
 						default:
 							break
 						}
-						time.Sleep(1000 * time.Millisecond)
+						time.Sleep(100 * time.Millisecond)
 
 						c, err := r.DB("Brain").Table("Logs").Run(session)
 						if err != nil {

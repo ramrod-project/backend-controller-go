@@ -65,7 +65,7 @@ func newLogger(ctx context.Context, dockerClient *client.Client, svc swarm.Servi
 				continue
 			}
 
-			time.Sleep(1000 * time.Millisecond)
+			time.Sleep(100 * time.Millisecond)
 		}
 	}()
 

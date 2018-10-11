@@ -103,7 +103,7 @@ func AggregateLogs(ctx context.Context, logChans <-chan (<-chan customtypes.Log)
 					break
 				}
 			}
-			time.Sleep(1000 * time.Millisecond)
+			time.Sleep(100 * time.Millisecond)
 		}
 	}()
 
