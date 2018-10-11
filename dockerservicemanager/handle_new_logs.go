@@ -30,12 +30,12 @@ func newLogger(ctx context.Context, dockerClient *client.Client, svc swarm.Servi
 			ShowStderr: true,
 			Follow:     true,
 		})
-		defer logOut.Close()
+
 		if err != nil {
 			errs <- err
 			return
 		}
-
+		defer logOut.Close()
 		// Get weird docker log header
 		h := make([]byte, 8)
 		n, err := logOut.Read(h)
@@ -59,13 +59,14 @@ func newLogger(ctx context.Context, dockerClient *client.Client, svc swarm.Servi
 			if new {
 				logs <- customtypes.Log{
 					Log:          scanner.Text(),
-					LogTimestamp: float64(time.Now().Unix()) / 1000000000,
+					LogTimestamp: uint64(time.Now().UnixNano() / (int64(time.Millisecond) / int64(time.Nanosecond))),
+					//LogTimestamp: int64(time.Now().UnixNano()) / 1000000,
 					ServiceName:  svcName,
 				}
 				continue
 			}
 
-			time.Sleep(100 * time.Millisecond)
+			time.Sleep(1000 * time.Millisecond)
 		}
 	}()
 

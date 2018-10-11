@@ -47,7 +47,8 @@ func Test_logSend(t *testing.T) {
 				ContainerName: "some-service-name.0whatever",
 				Log:           "[INFO] blahblahblahblhbq 39 4g0wo 43589pqhwpr8g4",
 				ServiceName:   "some-service-name",
-				LogTimestamp:  float64(time.Now().UnixNano()) / 1000000000,
+				LogTimestamp: uint64(time.Now().UnixNano() / (int64(time.Millisecond) / int64(time.Nanosecond))),
+				//LogTimestamp: int64(time.Now().UnixNano()) / 1000000,
 			},
 			wantErr: false,
 		},
@@ -110,8 +111,12 @@ func Test_logSend(t *testing.T) {
 								continue L
 							}
 							if v, ok := doc["rt"]; ok {
-								now := float64(time.Now().UnixNano()) / 1000000000
-								assert.True(t, (v.(float64) >= now-10))
+								//now := int64(time.Now().UnixNano()) /1000000
+								//assert.True(t, (v.(int64) >= now-10))
+								now := float64(time.Now().UnixNano() / (int64(time.Millisecond) / int64(time.Nanosecond)))
+								fmt.Printf("%v\n", v)
+								fmt.Printf("%v\n", t)
+								assert.True(t, (v.(float64) >= now-1000000))
 							} else {
 								continue L
 							}
@@ -195,7 +200,8 @@ func TestAggregateLogs(t *testing.T) {
 										ContainerName: cName,
 										Log:           log,
 										ServiceName:   sName,
-										LogTimestamp:  float64(time.Now().Unix()) / 1000000000,
+										LogTimestamp: uint64(time.Now().UnixNano() / (int64(time.Millisecond) / int64(time.Nanosecond))),
+										//LogTimestamp: int64(time.Now().UnixNano()) / 1000000,
 									}
 								}
 								select {
