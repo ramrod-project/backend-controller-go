@@ -2,7 +2,9 @@ package dockerservicemanager
 
 import (
 	"context"
+	"fmt"
 	"regexp"
+	"time"
 
 	"github.com/docker/docker/api/types"
 	events "github.com/docker/docker/api/types/events"
@@ -81,9 +83,22 @@ func NewLogMonitor(ctx context.Context) (<-chan swarm.Service, <-chan error) {
 			case e := <-errSvcStart:
 				errs <- e
 			case n := <-in:
-				svc, _, err := dockerClient.ServiceInspectWithRaw(ctx, n.Actor.ID)
-				if err != nil {
-					errs <- err
+				svc := swarm.Service{}
+			L:
+				for i := 0; i < 5; i++ {
+					time.Sleep(300 * time.Millisecond)
+					svc, _, err = dockerClient.ServiceInspectWithRaw(ctx, n.Actor.ID)
+					if err != nil {
+						errs <- err
+						continue L
+					}
+					if svc.ID != n.Actor.ID {
+						continue L
+					}
+					break
+				}
+				if len(svc.ID) == 0 {
+					errs <- fmt.Errorf("could not inspect service %v", n.Actor.ID)
 					break
 				}
 				ret <- svc
